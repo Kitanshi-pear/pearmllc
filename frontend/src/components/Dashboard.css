@@ -1,0 +1,62 @@
+.dashboard {
+    padding: 20px;
+    background-color: #f5f6fa;
+  }
+  
+  .dashboard-title {
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+  
+  .dashboard-metrics {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  
+  .metric-box {
+    flex: 1;
+    padding: 20px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .ad-spend {
+    border-left: 5px solid blue;
+  }
+  
+  .revenue {
+    border-left: 5px solid green;
+  }
+  
+  .roas {
+    border-left: 5px solid orange;
+  }
+  
+  .dashboard-tables {
+    margin-top: 30px;
+  }
+  
+  .table-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f4f4f4;
+  }
+  

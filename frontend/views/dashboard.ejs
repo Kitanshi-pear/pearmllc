@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Facebook Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <h1>Facebook Dashboard</h1>
+
+    <h2>Ad Accounts:</h2>
+    <ul>
+        <% adAccounts.forEach(account => { %>
+            <li><strong>ID:</strong> <%= account.id %>, <strong>Name:</strong> <%= account.name %></li>
+        <% }) %>
+    </ul>
+
+    <h2>Pixels:</h2>
+    <ul>
+        <% pixels.forEach(pixel => { %>
+            <li><strong>Pixel ID:</strong> <%= pixel.id %>, <strong>Name:</strong> <%= pixel.name %></li>
+        <% }) %>
+    </ul>
+
+    <a href="/auth/facebook">Reconnect Facebook</a>
+</body>
+</html>
