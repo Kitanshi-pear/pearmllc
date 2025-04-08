@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import "./Dashboard.css";
 
-const FACEBOOK_APP_ID = "2075153986313150"; // Your Facebook App ID
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);

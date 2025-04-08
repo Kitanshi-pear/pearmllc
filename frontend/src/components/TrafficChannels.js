@@ -1,11 +1,12 @@
-import React, { useState, useEffect, navigate } from "react";
+import React, { useState, useEffect } from "react";
+import {useNavigate } from "react-router-dom"
 import {
   DataGrid
 } from "@mui/x-data-grid";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { Button, InputLabel, CircularProgress, Typography, Box, Modal, Card, CardContent, Grid, TextField, FormControl, Select, MenuItem, Stack, Switch, Tooltip, InputAdornment} from "@mui/material";
 import Layout from "./Layout"; // Importing Layout component
-import axios from "axios"; // Import axios for API calls
+import axios from "axios"; // Import  axios for API calls
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -14,6 +15,7 @@ const ChannelTable = () => {
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [rows, setRows] = useState([]);
   const [filterText, setFilterText] = useState("");
+  const navigate = useNavigate();
   const [openModal, setOpenModal] = useState(false);
   const [openSecondModal, setOpenSecondModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
