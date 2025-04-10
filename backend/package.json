@@ -14,6 +14,7 @@
     "@mui/icons-material": "^6.4.8",
     "@mui/material": "^6.4.8",
     "@mui/system": "^6.4.8",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.8.3",
     "bcryptjs": "^3.0.2",
     "cookie-session": "^2.1.0",
@@ -31,6 +32,7 @@
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
-    "sequelize": "^6.37.6"
+    "sequelize": "^6.37.6",
+    "uuid": "^11.1.0"
   }
 }

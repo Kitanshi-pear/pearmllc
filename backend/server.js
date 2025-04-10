@@ -52,6 +52,9 @@ app.use('/api/offers', offerRoutes);
 const domainRoutes = require('./routes/domains');
 app.use('/api/domains', domainRoutes);
 
+const landerRoutes = require('./routes/landers');
+app.use('/api/landers', landerRoutes);
+
 // ✅ Google OAuth2 Configuration
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;

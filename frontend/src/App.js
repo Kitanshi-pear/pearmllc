@@ -7,6 +7,7 @@ import TrafficChannels from "./components/TrafficChannels";
 import Offers from "./components/Offers";
 import OfferSource from "./components/OfferSource";
 import DomainsPage from "./components/Domains";
+import LandingPage from "./components/Landers";
 
 const App = () => {
   return (
@@ -19,6 +20,7 @@ const App = () => {
         <Route path="/offers" element={<Offers />} />
         <Route path="/offer-source" element={<OfferSource />} />
         <Route path="/domains" element={<DomainsPage />} />
+        <Route path="/landers" element={<LandingPage />} />
       </Routes>
     </Router>
   );

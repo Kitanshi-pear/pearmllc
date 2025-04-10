@@ -7,6 +7,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { Edit } from "@mui/icons-material";
 import Layout from "./Layout";
 import axios from "axios";
+import { useParams } from 'react-router-dom'; // ✅ Import for route params
 
 // Add/Edit Domain Modal Component
 const DomainModal = ({ open, handleClose, onSave, domainData }) => {
@@ -42,11 +43,6 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
             </Box>
 
             <DialogContent dividers sx={{ px: 3, py: 2 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    For sub-domains (track.example.com), create CNAME record pointing to <strong>bseav.ttrk.io</strong><br />
-                    Important: please use 3rd level domain, not 2nd level domain. Ex: att.trk.agency, and not trk.agency
-                </Typography>
-
                 <TextField
                     fullWidth
                     label="URL *"
@@ -83,28 +79,51 @@ const DomainsPage = () => {
     const [openModal, setOpenModal] = useState(false);
     const [editingDomain, setEditingDomain] = useState(null);
 
+    const { id } = useParams(); // ✅ Get the domain ID from route params (if exists)
+
     useEffect(() => {
         const fetchDomains = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/domains');
-                const data = response.data;
-    
-                const formatted = data.map((d, idx) => ({
-                    ...d,
-                    serial_no: idx + 1
-                }));
-    
-                setDomains(formatted);
+                if (id) {
+                    const response = await axios.get(`http://localhost:5000/api/domains/${id}`);
+                    const domain = response.data;
+
+                    const formatted = [{
+                        ...domain,
+                        serial_no: 1,
+                        cname_acm_name:  '',
+    cname_acm_value: '',
+    created_at: '',
+    ssl_expiry:  '',
+    reissue: domain.status !== 'active',
+                    }];
+
+                    setDomains(formatted);
+                } else {
+                    const response = await axios.get('http://localhost:5000/api/domains');
+                    const data = response.data;
+
+                    const formatted = data.map((d, idx) => ({
+                        ...d,
+                        serial_no: idx + 1,
+                        cname_acm_name: d.cname_acm_name ?? '',
+    cname_acm_value: d.cname_acm_value ?? '',
+    created_at: d.created_at ?? '',
+    ssl_expiry: d.ssl_expiry ?? '',
+    reissue: d.status !== 'not_active',
+                    }));
+
+                    setDomains(formatted);
+                }
             } catch (error) {
-                console.error("Error fetching domains:", error);
+                console.error("Error fetching domain(s):", error);
             } finally {
                 setLoading(false);
             }
         };
-    
+
         fetchDomains();
-    }, []);
-    
+    }, [id]);
 
     const handleReissue = (id) => {
         alert(`Reissuing SSL for domain ID: ${id}`);
@@ -127,12 +146,11 @@ const DomainsPage = () => {
     const handleSaveDomain = async (domain) => {
         try {
             if (domain?.id) {
-                // PUT to update
                 const response = await axios.put(`http://localhost:5000/api/domains/${domain.id}`, {
                     url: domain.url,
                     sslEnabled: domain.sslEnabled
                 });
-    
+
                 const updated = response.data;
                 setDomains(prev => prev.map(d => d.id === updated.id ? {
                     ...d,
@@ -141,12 +159,11 @@ const DomainsPage = () => {
                     sslEnabled: updated.status !== 'active'
                 } : d));
             } else {
-                // POST to create
                 const response = await axios.post('http://localhost:5000/api/domains', {
                     url: domain.url,
                     sslEnabled: domain.sslEnabled
                 });
-    
+
                 const created = response.data.domain;
                 setDomains(prev => [
                     ...prev,
@@ -163,53 +180,61 @@ const DomainsPage = () => {
             alert("Failed to save domain.");
         }
     };
-    
 
     const columns = [
         {
-          field: 'action',
-          headerName: 'Action',
-          width: 100,
-          renderCell: (params) => (
-            <Tooltip title="Edit Domain">
-              <IconButton onClick={() => handleEdit(params.row)}>
-                <Edit />
-              </IconButton>
-            </Tooltip>
-          ),
+            field: 'action',
+            headerName: 'Action',
+            width: 100,
+            renderCell: (params) => (
+                <Tooltip title="Edit Domain">
+                    <IconButton onClick={() => handleEdit(params.row)}>
+                        <Edit />
+                    </IconButton>
+                </Tooltip>
+            ),
         },
         { field: 'id', headerName: 'ID', width: 250 },
         { field: 'url', headerName: 'URL', width: 350 },
         {
-          field: 'created_at',
-          headerName: 'Date Created (UTC)',
-          width: 300,
-          valueFormatter: (params) => {
-            const value = params?.value;
-            if (!value) return '';
-            const date = new Date(value);
-            return isNaN(date.getTime()) ? '' : date.toLocaleString(); // shows full date & time
-          },
+            field: 'cname_acm_name',
+            headerName: 'CNAME Name',
+            width: 300,
         },
         {
-          field: 'ssl_expiry',
-          headerName: 'SSL Expiry Date',
-          width: 300,
-          valueFormatter: (params) => {
-            const value = params?.value;
-            if (!value) return '';
-            const date = new Date(value);
-            return isNaN(date.getTime()) ? '' : date.toLocaleDateString(); // only date part
-          },
+            field: 'cname_acm_value',
+            headerName: 'CNAME Value',
+            width: 400,
         },
         {
-          field: 'reissue',
-          headerName: 'Reissue',
-          width: 150,
-          renderCell: (params) => (params.value ? 'Yes' : 'No'),
+            field: 'created_at',
+            headerName: 'Date Created (UTC)',
+            width: 300,
+            valueFormatter: (params) => {
+                const value = params?.value;
+                if (!value) return '';
+                const date = new Date(value);
+                return isNaN(date.getTime()) ? '' : date.toLocaleString();
+            },
         },
-      ];
-      
+        {
+            field: 'ssl_expiry',
+            headerName: 'SSL Expiry Date',
+            width: 300,
+            valueFormatter: (params) => {
+                const value = params?.value;
+                if (!value) return '';
+                const date = new Date(value);
+                return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+            },
+        },
+        {
+            field: 'reissue',
+            headerName: 'Reissue',
+            width: 150,
+            renderCell: (params) => (params.value ? 'Yes' : 'No'),
+        },
+    ];
 
     return (
         <Layout>
@@ -250,7 +275,6 @@ const DomainsPage = () => {
                 )}
             </Box>
 
-            {/* Add/Edit Domain Modal */}
             <DomainModal
                 open={openModal}
                 handleClose={() => setOpenModal(false)}

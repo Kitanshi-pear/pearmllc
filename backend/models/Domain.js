@@ -17,10 +17,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    cname_acm_name: DataTypes.TEXT,
-    cname_acm_value: DataTypes.TEXT,
-    cloudfront_domain: DataTypes.TEXT,
-    ssl_expiry: DataTypes.DATE,
+    certificate_arn: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    cname_acm_name: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    cname_acm_value: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    cloudfront_domain: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    ssl_expiry: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -31,7 +47,7 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     tableName: 'domains',
-    timestamps: false
+    timestamps: false,
   });
 
   return Domain;
