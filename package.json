@@ -15,5 +15,8 @@
     "url": "https://github.com/Kitanshi-pear/pearmllc/issues"
   },
   "homepage": "https://github.com/Kitanshi-pear/pearmllc#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "@mui/x-data-grid-pro": "^7.28.3"
+  }
 }

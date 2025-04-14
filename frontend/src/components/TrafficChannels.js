@@ -128,12 +128,51 @@ const ChannelTable = () => {
     setOpenModal(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(formData);
-    // Perform submission logic here (e.g., API call to save formData)
-    setOpenSecondModal(false);
+  
+    try {
+      // Send data to backend
+      const response = await axios.post(`${API_URL}/api/traffic-channels`, formData);// 🔁 change the endpoint if needed
+  
+      // Optionally update local state
+      setRows((prevRows) => [...prevRows, response.data]);
+  
+      // Reset form
+      setOpenSecondModal(false);
+      setFormData({
+        channelName: "",
+        aliasChannel: "",
+        costUpdateDepth: "",
+        costUpdateFrequency: "5 minutes",
+        currency: "USD",
+        s2sPostbackUrl: "",
+        clickRefId: "",
+        externalId: "",
+        pixelId: "",
+        apiAccessToken: "",
+        defaultEventName: "",
+        customConversionMatching: false,
+        googleAdsAccountId: "",
+        googleMccAccountId: "",
+      });
+  
+    } catch (error) {
+      console.error("Error saving channel:", error);
+      alert("Failed to save channel. Check the console for details.");
+    }
   };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/traffic-channels`);
+        setRows(response.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    fetchData();
+  }, []);  
 
   return (
     <Layout>
@@ -362,7 +401,7 @@ const ChannelTable = () => {
                         fullWidth
                         label="Channel Name"
                         name="channelName"
-                        value={selectedChannel || formData.channelName}
+                        value={ formData.channelName}
                         onChange={handleFormChange}
                         required
                       />

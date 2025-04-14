@@ -1,9 +1,14 @@
 module.exports = (sequelize, DataTypes) => {
   const Click = sequelize.define("Click", {
-    click_id: { type: DataTypes.STRING, unique: true },
+    click_id: {
+      type: DataTypes.STRING(255), // VARCHAR(255) for storing unique click IDs
+      allowNull: false,
+      unique: true, // Ensuring the click_id is unique
+      index: true,  // Indexing the click_id for faster queries
+    },
     source_id: DataTypes.INTEGER,
     traffic_channel_id: DataTypes.INTEGER,
-    campaign_id: DataTypes.INTEGER,
+    campaigns_id: DataTypes.INTEGER,
     domain_id: DataTypes.INTEGER,
     lander_id: DataTypes.INTEGER,
     offer_id: DataTypes.INTEGER,
@@ -17,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
     Click.hasOne(models.Macro, { foreignKey: "click_id" });
 
     Click.belongsTo(models.TrafficChannel, { foreignKey: "traffic_channel_id" });
-    Click.belongsTo(models.Campaign, { foreignKey: "campaign_id" });
+    Click.belongsTo(models.Campaigns, { foreignKey: "campaigns_id" });
     Click.belongsTo(models.Domain, { foreignKey: "domain_id" });
     Click.belongsTo(models.Lander, { foreignKey: "lander_id" });
     Click.belongsTo(models.Offer, { foreignKey: "offer_id" });

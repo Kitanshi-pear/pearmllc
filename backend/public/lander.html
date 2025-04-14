@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Landing Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f2f2f2;
+      color: #333;
+      text-align: center;
+    }
+
+    #cta-button {
+      display: inline-block;
+      margin-top: 2rem;
+      padding: 1rem 2rem;
+      background-color: #007bff;
+      color: white;
+      font-size: 1.2rem;
+      text-decoration: none;
+      border-radius: 8px;
+    }
+
+    #cta-button:hover {
+      background-color: #0056b3;
+    }
+
+    .tracking-pixel {
+      width: 1px;
+      height: 1px;
+      position: absolute;
+      left: -9999px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 Get Your Free Auto Insurance Quote</h1>
+  <p>Save big by comparing auto insurance providers in your area!</p>
+
+  <img class="tracking-pixel" id="lp-view-pixel" src="" alt="LP View Pixel" />
+  <a id="cta-button" href="#">Check My Quote</a>
+
+  <script>
+    const TRACKING_DOMAIN = "http://localhost:5000"; // Replace with your production domain
+    const campaignId = new URLSearchParams(window.location.search).get("campaign_id");
+    let clickId = localStorage.getItem("click_id");
+
+    if (!clickId) {
+      clickId = "generated_click_id_" + Math.random().toString(36).substring(2);
+      localStorage.setItem("click_id", clickId);
+    }
+
+    console.log("Click ID:", clickId);
+    console.log("Campaign ID:", campaignId);
+
+    // Set tracking pixel src
+    const pixelUrl = `${TRACKING_DOMAIN}/lander/track/view?campaign_id=${campaignId}&click_id=${clickId}`;
+    document.getElementById('lp-view-pixel').src = pixelUrl;
+
+    // Update CTA button href
+    const ctaButton = document.getElementById('cta-button');
+    if (ctaButton && campaignId && clickId) {
+      ctaButton.href = `https://track.autocoveragehub.info/click?utm_campaign=${campaignId}&sub6=${campaignId}&ref_id=${clickId}`;
+    }
+
+    // Append external tracking script
+    const script = document.createElement('script');
+    script.src = `${TRACKING_DOMAIN}/universal.js`;
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

@@ -162,17 +162,36 @@ router.get('/:id/dns-records', async (req, res) => {
 });
 
 // === 5. Auto Add CNAME to Route 53
+// === Auto Add CNAME to Route 53 (with auto-create zone)
 router.post('/:id/auto-route53', async (req, res) => {
   try {
     const domain = await Domain.findByPk(req.params.id);
-    if (!domain?.cname_acm_name) return res.status(404).json({ error: 'CNAME record not ready yet' });
+    if (!domain?.cname_acm_name || !domain?.cname_acm_value) {
+      return res.status(404).json({ error: 'CNAME record not ready yet' });
+    }
 
     const rootDomain = domain.domain.split('.').slice(-2).join('.');
-    const zones = await route53.listHostedZonesByName({ DNSName: rootDomain }).promise();
 
-    const matchedZone = zones.HostedZones.find(z => domain.domain.endsWith(z.Name.replace(/\.$/, '')));
-    if (!matchedZone) return res.status(404).json({ error: 'Matching Route 53 hosted zone not found' });
+    // List all hosted zones
+    const zonesData = await route53.listHostedZones().promise();
+    const zones = zonesData.HostedZones;
 
+    // Find zone matching root domain
+    let matchedZone = zones.find(z => z.Name.replace(/\.$/, '') === rootDomain);
+
+    // Auto-create if not found
+    if (!matchedZone) {
+      console.log(`Hosted zone not found for ${rootDomain}, creating...`);
+      const created = await route53.createHostedZone({
+        Name: rootDomain,
+        CallerReference: `${Date.now()}-${rootDomain}`,
+      }).promise();
+
+      matchedZone = created.HostedZone;
+      console.log(`Hosted zone created: ${matchedZone.Id}`);
+    }
+
+    // Create or update the CNAME record
     await route53.changeResourceRecordSets({
       HostedZoneId: matchedZone.Id,
       ChangeBatch: {
@@ -188,12 +207,18 @@ router.post('/:id/auto-route53', async (req, res) => {
       }
     }).promise();
 
-    res.json({ message: 'CNAME record added to Route 53' });
+    res.json({ message: 'CNAME record added to Route 53 successfully' });
+
   } catch (error) {
     console.error('Route 53 error:', error);
-    res.status(500).json({ error: 'Failed to add record to Route 53', details: error.message });
+    res.status(500).json({
+      error: 'Failed to add record to Route 53',
+      details: error.message
+    });
   }
 });
+
+
 
 // === 6. List All Domains
 router.get('/', async (req, res) => {

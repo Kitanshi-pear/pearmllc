@@ -30,12 +30,12 @@ Object.keys(db).forEach(modelName => {
 // Setup all associations
 const {
   Click, Cost, Revenue, Macro,
-  Campaign, Domain, Lander,
+  Campaigns, Domain, Lander,
   Offer, OfferSource, TrafficChannel, PostbackLog 
 } = db;
 
 // Click Associations
-Click.belongsTo(Campaign);
+Click.belongsTo(Campaigns);
 Click.belongsTo(Domain);
 Click.belongsTo(Lander);
 Click.belongsTo(Offer);

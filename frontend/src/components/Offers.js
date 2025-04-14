@@ -59,9 +59,6 @@ const OffersPage = () => {
         }));
     };
     
-    
-
-
     // Handlers for missing variables
     const handleDateChange = (event) => setDate(event.target.value);
     const handleTitleChange = (event) => setTitleText(event.target.value);

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 require('dotenv').config();
+const { TrafficChannel } = require('../models'); // Adjust the path as necessary
 
 const FB_CLIENT_ID = process.env.FB_CLIENT_ID || '1002084978515659';
 const FB_CLIENT_SECRET = process.env.FB_CLIENT_SECRET || 'your_fb_client_secret';
@@ -97,5 +98,88 @@ router.get('/auth/google/callback', async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+
+// Create a new channel
+// routes/trafficChannels.js
+// routes/trafficChannels.js
+
+router.post('/', async (req, res) => {
+    try {
+      console.log("Received data:", req.body); // Log to debug
+  
+      const newChannel = await TrafficChannel.create({
+        channelName: req.body.channelName,
+        aliasChannel: req.body.aliasChannel,
+        costUpdateDepth: req.body.costUpdateDepth,
+        costUpdateFrequency: req.body.costUpdateFrequency,
+        currency: req.body.currency,
+        s2sPostbackUrl: req.body.s2sPostbackUrl,
+        clickRefId: req.body.clickRefId,
+        externalId: req.body.externalId,
+        pixelId: req.body.pixelId,
+        apiAccessToken: req.body.apiAccessToken,
+        defaultEventName: req.body.defaultEventName,
+        customConversionMatching: req.body.customConversionMatching,
+        googleAdsAccountId: req.body.googleAdsAccountId,
+        googleMccAccountId: req.body.googleMccAccountId,
+      });
+  
+      res.status(201).json(newChannel);
+    } catch (error) {
+      console.error("❌ Error saving channel:", error);
+      res.status(500).json({ error: "Failed to save channel." });
+    }
+  });
+  
+  
+  // Get all channels
+  router.get("/", async (req, res) => {
+    try {
+      const channels = await TrafficChannel.findAll();
+      res.json(channels);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch channels" });
+    }
+  });
+  
+  // Get a single channel by ID
+  router.get("/:id", async (req, res) => {
+    try {
+      const channel = await TrafficChannel.findByPk(req.params.id);
+      if (!channel) return res.status(404).json({ error: "Channel not found" });
+      res.json(channel);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch channel" });
+    }
+  });
+  
+  // Update a channel
+  router.put("/:id", async (req, res) => {
+    try {
+      const [updated] = await TrafficChannel.update(req.body, {
+        where: { id: req.params.id },
+      });
+      if (!updated) return res.status(404).json({ error: "Channel not found" });
+      const updatedChannel = await TrafficChannel.findByPk(req.params.id);
+      res.json(updatedChannel);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update channel" });
+    }
+  });
+  
+  // Delete a channel
+  router.delete("/:id", async (req, res) => {
+    try {
+      const deleted = await TrafficChannel.destroy({
+        where: { id: req.params.id },
+      });
+      if (!deleted) return res.status(404).json({ error: "Channel not found" });
+      res.json({ message: "Channel deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete channel" });
+    }
+  });
+  
 
 module.exports = router;

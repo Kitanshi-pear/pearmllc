@@ -3,10 +3,12 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const axios = require("axios");
 const session = require("cookie-session");
-
+const path = require("path");
+const cookieParser = require("cookie-parser");
 const trafficRoutes = require("./routes/trafficRoutes");  // 🚀 Includes Facebook API now
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
+
 
 dotenv.config();
 const app = express();
@@ -37,11 +39,18 @@ app.use(
 const { sequelize } = require('./models');
 sequelize.sync({ alter: true });
 
-const clickRoutes = require('./routes/Click');
+const clickRoutes = require('./routes/clicks');
 app.use('/api/clicks', clickRoutes);
 
 const postbackRoutes = require('./routes/postback'); // <-- file exists?
 app.use('/', postbackRoutes);
+
+app.use(express.static("public")); // Put universal.js in /public
+
+app.get("/lander", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "lander.html"));
+});
+
 
 const OfferSourceRoutes = require('./routes/OfferSource');
 app.use('/offersource', OfferSourceRoutes)
@@ -54,6 +63,13 @@ app.use('/api/domains', domainRoutes);
 
 const landerRoutes = require('./routes/landers');
 app.use('/api/landers', landerRoutes);
+
+const lpTrackingRoutes = require('./routes/lp');
+app.use('/api/lp', lpTrackingRoutes);
+
+const campaignRoutes = require('./routes/campaignRoutes');
+app.use('/api/campaigns', campaignRoutes);
+
 
 // ✅ Google OAuth2 Configuration
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -103,6 +119,13 @@ app.use("/api/traffic/facebook", trafficRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 
+// server.js or app.js
+const trackRoutes = require("./routes/track");
+app.use("/", trackRoutes);
+
+
+
+app.use('/api/traffic-channels', trafficRoutes);
 // Root Route
 app.get("/", (req, res) => {
   res.send("Welcome to the PearM Dashboard API Server");
