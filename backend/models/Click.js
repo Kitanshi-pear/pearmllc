@@ -1,10 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
   const Click = sequelize.define("Click", {
     click_id: {
-      type: DataTypes.STRING(255), // VARCHAR(255) for storing unique click IDs
+      type: DataTypes.STRING(125), // VARCHAR(255) for storing unique click IDs
       allowNull: false,
       unique: true, // Ensuring the click_id is unique
-      index: true,  // Indexing the click_id for faster queries
     },
     source_id: DataTypes.INTEGER,
     traffic_channel_id: DataTypes.INTEGER,

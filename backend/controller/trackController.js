@@ -1,18 +1,29 @@
-// /backend/controllers/trackController.js
+// clickController.js
+const { Click } = require('../models');
+const { v4: uuidv4 } = require('uuid');
 
-async function saveTrackingDataToDB(data) {
-    // This is where you save the data to the database, e.g., MySQL or ClickHouse
-    console.log('Tracking data:', data);
+exports.trackClick = async (req, res) => {
+  const clickId = uuidv4();
+  const { campaign_id, source, referrer } = req.body;
 
-    // Simulate saving the data (replace with actual DB logic)
-    try {
-        // Example using Sequelize (replace with your actual DB code)
-        // const result = await TrackingData.create(data);
-        console.log('Data saved to the database');
-    } catch (error) {
-        console.error('Error saving data to DB:', error);
-        throw error;
-    }
-}
+  const click = await Click.create({
+    click_id: clickId,
+    campaigns_id: campaign_id,
+    source_id: source,
+    timestamp: new Date()
+  });
 
-module.exports = { saveTrackingDataToDB };
+  res.json({ click_id: click.click_id });
+};
+
+
+// clickController.js
+exports.trackView = async (req, res) => {
+    const { click_id, referrer } = req.query;
+  
+    console.log(`View registered for click: ${click_id}, ref: ${referrer}`);
+    // Optionally log view in DB here
+  
+    res.sendStatus(200);
+  };
+  

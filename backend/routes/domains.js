@@ -40,38 +40,191 @@ router.post('/:id/provision', async (req, res) => {
     const domain = await Domain.findByPk(req.params.id);
     if (!domain) return res.status(404).json({ error: 'Domain not found' });
 
+    // Request certificate
     const certRequest = await acm.requestCertificate({
       DomainName: domain.domain,
       ValidationMethod: 'DNS',
       IdempotencyToken: uuidv4().replace(/-/g, '').slice(0, 32),
     }).promise();
-    
+
     const certArn = certRequest.CertificateArn;
-    
-    await sleep(5000);
-    
+    await sleep(5000); // Allow ACM to generate validation record
+
+    // Fetch certificate details
     const certDetails = await acm.describeCertificate({ CertificateArn: certArn }).promise();
     const record = certDetails.Certificate.DomainValidationOptions?.[0]?.ResourceRecord;
-    
-    if (!record) return res.status(500).json({ error: 'ACM CNAME record not ready yet' });
-    
+    const notAfter = certDetails.Certificate.NotAfter;
+
+    if (!record) {
+      return res.status(500).json({ error: 'ACM CNAME record not ready yet' });
+    }
+
+    // Update domain record
     await domain.update({
-      certificate_arn: certArn, // <=== make sure this line exists
+      certificate_arn: certArn,
       cname_acm_name: record.Name,
       cname_acm_value: record.Value,
+      ssl_expiry: notAfter,
+      renew_eligible: true,
       status: 'verifying'
     });
-    console.log('Domain updated with ACM details:', domain.toJSON());    
+
+    console.log('Domain updated with ACM details:', domain.toJSON());
 
     res.json({
       message: 'Certificate requested. Add the following DNS record.',
-      cname: { name: record.Name, value: record.Value }
+      cname: { name: record.Name, value: record.Value },
+      ssl_expiry: notAfter
     });
+
   } catch (error) {
     console.error('ACM provisioning error:', error);
-    res.status(500).json({ error: 'ACM provisioning failed', details: error.message });
+    res.status(500).json({
+      error: 'ACM provisioning failed',
+      details: error.message
+    });
   }
 });
+
+router.post('/:id/use-eligible-certificate', async (req, res) => {
+  try {
+    const domain = await Domain.findByPk(req.params.id);
+    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+
+    let certs = [];
+    let nextToken = null;
+
+    // Step 1: List all issued certs
+    do {
+      const result = await acm.listCertificates({
+        CertificateStatuses: ['ISSUED'],
+        NextToken: nextToken,
+      }).promise();
+
+      certs = certs.concat(result.CertificateSummaryList);
+      nextToken = result.NextToken;
+    } while (nextToken);
+
+    // Step 2: Filter certs matching domain name
+    const matchingCerts = certs.filter(cert => cert.DomainName === domain.domain);
+
+    // Step 3: Find eligible one
+    let eligibleCert = null;
+    for (const cert of matchingCerts) {
+      const details = await acm.describeCertificate({ CertificateArn: cert.CertificateArn }).promise();
+      const certificate = details.Certificate;
+
+      if (certificate.RenewalEligibility === 'ELIGIBLE') {
+        eligibleCert = certificate;
+        break;
+      }
+    }
+
+    if (!eligibleCert) {
+      return res.status(404).json({ error: 'No eligible certificate found for domain' });
+    }
+
+    // Step 4: Update domain with eligible cert
+    await domain.update({
+      certificate_arn: eligibleCert.CertificateArn,
+      ssl_expiry: eligibleCert.NotAfter,
+      status: 'active'
+    });
+
+    res.json({
+      message: 'Eligible certificate applied successfully.',
+      certificateArn: eligibleCert.CertificateArn,
+      notAfter: eligibleCert.NotAfter
+    });
+
+  } catch (error) {
+    console.error('Error using eligible certificate:', error);
+    res.status(500).json({ error: 'Failed to apply eligible certificate', details: error.message });
+  }
+});
+
+router.get('/:id/eligible-certificates', async (req, res) => {
+  try {
+    const domain = await Domain.findByPk(req.params.id);
+    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+
+    // List all certificates
+    let certs = [];
+    let nextToken = null;
+
+    do {
+      const result = await acm.listCertificates({
+        CertificateStatuses: ['ISSUED'],
+        NextToken: nextToken,
+      }).promise();
+
+      certs = certs.concat(result.CertificateSummaryList);
+      nextToken = result.NextToken;
+    } while (nextToken);
+
+    // Filter by domain match
+    const matchingCerts = certs.filter(cert => cert.DomainName === domain.domain);
+
+    // Describe and filter by RenewalEligibility
+    const eligibleCerts = [];
+    for (const cert of matchingCerts) {
+      const details = await acm.describeCertificate({ CertificateArn: cert.CertificateArn }).promise();
+      const certificate = details.Certificate;
+
+      if (certificate.RenewalEligibility === 'ELIGIBLE') {
+        eligibleCerts.push(certificate);
+      }
+    }
+
+    res.json({
+      domain: domain.domain,
+      eligibleCertificates: eligibleCerts,
+    });
+
+  } catch (error) {
+    console.error('Error fetching eligible certificates:', error);
+    res.status(500).json({ error: 'Failed to get eligible certificates', details: error.message });
+  }
+});
+
+router.get('/:id/certificates', async (req, res) => {
+  try {
+    const domain = await Domain.findByPk(req.params.id);
+    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+
+    // Fetch all ACM certificates
+    let certs = [];
+    let nextToken = null;
+
+    do {
+      const result = await acm.listCertificates({
+        CertificateStatuses: ['PENDING_VALIDATION', 'ISSUED', 'INACTIVE', 'EXPIRED', 'VALIDATION_TIMED_OUT', 'REVOKED', 'FAILED'],
+        NextToken: nextToken,
+        Includes: {
+          keyTypes: ['RSA_2048', 'RSA_4096', 'EC_prime256v1'],
+        }
+      }).promise();
+
+      certs = certs.concat(result.CertificateSummaryList);
+      nextToken = result.NextToken;
+    } while (nextToken);
+
+    // Filter certs by domain name match
+    const filtered = certs.filter(cert => cert.DomainName === domain.domain);
+
+    // Optionally: fetch detailed info about each cert
+    const detailedCerts = await Promise.all(filtered.map(async (cert) => {
+      const details = await acm.describeCertificate({ CertificateArn: cert.CertificateArn }).promise();
+      return details.Certificate;
+    }));
+
+    res.json({ domain: domain.domain, certificates: detailedCerts });
+  } catch (err) {
+    console.error('Error listing certificates:', err);
+    res.status(500).json({ error: 'Failed to list certificates', details: err.message });
+  }
+});
+
 
 // === 3. Poll ACM + Deploy CloudFront
 router.post('/:id/deploy', async (req, res) => {
@@ -88,18 +241,16 @@ router.post('/:id/deploy', async (req, res) => {
       return res.status(400).json({ error: `Certificate not ready. Current status: ${status}` });
     }
 
-
-
     const distConfig = {
       DistributionConfig: {
         CallerReference: uuidv4(),
-        Comment: '', // <-- ✅ Add this line
+        Comment: `CloudFront distribution for ${domain.domain}`,  // Add a meaningful comment
         Aliases: { Quantity: 1, Items: [domain.domain] },
         Origins: {
           Quantity: 1,
           Items: [{
             Id: 'redirector',
-            DomainName: 'pearmllc.onrender.com',
+            DomainName: domain.domain,
             CustomOriginConfig: {
               HTTPPort: 80,
               HTTPSPort: 443,
@@ -114,7 +265,6 @@ router.post('/:id/deploy', async (req, res) => {
             QueryString: true,
             Cookies: { Forward: 'none' }
           },
-          TrustedSigners: { Enabled: false, Quantity: 0 },
           MinTTL: 0
         },
         ViewerCertificate: {
@@ -128,10 +278,10 @@ router.post('/:id/deploy', async (req, res) => {
     
     const dist = await cloudfront.createDistribution(distConfig).promise();
 
+    // Update domain with CloudFront info
     await domain.update({
       status: 'active',
       cloudfront_domain: dist.Distribution.DomainName,
-      ssl_expiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     });
 
     res.json({
@@ -166,20 +316,23 @@ router.get('/:id/dns-records', async (req, res) => {
 router.post('/:id/auto-route53', async (req, res) => {
   try {
     const domain = await Domain.findByPk(req.params.id);
+
     if (!domain?.cname_acm_name || !domain?.cname_acm_value) {
       return res.status(404).json({ error: 'CNAME record not ready yet' });
     }
 
-    const rootDomain = domain.domain.split('.').slice(-2).join('.');
+    // Main domain for routing
+    const mainDomain = 'pearmllc.onrender.com';
+    const trackSubdomain = `track.${domain.domain}`;
 
-    // List all hosted zones
+    // Step 1: List all hosted zones
     const zonesData = await route53.listHostedZones().promise();
     const zones = zonesData.HostedZones;
 
-    // Find zone matching root domain
+    // Step 2: Find or create hosted zone
+    const rootDomain = domain.domain.split('.').slice(-2).join('.');
     let matchedZone = zones.find(z => z.Name.replace(/\.$/, '') === rootDomain);
 
-    // Auto-create if not found
     if (!matchedZone) {
       console.log(`Hosted zone not found for ${rootDomain}, creating...`);
       const created = await route53.createHostedZone({
@@ -191,33 +344,53 @@ router.post('/:id/auto-route53', async (req, res) => {
       console.log(`Hosted zone created: ${matchedZone.Id}`);
     }
 
-    // Create or update the CNAME record
+    // Step 3: Add ACM validation CNAME record
     await route53.changeResourceRecordSets({
       HostedZoneId: matchedZone.Id,
       ChangeBatch: {
         Changes: [{
           Action: 'UPSERT',
           ResourceRecordSet: {
-            Name: domain.cname_acm_name,
+            Name: domain.cname_acm_name, // ACM validation CNAME record
             Type: 'CNAME',
             TTL: 300,
             ResourceRecords: [{ Value: domain.cname_acm_value }]
+          }
+        }, {
+          Action: 'UPSERT',
+          ResourceRecordSet: {
+            Name: trackSubdomain, // CNAME for track subdomain
+            Type: 'CNAME',
+            TTL: 300,
+            ResourceRecords: [{ Value: mainDomain }] // Pointing to pearmllc.onrender.com
           }
         }]
       }
     }).promise();
 
-    res.json({ message: 'CNAME record added to Route 53 successfully' });
+    // Step 4: Respond with both CNAME records
+    res.json({
+      message: 'CNAME records created and added successfully',
+      records: [
+        {
+          cname_name: domain.cname_acm_name,  // ACM validation CNAME record
+          cname_value: domain.cname_acm_value
+        },
+        {
+          cname_name: trackSubdomain,  // track subdomain CNAME record
+          cname_value: mainDomain // Main domain pointing to pearmllc.onrender.com
+        }
+      ]
+    });
 
   } catch (error) {
-    console.error('Route 53 error:', error);
+    console.error('Route53 error:', error);
     res.status(500).json({
       error: 'Failed to add record to Route 53',
       details: error.message
     });
   }
 });
-
 
 
 // === 6. List All Domains

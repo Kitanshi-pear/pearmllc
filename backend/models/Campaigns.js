@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     lander_id: DataTypes.INTEGER,
     offer_id: DataTypes.INTEGER,
     offer_source_id: DataTypes.INTEGER,
+    
     // other fields...
   });
 

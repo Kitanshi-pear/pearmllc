@@ -7,6 +7,15 @@ module.exports = (sequelize, DataTypes) => {
     url: {
       type: DataTypes.STRING,
       allowNull: false
+    },
+  
+    trackingDomain: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    clickUrl: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   });
 };

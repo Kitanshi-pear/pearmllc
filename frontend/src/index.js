@@ -5,6 +5,7 @@ import { IntlProvider } from "react-intl";
 import enMessages from "./translations/en";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
+<script src="/scripts/universal.js"></script>
 
 root.render(
   <React.StrictMode>

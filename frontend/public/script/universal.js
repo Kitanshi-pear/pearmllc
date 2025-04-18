@@ -1,44 +1,68 @@
 (function () {
-    const TRACKING_DOMAIN = "http://localhost:5000"; // Update this in production
-    const campaignId = new URLSearchParams(window.location.search).get("campaign_id");
-    const storedClickId = localStorage.getItem("click_id");
+    const cookieName = 'click_id_store';
+    const cookieDurationDays = 30;
   
-
+    // TODO: Replace these URLs with your production ones
+    const clickApi = 'http://localhost:5000/api/track/click'; // Logs the click
+    const viewApi = 'http://localhost:5000/api/track/view';   // Logs the LP view
+    const cookieDomain = window.location.hostname; // Automatically set domain
   
-    // Track page view
-    fetch(`${TRACKING_DOMAIN}/lander/track/view?campaign_id=${campaignId}&click_id=${storedClickId}`)
+    const urlParams = new URLSearchParams(window.location.search);
+    const campaignId = urlParams.get('cmpid') || null;
+    const trafficSource = urlParams.get('tsource') || null;
+    const referrer = document.referrer;
+  
+    let clickId = getCookie(cookieName);
+  
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+  
+    function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days * 86400000));
+      document.cookie = `${name}=${value}; expires=${d.toUTCString()}; path=/; domain=${cookieDomain}`;
+    }
+  
+    function trackClick() {
+      fetch(clickApi, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign_id: campaignId,
+          source: trafficSource,
+          referrer: referrer,
+          timestamp: new Date().toISOString()
+        })
+      })
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          localStorage.setItem("click_id", data.click_id);
-          localStorage.setItem("campaign_id", data.campaign_id);
-          console.log("[Tracker] View tracked", data);
-        }
+        clickId = data.click_id;
+        sessionStorage.setItem('click_id', clickId);
+        setCookie(cookieName, clickId, cookieDurationDays);
+        triggerView();
       })
-      .catch(err => console.error("[Tracker] View tracking error:", err));
+      .catch(err => console.error('Error tracking click:', err));
+    }
   
+    function triggerView() {
+      if (sessionStorage.getItem('view_once') === '1') return;
   
-    // 2. Attach click tracking to all CTAs
-    window.addEventListener("DOMContentLoaded", () => {
-      const click_id = localStorage.getItem("click_id");
-      const campaign_id = localStorage.getItem("campaign_id");
+      if (!clickId) return; // clickId must exist
   
-      document.querySelectorAll("[data-track-cta]").forEach(el => {
-        el.addEventListener("click", () => {
-          if (!click_id || !campaign_id) return;
+      fetch(`${viewApi}?click_id=${clickId}&referrer=${encodeURIComponent(referrer)}`)
+        .catch(err => console.error('Error tracking view:', err));
   
-          fetch(`${TRACKING_DOMAIN}/track/click`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ click_id, campaign_id })
-          })
-            .then(res => res.json())
-            .then(data => console.log("[Tracker] CTA click tracked", data))
-            .catch(err => console.error("[Tracker] Click tracking error:", err));
-        });
-      });
-    });
+      sessionStorage.setItem('view_once', '1');
+    }
+  
+    if (!clickId) {
+      trackClick();
+    } else {
+      sessionStorage.setItem('click_id', clickId);
+      triggerView();
+    }
   })();
   

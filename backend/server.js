@@ -9,17 +9,15 @@ const trafficRoutes = require("./routes/trafficRoutes");  // 🚀 Includes Faceb
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
 
-
 dotenv.config();
 const app = express();
-const port = process.env.PORT || 5000;
+
+// Ensure that port is properly set with a fallback if not provided
+const port = process.env.PORT || 5000; 
 
 // ✅ CORS Configuration
 const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "https://pearmllc.onrender.com"
-  ],
+  origin: "pearmllc.onrender.com",         // Local development for React app
   credentials: true,
   methods: "GET,POST,PUT,DELETE,OPTIONS",
   allowedHeaders: ["Content-Type", "Authorization"]
@@ -32,28 +30,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     name: "session",
-    keys: [process.env.SESSION_SECRET],
+    keys: [process.env.SESSION_SECRET],  // Ensure your session secret is stored safely
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   })
 );
+
 const { sequelize } = require('./models');
 sequelize.sync({ alter: true });
 
+// ✅ Routes Setup
 const clickRoutes = require('./routes/clicks');
 app.use('/api/clicks', clickRoutes);
 
-const postbackRoutes = require('./routes/postback'); // <-- file exists?
+const postbackRoutes = require('./routes/postback');
 app.use('/', postbackRoutes);
 
-app.use(express.static("public")); // Put universal.js in /public
-
-app.get("/lander", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "lander.html"));
-});
-
+app.use(cookieParser());
 
 const OfferSourceRoutes = require('./routes/OfferSource');
-app.use('/offersource', OfferSourceRoutes)
+app.use('/offersource', OfferSourceRoutes);
 
 const offerRoutes = require('./routes/offerRoutes');
 app.use('/api/offers', offerRoutes);
@@ -69,7 +64,6 @@ app.use('/api/lp', lpTrackingRoutes);
 
 const campaignRoutes = require('./routes/campaignRoutes');
 app.use('/api/campaigns', campaignRoutes);
-
 
 // ✅ Google OAuth2 Configuration
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -110,6 +104,7 @@ app.get("/auth/logout", (req, res) => {
   res.redirect("/");
 });
 
+// ✅ Get User Info
 app.get("/auth/user", (req, res) => {
   res.json({ access_token: req.session.access_token || null });
 });
@@ -119,14 +114,11 @@ app.use("/api/traffic/facebook", trafficRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 
-// server.js or app.js
+// Server-side routing for tracking requests
 const trackRoutes = require("./routes/track");
-app.use("/", trackRoutes);
+app.use('/api/track', trackRoutes);
 
-
-
-app.use('/api/traffic-channels', trafficRoutes);
-// Root Route
+// API Root Route
 app.get("/", (req, res) => {
   res.send("Welcome to the PearM Dashboard API Server");
 });

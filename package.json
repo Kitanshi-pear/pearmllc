@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
   "repository": {
     "type": "git",
@@ -17,6 +21,8 @@
   "homepage": "https://github.com/Kitanshi-pear/pearmllc#readme",
   "description": "",
   "dependencies": {
-    "@mui/x-data-grid-pro": "^7.28.3"
+    "@mui/x-data-grid-pro": "^7.28.3",
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.2"
   }
 }
