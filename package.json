@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "react-scripts start"
-  },
+  "start": "node backend/server.js",
+  "dev": "nodemon backend/server.js"
+}
+,
   "repository": {
     "type": "git",
     "url": "git+https://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@github.com/Kitanshi-pear/pearmllc.git"
