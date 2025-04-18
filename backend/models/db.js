@@ -8,6 +8,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || "kitanshi",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "pearm_tracking_db",
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 900,
     queueLimit: 0
@@ -28,9 +29,20 @@ const sequelize = new Sequelize(
     process.env.DB_NAME || "pearm_tracking_db",
     process.env.DB_USER || "kitanshi",
     process.env.DB_PASSWORD || "",
+    
     {
         host: process.env.DB_HOST || "localhost",
         dialect: "mysql",
+        port: process.env.DB_PORT || 3306,
+        dialectOptions: {
+            connectTimeout: 10000, // 10 seconds
+        },
+        pool: {
+            max: 900,
+            min: 0,
+            acquire: 30000,
+            idle: 10000,
+        },
         logging: false, // Set true for debugging SQL queries
         retry: { max: 3 }, // Auto-retry connection failures
     }
