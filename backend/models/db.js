@@ -9,7 +9,7 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "pearm_tracking_db",
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 100,
     queueLimit: 0
 });
 
