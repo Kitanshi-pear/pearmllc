@@ -15,7 +15,7 @@ const DB_CONFIG = {
 const pool = mysql.createPool({
     ...DB_CONFIG,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 72,
     queueLimit: 0,
 });
 
@@ -35,13 +35,13 @@ const sequelize = new Sequelize(DB_CONFIG.database, DB_CONFIG.user, DB_CONFIG.pa
     port: DB_CONFIG.port,
     dialect: "mysql",
     dialectOptions: {
-        connectTimeout: 10000,
+        connectTimeout: 72000,
     },
     pool: {
         max: 10,
         min: 0,
         acquire: 30000,
-        idle: 10000,
+        idle: 72000,
     },
     logging: false,
     retry: { max: 3 },
