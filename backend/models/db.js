@@ -2,57 +2,64 @@ require("dotenv").config();
 const mysql = require("mysql2");
 const { Sequelize } = require("sequelize");
 
-// ✅ DB Config strictly from .env
+// ✅ Validate required .env variables
+const requiredEnv = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_PORT"];
+for (const key of requiredEnv) {
+    if (!process.env[key]) {
+        console.error(`❌ Missing .env value: ${key}`);
+        process.exit(1);
+    }
+}
+
+// ✅ DB Config from environment
 const DB_CONFIG = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: parseInt(process.env.DB_PORT || 3306),
+    port: parseInt(process.env.DB_PORT, 10),
 };
 
-// ✅ MySQL Connection Pool (for raw queries)
+// ✅ Raw MySQL Connection Pool
 const pool = mysql.createPool({
     ...DB_CONFIG,
     waitForConnections: true,
-    connectionLimit: 72,
+    connectionLimit: 10,
     queueLimit: 0,
+    connectTimeout: 72000, // 72 seconds
 });
 
-// ✅ Handle MySQL Connection Errors
+// ✅ Test raw MySQL connection
 pool.getConnection((err, connection) => {
     if (err) {
-        console.error("❌ MySQL Connection Failed:", err.message);
+        console.error(`❌ MySQL Pool Connection Failed: ${err.message}`);
         process.exit(1);
     }
-    console.log("✅ MySQL Connected Successfully!");
+    console.log("✅ MySQL Pool Connected");
     connection.release();
 });
 
-// ✅ Sequelize ORM Connection
+// ✅ Sequelize ORM
 const sequelize = new Sequelize(DB_CONFIG.database, DB_CONFIG.user, DB_CONFIG.password, {
     host: DB_CONFIG.host,
     port: DB_CONFIG.port,
     dialect: "mysql",
-    dialectOptions: {
-        connectTimeout: 72000,
-    },
-    pool: {
-        max: 10,
-        min: 0,
-        acquire: 30000,
-        idle: 72000,
-    },
     logging: false,
-    retry: { max: 3 },
+    dialectOptions: {
+        connectTimeout: 72000, // 72 seconds
+    },
 });
 
-// ✅ Handle Sequelize Authentication
+// ✅ Test Sequelize connection
 sequelize.authenticate()
-    .then(() => console.log("✅ Sequelize Connected Successfully!"))
-    .catch(err => {
-        console.error("❌ Sequelize Connection Failed:", err.message);
+    .then(() => console.log("✅ Sequelize ORM Connected"))
+    .catch((err) => {
+        console.error("❌ Sequelize ORM Connection Failed:", err.message);
         process.exit(1);
     });
 
-module.exports = { pool: pool.promise(), sequelize };
+// ✅ Exports
+module.exports = {
+    sequelize,
+    pool: pool.promise(),
+};
