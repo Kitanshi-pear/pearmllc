@@ -13,7 +13,7 @@ dotenv.config();
 const app = express();
 
 // Ensure that port is properly set with a fallback if not provided
-const port = process.env.PORT; 
+const port = process.env.PORT || 10000; 
 
 // ✅ CORS Configuration
 const corsOptions = {
