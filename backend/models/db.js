@@ -2,14 +2,12 @@ require("dotenv").config();
 const mysql = require("mysql2");
 const { Sequelize } = require("sequelize");
 
-const isProduction = process.env.NODE_ENV === "production";
-
-// Environment-aware DB config
+// ✅ DB Config strictly from .env
 const DB_CONFIG = {
-    host: isProduction ? process.env.DB_HOST : process.env.DB_HOST_LOCAL || "localhost",
-    user: isProduction ? process.env.DB_USER : process.env.DB_USER_LOCAL || "root",
-    password: isProduction ? process.env.DB_PASSWORD : process.env.DB_PASSWORD_LOCAL || "",
-    database: process.env.DB_NAME || "pearm_tracking_db",
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT || 3306),
 };
 
