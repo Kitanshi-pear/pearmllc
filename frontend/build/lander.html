@@ -8,7 +8,7 @@
     body {
       font-family: Arial, sans-serif;
       padding: 2rem;
-      background: #f2f2f2;
+      background: linear-gradient(to right, #e3f2fd, #bbdefb);
       color: #333;
       text-align: center;
     }
@@ -22,6 +22,7 @@
       font-size: 1.2rem;
       text-decoration: none;
       border-radius: 8px;
+      transition: background-color 0.3s ease;
     }
 
     #cta-button:hover {
@@ -38,7 +39,7 @@
 </head>
 <body>
   <h1>🚗 Get Your Free Auto Insurance Quote</h1>
-  <p>Save big by comparing auto insurance providers in your area!</p>
+  <p>Compare and save on auto insurance in your area today!</p>
 
   <!-- Tracking Pixel -->
   <img class="tracking-pixel" id="lp-view-pixel" src="" alt="LP View Pixel" />
@@ -46,28 +47,30 @@
   <!-- Call to Action -->
   <a id="cta-button" href="#">Check My Quote</a>
 
-  <!-- Tracker JS -->
+  <!-- Script -->
   <script>
-    // Get tracking param from the URL — adjust the name if needed
+    // Generate or get ref_id
     const params = new URLSearchParams(window.location.search);
-    const refId = params.get("ref_id"); // <-- use the correct param name
-  
-    // Set pixel source only if refId is present
-    if (refId) {
-      const pixel = document.getElementById("lp-view-pixel");
-      pixel.src = `http://localhost:5000/lp-view?ref_id=${refId}`;
+    let refId = params.get("ref_id");
+
+    // If no ref_id present, generate one (optional)
+    if (!refId) {
+      refId = 'ref_' + Date.now(); // or use UUID if needed
     }
-  
-    // CTA click tracking + redirection (optional)
+
+    // Set tracking pixel source
+    const pixel = document.getElementById("lp-view-pixel");
+    pixel.src = `https://track.autofullcoverage.pro/lp-view?ref_id=${refId}`;
+
+    // Handle CTA click
     document.getElementById("cta-button").addEventListener("click", function (e) {
       e.preventDefault();
-      // Ensure the ref_id is passed during redirection
-      const destination = `http://localhost:5000/lander.html/?ref_id=${refId}`;
+      const destination = `https://track.autofullcoverage.pro/offer.html?ref_id=${refId}`;
       window.location.href = destination;
     });
   </script>
 
-  <!-- Ensure universal.js is correctly loaded from the frontend public folder -->
-  <script src="/scripts/universal.js"></script>
+  <!-- Optional: Universal tracking script -->
+  <script src="https://track.autofullcoverage.pro/path/to/universal.js"></script>
 </body>
 </html>
