@@ -1,0 +1,26 @@
+{
+  "development": {
+    "username": "admin",
+    "password": "Pear123Mllc",
+    "database": "pearm_tracking_db",
+    "host": "pearm-tracking-db.cgpy4482op4e.us-east-1.rds.amazonaws.com",
+    "dialect": "mysql",
+    "port": 3306
+  },
+  "test": {
+    "username": "admin",
+    "password": "Pear123Mllc",
+    "database": "pearm_tracking_db",
+    "host": "pearm-tracking-db.cgpy4482op4e.us-east-1.rds.amazonaws.com",
+    "dialect": "mysql",
+    "port": 3306
+  },
+  "production": {
+    "username": "admin",
+    "password": "Pear123Mllc",
+    "database": "pearm_tracking_db",
+    "host": "pearm-tracking-db.cgpy4482op4e.us-east-1.rds.amazonaws.com",
+    "dialect": "mysql",
+    "port": 3306
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "pmllc",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://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@github.com/Kitanshi-pear/pearmllc.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Kitanshi-pear/pearmllc/issues"
+  },
+  "homepage": "https://github.com/Kitanshi-pear/pearmllc#readme",
+  "description": "",
+  "dependencies": {
+    "@mui/x-data-grid-pro": "^7.28.3",
+    "mysql2": "^3.14.0",
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.2"
+  }
+}

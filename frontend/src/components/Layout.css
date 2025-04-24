@@ -1,0 +1,222 @@
+/* DASHBOARD LAYOUT */
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: linear-gradient(to right, #f0f2f5, #e0e0e0);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* HEADER STYLING */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #1e3c72, #2a5298); 
+  color: #fff;
+  padding: 20px 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1100;
+  transition: all 0.3s ease;
+}
+
+.dashboard-header:hover {
+  background: linear-gradient(135deg, #2a5298, #1e3c72);
+}
+
+/* LEFT SIDE: LOGO & COMPANY NAME */
+.header-left {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.header-left:hover {
+  transform: scale(1.05);
+}
+
+.company-logo {
+  height: 45px;
+  margin-right: 12px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
+}
+
+.company-name {
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* RIGHT SIDE: USER EMAIL */
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.user-email {
+  font-size: 16px;
+  font-weight: 500;
+  margin-right: 15px;
+  color: #ffffff;
+  transition: color 0.3s;
+}
+
+.user-email:hover {
+  color: #a8c0ff;
+}
+
+/* ICONS */
+.email-icon {
+  margin-right: 8px;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 260px;
+  background: #ffffff;
+  height: 100%;
+  padding: 30px 0;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.sidebar:hover {
+  width: 280px;
+}
+
+/* SIDEBAR MENU */
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar ul li {
+  display: flex;
+  align-items: center;
+  padding: 14px 25px;
+  transition: all 0.3s;
+  border-radius: 8px;
+  margin: 10px 20px;
+}
+
+.sidebar ul li:hover {
+  background: #1976d2;
+  box-shadow: 0 5px 15px rgba(25, 118, 210, 0.3);
+  transform: translateX(8px);
+}
+
+.sidebar ul li a {
+  color: #555;
+  text-decoration: none;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s;
+}
+
+.sidebar ul li a:hover {
+  color: #fff;
+}
+
+.sidebar ul li svg {
+  margin-right: 15px;
+  color: #1976d2;
+  font-size: 24px;
+  transition: transform 0.3s;
+}
+
+.sidebar ul li:hover svg {
+  color: #fff;
+  transform: scale(1.2);
+}
+
+/* SUBMENU FOR LOGS */
+.submenu {
+  padding-left: 35px;
+  background: #f9f9f9;
+  border-left: 3px solid #1976d2;
+}
+
+.submenu li {
+  padding: 10px 20px;
+  transition: all 0.3s;
+}
+
+.submenu li:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+/* MAIN CONTENT */
+.main-content {
+  flex-grow: 1;
+  padding: 30px;
+  background: linear-gradient(to bottom right, #ffffff, #f5f5f5);
+  overflow-y: auto;
+  transition: all 0.3s;
+}
+
+.main-content:hover {
+  background: #ffffff;
+}
+
+/* LOGOUT BUTTON */
+.logout-button {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #e63946, #c72c3b);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+}
+
+.logout-button:hover {
+  background: linear-gradient(135deg, #c72c3b, #e63946);
+  transform: scale(1.1);
+  box-shadow: 0 6px 18px rgba(230, 57, 70, 0.5);
+}
+
+/* AVATAR */
+.profile-pic {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: all 0.3s;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+}
+
+.profile-pic:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+/* MOBILE DRAWER */
+.mobile-drawer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+      display: none;
+  }
+  
+  .mobile-drawer {
+      display: block;
+  }
+
+  .dashboard-header {
+      padding: 15px 20px;
+  }
+
+  .main-content {
+      padding: 15px;
+  }
+}

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Your Auto Quote</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+      color: #333;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 5rem auto;
+      padding: 2rem;
+      background-color: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: #007bff;
+      margin-bottom: 0.5rem;
+      animation: fadeInDown 1s ease-out;
+    }
+
+    p.subtitle {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      color: #555;
+      animation: fadeInDown 1.3s ease-out;
+    }
+
+    .offer-card {
+      padding: 1.5rem;
+      background-color: #f9f9f9;
+      border-radius: 12px;
+      margin-top: 1rem;
+      text-align: left;
+      box-shadow: 0 5px 15px rgba(0, 123, 255, 0.1);
+      animation: fadeInUp 1s ease-in;
+    }
+
+    .offer-card h2 {
+      color: #007bff;
+      margin-top: 0;
+    }
+
+    .cta-button {
+      display: inline-block;
+      margin-top: 2rem;
+      padding: 1rem 2rem;
+      background-color: #28a745;
+      color: white;
+      font-size: 1.2rem;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: background-color 0.3s ease;
+    }
+
+    .cta-button:hover {
+      background-color: #218838;
+    }
+
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>🎉 Your Custom Auto Quote Is Ready!</h1>
+    <p class="subtitle">We found the best provider based on your location and profile.</p>
+
+    <div class="offer-card">
+      <h2>Statewide Auto Insurance</h2>
+      <p><strong>Monthly Premium:</strong> $45.67</p>
+      <p><strong>Coverage:</strong> Full coverage with roadside assistance</p>
+      <p><strong>Rating:</strong> ⭐⭐⭐⭐☆ (4.5/5 from 2,145 reviews)</p>
+    </div>
+
+    <a class="cta-button" id="apply-now-btn" href="#">Apply Now</a>
+  </div>
+
+  <script>
+    // Grab ref_id and set in final link
+    const params = new URLSearchParams(window.location.search);
+    const refId = params.get("ref_id");
+    const btn = document.getElementById("apply-now-btn");
+
+    if (refId) {
+      btn.href = `https://apply.pearmllc.com/?ref_id=${refId}`;
+    } else {
+      btn.href = "https://apply.pearmllc.com/";
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,175 @@
+/* 🌟 Full-Page Layout */
+.login-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  font-family: "Inter", sans-serif;
+}
+
+/* 🔵 Left Section - Image & Ad Text */
+.login-left {
+  flex: 1;
+  background: #f7f8fc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  position: relative;
+}
+
+/* 🏷 Logo */
+.logo {
+  width: 160px;
+  position: absolute;
+  top: 30px;
+  left: 30px;
+}
+
+/* 📊 Ad Image */
+.banner {
+  width: 75%;
+  max-width: 450px;
+  margin-top: 2rem;
+}
+
+/* 🔤 Left Side Text */
+.login-left h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 0.5rem;
+}
+
+.login-left p {
+  font-size: 1rem;
+  color: #6b7280;
+  max-width: 400px;
+  margin-top: 10px;
+}
+
+/* 🔴 Right Section - Login Form */
+.login-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+  padding: 3rem;
+  position: relative;
+}
+
+/* 🔗 Sign-up button (Top-Right) */
+.signup-button {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  background: transparent;
+  border: 1px solid #000;
+  color: #000;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.signup-button:hover {
+  background: #000;
+  color: #fff;
+}
+
+/* 🎯 Title Text */
+.login-right h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.red-text {
+  color: #ff3b30;
+  font-weight: 700;
+}
+
+.login-right p {
+  font-size: 1rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+/* 📋 Labels */
+label {
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0.5rem 0 0.2rem;
+}
+
+.required {
+  color: red;
+}
+
+/* ✏️ Input Fields */
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  background: #f8f9fa;
+}
+
+/* 🔗 Forgot Password */
+.forgot-password {
+  text-align: right;
+  font-size: 0.9rem;
+  color: #ff3b30;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+/* 🖤 Login Button */
+.login-button {
+  background: #000;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.login-button:hover {
+  background: #222;
+}
+
+/* 📱 Responsive Fixes */
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+  .login-left {
+    display: none; /* Hide left panel on small screens */
+  }
+  .login-right {
+    width: 100%;
+    padding: 3rem;
+  }
+  form {
+    width: 90%;
+  }
+}
