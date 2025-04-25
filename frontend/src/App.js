@@ -1,36 +1,31 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
+import Login from "./components/Login";
+import Dashboard from "./components/Dashboard";
+import AdminPanelPage from "./components/AdminPanelPage";
+import TrafficChannels from "./components/TrafficChannels";
+import Offers from "./components/Offers";
+import OfferSource from "./components/OfferSource";
+import DomainsPage from "./components/Domains";
+import LandingPage from "./components/Landers";
+import CampaignsPage from "./components/Campaigns";
 
-// Import your page components here
-import AdminPanel from "./components/AdminPanel";
-import CampaignsPage from "./components/CampaignsPage";
-import TrafficChannelsPage from "./components/TrafficChannelsPage";
-import OffersPage from "./components/OffersPage";
-import OfferSourcePage from "./components/OfferSourcePage";
-import ClickLogsPage from "./components/ClickLogsPage";
-import ConversionLogsPage from "./components/ConversionLogsPage";
-import LandersPage from "./components/LandersPage";
-import DomainsPage from "./components/DomainsPage";
-
-function App() {
+const App = () => {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/admin-panel" element={<AdminPanel />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/traffic-channels" element={<TrafficChannelsPage />} />
-          <Route path="/offers" element={<OffersPage />} />
-          <Route path="/offer-source" element={<OfferSourcePage />} />
-          <Route path="/logs/click-logs" element={<ClickLogsPage />} />
-          <Route path="/logs/conversion-logs" element={<ConversionLogsPage />} />
-          <Route path="/landers" element={<LandersPage />} />
-          <Route path="/domains" element={<DomainsPage />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/Admin%20Panel" element={<AdminPanelPage />} />
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/campaigns" element={<CampaignsPage />} />
+        <Route path="/traffic-channels" element={<TrafficChannels />} />
+        <Route path="/offers" element={<Offers />} />
+        <Route path="/offer-source" element={<OfferSource />} />
+        <Route path="/domains" element={<DomainsPage />} />
+        <Route path="/landers" element={<LandingPage />} />
+      </Routes>
     </Router>
   );
-}
+};
 
 export default App;
