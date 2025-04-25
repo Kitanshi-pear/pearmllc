@@ -29,7 +29,7 @@ import ClickIcon from "@mui/icons-material/TouchApp";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import pmLogo from "./pm1.png"; // Path to the transparent logo
-import "./Layout.css"; // Import your CSS file
+
 const drawerWidth = 260;
 
 const Layout = ({ children }) => {
