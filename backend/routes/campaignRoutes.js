@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Campaigns, Domain, TrafficChannel, Lander, Offer } = require("../models");
+const { Campaigns, Domain, TrafficChannel, Lander } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Helper: Generate promoting URL
@@ -8,47 +8,13 @@ const getPromotingUrl = (domainStr, campaignUniqueId) => {
   return `${domainStr}/track?unique_id=${campaignUniqueId}`;
 };
 
-// GET /api/campaigns - Get all campaigns
-router.get("/", async (req, res) => {
-  try {
-    const campaigns = await Campaigns.findAll({
-      include: [
-        { model: Domain, as: 'domain_id' },
-        { model: TrafficChannel, as: 'traffic_channel_id' },
-        { model: Lander, as: 'lander_id' },
-        { model: Offer, as: 'offer_id' }
-      ]
-    });
-    res.status(200).json(campaigns);
-  } catch (error) {
-    console.error("Error fetching campaigns:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 // POST /api/campaigns - Create a campaign
 router.post("/", async (req, res) => {
   try {
-    const { 
-      name, 
-      traffic_channel_id, 
-      domain_id, 
-      lander_id,
-      offer_id,
-      isDirectLinking,
-      costType,
-      costValue,
-      tags,
-      offerWeight,
-      autoOptimize,
-      status
-    } = req.body;
+    const { name, traffic_channel_id, domain_id, lander_id } = req.body;
 
-    console.log("Received campaign creation request:", req.body);
-
-    // Check only essential fields
-    if (!name || !traffic_channel_id || !domain_id) {
-      return res.status(400).json({ error: "Missing required fields", required: "name, traffic_channel_id, domain_id" });
+    if (!name || !traffic_channel_id || !domain_id || !lander_id) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
     const domain = await Domain.findByPk(domain_id);
@@ -57,98 +23,27 @@ router.post("/", async (req, res) => {
     const trafficChannel = await TrafficChannel.findByPk(traffic_channel_id);
     if (!trafficChannel) return res.status(400).json({ error: "Invalid traffic_channel_id" });
 
-    // Only check lander if not direct linking
-    if (!isDirectLinking && lander_id) {
-      const lander = await Lander.findByPk(lander_id);
-      if (!lander) return res.status(400).json({ error: "Invalid lander_id" });
-    }
-
-    // Check offer if provided
-    if (offer_id) {
-      const offer = await Offer.findByPk(offer_id);
-      if (!offer) return res.status(400).json({ error: "Invalid offer_id" });
-    }
+    const lander = await Lander.findByPk(lander_id);
+    if (!lander) return res.status(400).json({ error: "Invalid lander_id" });
 
     const unique_id = uuidv4().split("-")[0];
 
-    // Create campaign with all provided fields
     const campaign = await Campaigns.create({
       name,
       unique_id,
       traffic_channel_id,
       domain_id,
-      lander_id: isDirectLinking ? null : lander_id,
-      offer_id,
-      costType: costType || "CPC",
-      costValue: costValue || 0,
-      tags: tags || [],
-      offerWeight: offerWeight || 100,
-      autoOptimize: autoOptimize || false,
-      status: status || "ACTIVE",
-      isDirectLinking: isDirectLinking || false
+      lander_id,
     });
 
-    const promoting_url = getPromotingUrl(domain.url || domain.domain, campaign.unique_id);
+    const promoting_url = getPromotingUrl(domain.domain, campaign.unique_id);
 
     return res.status(201).json({
       ...campaign.toJSON(),
       promoting_url,
-      domain,
-      traffic_channel: trafficChannel
     });
   } catch (error) {
     console.error("Error creating campaign:", error);
-    res.status(500).json({ error: "Internal server error", details: error.message });
-  }
-});
-
-// Add support for the singular endpoint as well
-// This just redirects to the plural version
-router.get("/campaign", (req, res) => {
-  res.redirect("/api/campaigns");
-});
-
-router.post("/campaign", (req, res) => {
-  // Forward the request to the plural endpoint handler
-  router.handle(req, res);
-});
-
-// GET /api/campaigns/:id - Get a specific campaign
-router.get("/:id", async (req, res) => {
-  try {
-    const campaign = await Campaigns.findByPk(req.params.id, {
-      include: [
-        { model: Domain, as: 'domain_id' },
-        { model: TrafficChannel, as: 'traffic_channel_id' },
-        { model: Lander, as: 'lander_id' },
-        { model: Offer, as: 'offer_id' }
-      ]
-    });
-    
-    if (!campaign) {
-      return res.status(404).json({ error: "Campaign not found" });
-    }
-    
-    res.status(200).json(campaign);
-  } catch (error) {
-    console.error(`Error fetching campaign ${req.params.id}:`, error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// PUT /api/campaigns/:id - Update a campaign
-router.put("/:id", async (req, res) => {
-  try {
-    const campaign = await Campaigns.findByPk(req.params.id);
-    
-    if (!campaign) {
-      return res.status(404).json({ error: "Campaign not found" });
-    }
-    
-    await campaign.update(req.body);
-    res.status(200).json(campaign);
-  } catch (error) {
-    console.error(`Error updating campaign ${req.params.id}:`, error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
