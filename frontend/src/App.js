@@ -10,18 +10,12 @@ import DomainsPage from "./components/Domains";
 import LandingPage from "./components/Landers";
 import CampaignsPage from "./components/Campaigns";
 import AdminPanelPage from "./components/AdminPanelPage";
-import LogsPage from "./components/LogsPage";
-import ClickLogsPage from "./components/ClickLogsPage";
-import ConversionLogsPage from "./components/ConversionLogsPage";
 
 const App = () => {
   return (
     <Router>
       <Routes>
         <Route path="/admin" element={<AdminPanelPage />} />
-        <Route path="/logs" element={<LogsPage />} />
-        <Route path="/logs/click-logs" element={<ClickLogsPage />} />
-        <Route path="/logs/conversion-logs" element={<ConversionLogsPage />} />
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
