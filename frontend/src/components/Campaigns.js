@@ -212,7 +212,7 @@ export default function CampaignsPage() {
   ];
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/campaigns`)
+    axios.get(`${API_URL}`)
       .then((res) => {
         const campaignsWithIds = res.data.map((campaign, index) => ({
           ...campaign,
