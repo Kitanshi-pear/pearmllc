@@ -207,11 +207,7 @@ router.get("/:id", async (req, res) => {
                   attributes: ['click_id', 'timestamp'],
                   required: false,
               },
-              {
-                  model: Lpclicks,
-                  attributes: ['lpclick_id', 'timestamp'],
-                  required: false,
-              },
+           
               {
                   model: Offer,
                   attributes: ['offer_id', 'name'],
