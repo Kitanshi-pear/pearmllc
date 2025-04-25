@@ -54,14 +54,11 @@ Revenue.belongsTo(Click, { foreignKey: 'click_id' });
 // Metrics belong to Campaign
 Metrics.belongsTo(Campaigns, { foreignKey: 'campaign_id' });
 
-// Macros belong to TrafficChannel
-Macro.belongsTo(TrafficChannel, { foreignKey: 'source_id' });
+// Macros belong to TrafficChannel (foreign key: traffic_channel_id)
+Macro.belongsTo(TrafficChannel, { foreignKey: "traffic_channel_id" });
 
 // Campaign Associations
 Campaigns.hasOne(Metrics, { foreignKey: 'campaign_id' });
-
-
-// Additional associations can be added for other models as needed
 
 // Export the models and sequelize instance
 db.Click = Click;
