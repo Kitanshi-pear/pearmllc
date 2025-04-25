@@ -211,7 +211,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
       }
     }
   };
-
+  
   const handleAddTag = () => {
     if (tagInput && !tags.includes(tagInput)) {
       setTags([...tags, tagInput]);
@@ -636,80 +636,69 @@ export default function CampaignsPage() {
   ];
 
   const fetchCampaigns = () => {
-  setLoading(true);
-  
-  console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
-  
-  axios.get(`${API_URL}/api/campaigns`)
-    .then((res) => {
-      console.log("Campaign data received:", res.data);
-      const campaignsWithIds = res.data.map((campaign) => ({
-        ...campaign,
-        id: campaign.id || campaign._id || campaign.campaign_id,
-      }));
-      setCampaigns(campaignsWithIds);
-      setLoading(false);
-      
-      // Fetch metrics for these campaigns
-      fetchMetrics(campaignsWithIds.map(c => c.id));
-    })
-    .catch((err) => {
-      console.error("Error fetching campaigns:", err);
-      
-      // Enhanced error logging
-      if (err.response) {
-        console.error("Response status:", err.response.status);
-        console.error("Response data:", err.response.data);
+    setLoading(true);
+    
+    console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
+    
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => {
+        console.log("Campaign data received:", res.data);
+        const campaignsWithIds = res.data.map((campaign) => ({
+          ...campaign,
+          id: campaign.id || campaign._id || campaign.campaign_id,
+        }));
+        setCampaigns(campaignsWithIds);
+        setLoading(false);
         
-        // Try an alternative endpoint if we get a 404
-        if (err.response.status === 404) {
-          console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
+        // Fetch metrics for these campaigns
+        fetchMetrics(campaignsWithIds.map(c => c.id));
+      })
+      .catch((err) => {
+        console.error("Error fetching campaigns:", err);
+        
+        // Enhanced error logging
+        if (err.response) {
+          console.error("Response status:", err.response.status);
+          console.error("Response data:", err.response.data);
           
-          // Try without the 's' in campaigns
-          axios.get(`${API_URL}/api/campaign`)
-            .then((res) => {
-              const campaignsWithIds = res.data.map((campaign) => ({
-                ...campaign,
-                id: campaign.id || campaign._id || campaign.campaign_id,
-              }));
-              setCampaigns(campaignsWithIds);
-              setLoading(false);
-              
-              // Fetch metrics for these campaigns
-              fetchMetrics(campaignsWithIds.map(c => c.id));
-            })
-            .catch((altErr) => {
-              console.error("Alternative endpoint also failed:", altErr);
-              
-              // As a last resort, try to manually check if we can do a server health check
-              axios.get(`${API_URL}/health`)
-                .then(() => {
-                  setLoading(false);
-                  setSnackbarMessage("API is running but campaigns endpoint not found. Please check API configuration.");
-                  setSnackbarSeverity("warning");
-                  setSnackbarOpen(true);
-                })
-                .catch(() => {
-                  setLoading(false);
-                  setSnackbarMessage("Cannot connect to API server. Please check server status and network connection.");
-                  setSnackbarSeverity("error");
-                  setSnackbarOpen(true);
-                });
-            });
+          // Try an alternative endpoint if we get a 404
+          if (err.response.status === 404) {
+            console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
+            
+            // Try without the 's' in campaigns
+            axios.get(`${API_URL}/api/campaign`)
+              .then((res) => {
+                const campaignsWithIds = res.data.map((campaign) => ({
+                  ...campaign,
+                  id: campaign.id || campaign._id || campaign.campaign_id,
+                }));
+                setCampaigns(campaignsWithIds);
+                setLoading(false);
+                
+                // Fetch metrics for these campaigns
+                fetchMetrics(campaignsWithIds.map(c => c.id));
+              })
+              .catch((altErr) => {
+                console.error("Alternative endpoint also failed:", altErr);
+                setLoading(false);
+                setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
+                setSnackbarSeverity("error");
+                setSnackbarOpen(true);
+              });
+          } else {
+            setLoading(false);
+            setSnackbarMessage(`API Error (${err.response.status}): ${err.response.data?.message || "Unknown error"}`);
+            setSnackbarSeverity("error");
+            setSnackbarOpen(true);
+          }
         } else {
           setLoading(false);
-          setSnackbarMessage(`API Error (${err.response.status}): ${err.response.data?.message || "Unknown error"}`);
+          setSnackbarMessage("Failed to connect to the server. Please check your network connection.");
           setSnackbarSeverity("error");
           setSnackbarOpen(true);
         }
-      } else {
-        setLoading(false);
-        setSnackbarMessage("Failed to connect to the server. Please check your network connection.");
-        setSnackbarSeverity("error");
-        setSnackbarOpen(true);
-      }
-    });
-};
+      });
+  };
   
   const fetchMetrics = (campaignIds) => {
     // Format date range for API
