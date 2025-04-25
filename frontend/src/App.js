@@ -9,20 +9,26 @@ import OfferSource from "./components/OfferSource";
 import DomainsPage from "./components/Domains";
 import LandingPage from "./components/Landers";
 import CampaignsPage from "./components/Campaigns";
+import Layout from "./components/Layout"; // Import your Layout
 
 const App = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/Admin%20Panel" element={<AdminPanelPage />} />
+        {/* Public Route */}
         <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/campaigns" element={<CampaignsPage />} />
-        <Route path="/traffic-channels" element={<TrafficChannels />} />
-        <Route path="/offers" element={<Offers />} />
-        <Route path="/offer-source" element={<OfferSource />} />
-        <Route path="/domains" element={<DomainsPage />} />
-        <Route path="/landers" element={<LandingPage />} />
+
+        {/* Routes that use the Layout with Sidebar */}
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin-panel" element={<AdminPanelPage />} />
+          <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/traffic-channels" element={<TrafficChannels />} />
+          <Route path="/offers" element={<Offers />} />
+          <Route path="/offer-source" element={<OfferSource />} />
+          <Route path="/domains" element={<DomainsPage />} />
+          <Route path="/landers" element={<LandingPage />} />
+        </Route>
       </Routes>
     </Router>
   );
