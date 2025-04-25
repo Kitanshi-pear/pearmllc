@@ -198,128 +198,70 @@ export default function CampaignsPage() {
     {
       field: "status",
       headerName: "Campaign Status",
-      width: 140,
-      renderCell: (params) => <span style={{ color: "green" }}>● {params.value}</span>,
+      flex: 1,
+      renderCell: (params) => (
+        <Chip label={params.value} color={params.value === "ACTIVE" ? "primary" : "default"} />
+      ),
     },
-    {
-      field: "traffic_channel",
-      headerName: "Traffic Channel",
-      width: 180,
-      renderCell: (params) => {
-        console.log('Row:', params.row);
-        const channel = params.row.traffic_channel;
-        return channel ? `${channel.channelName}` : '';
-      },      
-    },      
-    { field: "clicks", headerName: "Clicks", width: 100 },
-    { field: "lp_clicks", headerName: "LP Clicks", width: 110 },
-    { field: "conversions", headerName: "Conversions", width: 120 },
-    {
-      field: "revenue",
-      headerName: "Total Revenue",
-      width: 130,
-      renderCell: (params) => `$${params.value?.toFixed(2) ?? "0.00"}`,
-    },
-    {
-      field: "cost",
-      headerName: "Cost",
-      width: 100,
-      renderCell: (params) => `$${params.value?.toFixed(2) ?? "0.00"}`,
-    },
-    {
-      field: "profit",
-      headerName: "Profit",
-      width: 100,
-      renderCell: (params) => `$${params.value?.toFixed(2) ?? "0.00"}`,
-    },
+    { field: "costType", headerName: "Cost Type", flex: 1 },
+    { field: "costValue", headerName: "Cost Value", flex: 1 },
+    { field: "tags", headerName: "Tags", flex: 1 },
+    { field: "offer", headerName: "Offer", flex: 1 },
+    { field: "offerWeight", headerName: "Weight", flex: 1 },
+    { field: "autoOptimize", headerName: "Auto Optimize", flex: 1, renderCell: (params) => (params.value ? "Yes" : "No") },
   ];
 
-  const handleCreateCampaign = (campaign) => {
-    setCampaigns((prev) => [...prev, campaign]);
-  };
-
-  const fetchCampaigns = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API_URL}/api/campaigns`);
-      setCampaigns(response.data);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching campaigns:", err);
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchCampaigns();
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => {
+        const campaignsWithIds = res.data.map((campaign, index) => ({
+          ...campaign,
+          id: campaign.id || campaign._id || index, // Ensure each row has an `id`
+        }));
+        setCampaigns(campaignsWithIds);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching campaigns:", err);
+        setLoading(false);
+      });
   }, []);
 
+  const handleCreateClick = () => {
+    setCreateOpen(true);
+  };
+
+  const handleCreateClose = () => {
+    setCreateOpen(false);
+  };
+
+  const handleCreate = (newCampaign) => {
+    setCampaigns([...campaigns, newCampaign]);
+  };
 
   return (
     <Layout>
-      <Box>
-        {/* Header */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-          <Typography variant="h4">Campaigns</Typography>
-          <Button variant="contained" onClick={() => setCreateOpen(true)}>Create Campaign</Button>
-        </Box>
+      <Typography variant="h4">Campaigns</Typography>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleCreateClick}
+        startIcon={<AddIcon />}
+      >
+        Add Campaign
+      </Button>
 
-        {/* Filter Bar */}
-        <Box display="flex" alignItems="center" gap={2} mb={2} flexWrap="wrap">
-          <TextField label="Date" size="small" sx={{ width: 200 }} value={selectedDateLabel} onClick={(e) => setAnchorEl(e.currentTarget)} />
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-            {Object.entries(predefinedRanges).map(([label, range]) => (
-              <MenuItem key={label} onClick={() => {
-                setSelectedDateLabel(label);
-                setSelectedRange(range);
-                setAnchorEl(null);
-              }}>{label}</MenuItem>
-            ))}
-          </Menu>
-          <IconButton sx={{ border: "1px solid #ccc", borderRadius: 1, p: 1, height: 40, width: 40 }}>
-            <EastIcon fontSize="medium" /><WestIcon fontSize="medium" />
-          </IconButton>
-          <TextField label="Date" type="date" size="small" sx={{ width: 200 }} InputLabelProps={{ shrink: true }} />
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Traffic channels</InputLabel>
-            <Select defaultValue="">
-              <MenuItem value="">Traffic channels</MenuItem>
-              <MenuItem value="Facebook">Facebook</MenuItem>
-              <MenuItem value="Google Ads">Google Ads</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Status</InputLabel>
-            <Select defaultValue="Active" label="Status">
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Paused">Paused</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField label="Time zone" size="small" defaultValue="America/New_York" />
-          <TextField label="Title" size="small" />
-          <TextField label="Tags" size="small" />
-          <Button variant="contained">Apply</Button>
-        </Box>
+      <DataGrid
+        rows={campaigns}
+        columns={columns}
+        pageSize={10}
+        loading={loading}
+        rowsPerPageOptions={[5, 10, 25]}
+        checkboxSelection
+        disableSelectionOnClick
+      />
 
-        {/* Table */}
-        <DataGrid
-          rows={campaigns}
-          columns={columns}
-          pageSize={100}
-          rowsPerPageOptions={[100]}
-          loading={loading}
-          checkboxSelection
-          autoHeight
-          disableSelectionOnClick
-        />
-
-        {/* Create Modal */}
-        <CampaignModal
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
-          onCreate={handleCreateCampaign}
-        />
-      </Box>
+      <CampaignModal open={createOpen} onClose={handleCreateClose} onCreate={handleCreate} />
     </Layout>
   );
 }
