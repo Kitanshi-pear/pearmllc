@@ -1,44 +1,59 @@
 import React, { useEffect, useState } from "react";
 import {
-  Menu, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Select, MenuItem, InputLabel, FormControl, Button, ToggleButton, ToggleButtonGroup, Chip, Box, Typography, Tabs, Tab, Switch, Divider, Tooltip,
+  Menu, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Select, MenuItem, InputLabel, 
+  FormControl, Button, ToggleButton, ToggleButtonGroup, Chip, Box, Typography, Tabs, Tab, Switch, Divider, 
+  Tooltip, Snackbar, Alert, Paper, Grid
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import EastIcon from "@mui/icons-material/East";
 import WestIcon from "@mui/icons-material/West";
 import CloseIcon from "@mui/icons-material/Close";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import EditIcon from "@mui/icons-material/Edit";
+import LaunchIcon from "@mui/icons-material/Launch";
 import axios from "axios";
 import Layout from "./Layout";
-import { startOfToday, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { startOfToday, subDays, startOfMonth, endOfMonth, format } from "date-fns";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
 
-const CampaignModal = ({ open, onClose, onCreate }) => {
+const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData = {} }) => {
   const [tabIndex, setTabIndex] = useState(0);
-  const [campaignName, setCampaignName] = useState("");
-  const [trafficChannel, setTrafficChannel] = useState("");
-  const [trackingDomain, setTrackingDomain] = useState("");
-  const [costType, setCostType] = useState("CPC");
-  const [costValue, setCostValue] = useState("0");
-  const [tags, setTags] = useState([]);
+  const [campaignName, setCampaignName] = useState(editMode ? campaignData.name || "" : "");
+  const [trafficChannel, setTrafficChannel] = useState(editMode ? campaignData.traffic_channel_id || "" : "");
+  const [trackingDomain, setTrackingDomain] = useState(editMode ? campaignData.domain_id || "" : "");
+  const [costType, setCostType] = useState(editMode ? campaignData.costType || "CPC" : "CPC");
+  const [costValue, setCostValue] = useState(editMode ? campaignData.costValue || "0" : "0");
+  const [tags, setTags] = useState(editMode ? campaignData.tags || [] : []);
   const [tagInput, setTagInput] = useState("");
-  const [offer, setOffer] = useState("");
-  const [offerWeight, setOfferWeight] = useState("100");
-  const [autoOptimize, setAutoOptimize] = useState(false);
+  const [offer, setOffer] = useState(editMode ? campaignData.offer || "" : "");
+  const [offerWeight, setOfferWeight] = useState(editMode ? campaignData.offerWeight || "100" : "100");
+  const [autoOptimize, setAutoOptimize] = useState(editMode ? campaignData.autoOptimize || false : false);
   const [trafficChannels, setTrafficChannels] = useState([]);
   const [domains, setDomains] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [isDirectLinking, setIsDirectLinking] = useState(editMode ? campaignData.isDirectLinking || false : false);
+  const [lander, setLander] = useState(editMode ? campaignData.lander_id || "" : "");
+  const [landers, setLanders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const selectedDomain = domains.find(d => d.id === trackingDomain);
-  const clickUrl = selectedDomain ? `https://${selectedDomain.url}/click?cid=...` : "";
 
   useEffect(() => {
     if (open) {
+      setLoading(true);
+      
+      // Fetch traffic channels
       fetch(`${API_URL}/api/traffic/facebook`)
         .then((res) => res.json())
         .then((data) => setTrafficChannels(data))
         .catch((err) => console.error("Error fetching traffic channels:", err));
 
+      // Fetch domains
       fetch(`${API_URL}/api/domains`)
         .then(res => res.json())
         .then(data => {
@@ -49,39 +64,81 @@ const CampaignModal = ({ open, onClose, onCreate }) => {
           setDomains(cleaned);
         })
         .catch(err => console.error('Error fetching domains:', err));
+        
+      // Fetch offers
+      fetch(`${API_URL}/api/offers`)
+        .then(res => res.json())
+        .then(data => setOffers(data))
+        .catch(err => console.error('Error fetching offers:', err));
+        
+      // Fetch landers
+      fetch(`${API_URL}/api/landers`)
+        .then(res => res.json())
+        .then(data => setLanders(data))
+        .catch(err => console.error('Error fetching landers:', err));
+        
+      setLoading(false);
     }
   }, [open]);
 
+  // Generate tracking URL when relevant fields change
+  useEffect(() => {
+    if (selectedDomain && trafficChannel) {
+      let url = `https://${selectedDomain?.url}/api/track/click?campaign_id=${editMode ? campaignData.id : 'CAMPAIGN_ID'}&tc=${trafficChannel}`;
+      
+      // Add placeholder macros
+      url += '&sub1={sub1}&sub2={sub2}&sub3={sub3}';
+      
+      setTrackingUrl(url);
+    } else {
+      setTrackingUrl("");
+    }
+  }, [selectedDomain, trafficChannel, editMode, campaignData]);
+
   const handleSubmit = async () => {
-    const newCampaign = {
+    const campaignPayload = {
       name: campaignName,
       traffic_channel_id: trafficChannel,
       domain_id: trackingDomain,
       costType,
       costValue,
       tags,
-      offer: offer || null,
+      offer_id: offer,
       offerWeight: offerWeight || 100,
       autoOptimize,
+      isDirectLinking,
+      lander_id: isDirectLinking ? null : lander,
+      status: "ACTIVE"
     };
 
     try {
-      const res = await axios.post(`${API_URL}/api/campaigns`, newCampaign);
-      onCreate(res.data);
-      onClose();
+      let res;
+      if (editMode) {
+        res = await axios.put(`${API_URL}/api/campaigns/${campaignData.id}`, campaignPayload);
+        onClose(res.data);
+      } else {
+        res = await axios.post(`${API_URL}/api/campaigns`, campaignPayload);
+        onCreate(res.data);
+        onClose();
+      }
 
-      setCampaignName("");
-      setTrafficChannel("");
-      setTrackingDomain("");
-      setCostType("CPC");
-      setCostValue("0");
-      setTags([]);
-      setTagInput("");
-      setOffer("");
-      setOfferWeight("100");
-      setAutoOptimize(false);
+      // Reset form after submission
+      if (!editMode) {
+        setCampaignName("");
+        setTrafficChannel("");
+        setTrackingDomain("");
+        setCostType("CPC");
+        setCostValue("0");
+        setTags([]);
+        setTagInput("");
+        setOffer("");
+        setOfferWeight("100");
+        setAutoOptimize(false);
+        setIsDirectLinking(false);
+        setLander("");
+      }
     } catch (error) {
-      console.error("Error creating campaign:", error);
+      console.error("Error saving campaign:", error);
     }
   };
 
@@ -91,87 +148,289 @@ const CampaignModal = ({ open, onClose, onCreate }) => {
       setTagInput("");
     }
   };
+  
+  const handleDeleteTag = (tagToDelete) => {
+    setTags(tags.filter(tag => tag !== tagToDelete));
+  };
+  
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setSnackbarMessage("Copied to clipboard!");
+    setSnackbarOpen(true);
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
-      <DialogTitle sx={{ display: "flex", justifyContent: "space-between" }}>
-        Campaign
-        <IconButton onClick={onClose}><CloseIcon /></IconButton>
-      </DialogTitle>
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between" }}>
+          {editMode ? "Edit Campaign" : "Create Campaign"}
+          <IconButton onClick={onClose}><CloseIcon /></IconButton>
+        </DialogTitle>
 
-      <Tabs value={tabIndex} onChange={(_, i) => setTabIndex(i)} sx={{ px: 3 }}>
-        <Tab label="Campaign Details" />
-      </Tabs>
+        <Tabs value={tabIndex} onChange={(_, i) => setTabIndex(i)} sx={{ px: 3 }}>
+          <Tab label="Campaign Details" />
+          <Tab label="Tracking & Routing" />
+        </Tabs>
 
-      <DialogContent dividers>
-        {tabIndex === 0 && (
-          <Box display="flex">
-            <Box flex={1}>
+        <DialogContent dividers>
+          {tabIndex === 0 && (
+            <Box display="flex" flexDirection="column" gap={2}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>General</Typography>
               <Divider />
-              <TextField label="Name" fullWidth value={campaignName} onChange={(e) => setCampaignName(e.target.value)} margin="normal" />
-              <Box display="flex" gap={1} my={2}>
-                <FormControl fullWidth>
+              <TextField 
+                label="Campaign Name" 
+                fullWidth 
+                value={campaignName} 
+                onChange={(e) => setCampaignName(e.target.value)} 
+                required
+              />
+              
+              <Box display="flex" gap={2}>
+                <FormControl fullWidth required>
                   <InputLabel>Traffic Channel</InputLabel>
-                  <Select value={trafficChannel} onChange={(e) => setTrafficChannel(e.target.value)} label="Traffic Channel">
+                  <Select 
+                    value={trafficChannel} 
+                    onChange={(e) => setTrafficChannel(e.target.value)} 
+                    label="Traffic Channel"
+                  >
                     {trafficChannels.map((channel) => (
                       <MenuItem key={channel.id} value={channel.id}>
-                        {channel.channelName} ({channel.aliasChannel})
+                        {channel.channelName} ({channel.aliasChannel || "N/A"})
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl fullWidth>
+                
+                <FormControl fullWidth required>
                   <InputLabel>Tracking Domain</InputLabel>
-                  <Select value={trackingDomain} onChange={(e) => setTrackingDomain(e.target.value)} label="Tracking Domain">
-                    {domains.map((domain, index) => (
-                      <MenuItem key={index} value={domain.id}>{domain.url}</MenuItem>
+                  <Select 
+                    value={trackingDomain} 
+                    onChange={(e) => setTrackingDomain(e.target.value)} 
+                    label="Tracking Domain"
+                  >
+                    {domains.map((domain) => (
+                      <MenuItem key={domain.id} value={domain.id}>{domain.url}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </Box>
+              
               <Typography variant="subtitle2" gutterBottom display="flex" alignItems="center">
                 Campaign Cost
-                <Tooltip title="Choose how cost will be tracked."><span style={{ marginLeft: 1, cursor: "pointer" }}>❓</span></Tooltip>
+                <Tooltip title="Choose how cost will be tracked.">
+                  <span style={{ marginLeft: 8, cursor: "pointer" }}>❓</span>
+                </Tooltip>
               </Typography>
+              
               <ToggleButtonGroup
                 value={costType}
                 exclusive
                 onChange={(e, value) => value && setCostType(value)}
-                sx={{ mb: 2, display: 'flex', flexDirection: 'row', gap: 0, flexWrap: 'nowrap', overflowX: 'auto' }}
+                sx={{ mb: 2, display: 'flex', flexWrap: 'wrap' }}
               >
                 {["CPC", "CPA", "CPM", "POPCPM", "REVSHARE", "DONOTTRACK"].map((val) => (
                   <ToggleButton key={val} value={val}>{val}</ToggleButton>
                 ))}
               </ToggleButtonGroup>
-              <TextField label="Value" type="number" value={costValue} onChange={(e) => setCostValue(e.target.value)} InputProps={{ endAdornment: "$" }} />
+              
+              <TextField 
+                label="Cost Value" 
+                type="number" 
+                value={costValue} 
+                onChange={(e) => setCostValue(e.target.value)} 
+                InputProps={{ endAdornment: "$" }} 
+              />
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Tags</Typography>
+              <Box display="flex" flexWrap="wrap" gap={1}>
+                {tags.map((tag, i) => (
+                  <Chip 
+                    key={i} 
+                    label={tag} 
+                    onDelete={() => handleDeleteTag(tag)}
+                  />
+                ))}
+              </Box>
+              
+              <Box display="flex" gap={1}>
+                <TextField 
+                  label="Add Tag" 
+                  value={tagInput} 
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddTag();
+                      e.preventDefault();
+                    }
+                  }}
+                />
+                <Button variant="outlined" onClick={handleAddTag}>Add</Button>
+              </Box>
             </Box>
-          </Box>
-        )}
-        <Divider sx={{ my: 1 }} />
-        <Typography variant="subtitle2" gutterBottom>Tags</Typography>
-        <Box display="flex" flexWrap="wrap">{tags.map((tag, i) => <Chip key={i} label={tag} />)}</Box>
-        <Box display="flex" gap={1}>
-          <TextField label="Add Tag" value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
-          <Button variant="outlined" onClick={handleAddTag}>Add</Button>
-        </Box>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="subtitle2" gutterBottom>Tracking links and parameters</Typography>
-        <Box display="flex" mb={2}>
-          <Button variant="contained">REDIRECT</Button>
-        </Box>
-        <TextField
-          label="Click URL"
-          fullWidth
-          value={clickUrl}
-        />
-      </DialogContent>
+          )}
+          
+          {tabIndex === 1 && (
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Traffic Routing</Typography>
+              <Divider />
+              
+              <Box display="flex" alignItems="center" gap={1}>
+                <Switch 
+                  checked={isDirectLinking} 
+                  onChange={(e) => setIsDirectLinking(e.target.checked)} 
+                />
+                <Typography>Direct Linking (Skip Lander)</Typography>
+              </Box>
+              
+              {!isDirectLinking && (
+                <FormControl fullWidth required={!isDirectLinking}>
+                  <InputLabel>Landing Page</InputLabel>
+                  <Select 
+                    value={lander} 
+                    onChange={(e) => setLander(e.target.value)} 
+                    label="Landing Page"
+                    disabled={isDirectLinking}
+                  >
+                    {landers.map((lander) => (
+                      <MenuItem key={lander.id} value={lander.id}>
+                        {lander.name} ({lander.url})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              
+              <FormControl fullWidth required>
+                <InputLabel>Offer</InputLabel>
+                <Select 
+                  value={offer} 
+                  onChange={(e) => setOffer(e.target.value)} 
+                  label="Offer"
+                >
+                  {offers.map((offerItem) => (
+                    <MenuItem key={offerItem.id} value={offerItem.id}>
+                      {offerItem.name} (${offerItem.payout})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <TextField 
+                label="Offer Weight" 
+                type="number" 
+                value={offerWeight} 
+                onChange={(e) => setOfferWeight(e.target.value)}
+                InputProps={{ endAdornment: "%" }}
+                helperText="For offer rotations (if applicable)"
+              />
+              
+              <Box display="flex" alignItems="center" gap={1}>
+                <Switch 
+                  checked={autoOptimize} 
+                  onChange={(e) => setAutoOptimize(e.target.checked)} 
+                />
+                <Typography>Auto-Optimize Offers</Typography>
+              </Box>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Tracking Links</Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Campaign Tracking URL</Typography>
+                  <IconButton onClick={() => copyToClipboard(trackingUrl)} size="small">
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <TextField
+                  fullWidth
+                  value={trackingUrl}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                  This URL will track clicks to your campaign. Append additional sub parameters as needed.
+                </Typography>
+              </Paper>
+              
+              {!isDirectLinking && (
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="subtitle2">Lander View Tracking Code</Typography>
+                    <IconButton 
+                      onClick={() => copyToClipboard(`<img src="${API_URL}/api/track/lander?click_id={CLICK_ID}" style="position:absolute; visibility:hidden;" height="1" width="1" />`)} 
+                      size="small"
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  <TextField
+                    fullWidth
+                    value={`<img src="${API_URL}/api/track/lander?click_id={CLICK_ID}" style="position:absolute; visibility:hidden;" height="1" width="1" />`}
+                    variant="outlined"
+                    size="small"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                    Add this invisible pixel to your landing page to track views. Replace {'{CLICK_ID}'} with the actual click_id parameter.
+                  </Typography>
+                </Paper>
+              )}
+              
+              <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Conversion Tracking URL</Typography>
+                  <IconButton 
+                    onClick={() => copyToClipboard(`${API_URL}/api/track/conversion?click_id={CLICK_ID}&payout={PAYOUT}`)} 
+                    size="small"
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <TextField
+                  fullWidth
+                  value={`${API_URL}/api/track/conversion?click_id={CLICK_ID}&payout={PAYOUT}`}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                  Use this URL for server-to-server conversion tracking. Replace {'{CLICK_ID}'} with the actual click_id and {'{PAYOUT}'} with the conversion amount.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
 
-      <DialogActions>
-        <Button onClick={handleSubmit} variant="contained">Save</Button>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
+        <DialogActions>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {editMode ? "Update Campaign" : "Create Campaign"}
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+      
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity="success">
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 
@@ -179,10 +438,225 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedDateLabel, setSelectedDateLabel] = useState("Today");
-  const [selectedRange, setSelectedRange] = useState([startOfToday(), startOfToday()]);
+  const [dateRange, setDateRange] = useState([startOfToday(), startOfToday()]);
+  const [metrics, setMetrics] = useState({});
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
+  const columns = [
+    { field: "id", headerName: "ID", width: 70 },
+    { field: "name", headerName: "Campaign Name", flex: 1 },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 120,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value} 
+          color={params.value === "ACTIVE" ? "success" : "default"} 
+          size="small"
+        />
+      ),
+    },
+    {
+      field: "traffic_channel",
+      headerName: "Traffic Source",
+      width: 150,
+      valueGetter: (params) => params.row.traffic_channel?.channelName || "N/A"
+    },
+    { 
+      field: "costType", 
+      headerName: "Cost Type", 
+      width: 100 
+    },
+    { 
+      field: "costValue", 
+      headerName: "Cost", 
+      width: 80,
+      valueFormatter: (params) => `$${params.value}` 
+    },
+    {
+      field: "metrics",
+      headerName: "Clicks",
+      width: 80,
+      valueGetter: (params) => metrics[params.row.id]?.clicks || 0
+    },
+    {
+      field: "conversions",
+      headerName: "Conversions",
+      width: 110,
+      valueGetter: (params) => metrics[params.row.id]?.conversions || 0
+    },
+    {
+      field: "cr",
+      headerName: "CR%",
+      width: 80,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        const clicks = campaignMetrics.clicks || 0;
+        const conversions = campaignMetrics.conversions || 0;
+        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+      },
+      valueFormatter: (params) => `${params.value}%`
+    },
+    {
+      field: "revenue",
+      headerName: "Revenue",
+      width: 100,
+      valueGetter: (params) => metrics[params.row.id]?.total_revenue || 0,
+      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    },
+    {
+      field: "profit",
+      headerName: "Profit",
+      width: 100,
+      valueGetter: (params) => metrics[params.row.id]?.profit || 0,
+      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      renderCell: (params) => (
+        <Box display="flex">
+          <IconButton
+            size="small"
+            onClick={() => handleEditClick(params.row)}
+            title="Edit Campaign"
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              // Function to copy tracking URL
+              const domain = params.row.domain?.url || "yourdomain.com";
+              const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
+              navigator.clipboard.writeText(trackingUrl);
+              setSnackbarMessage("Tracking URL copied to clipboard!");
+              setSnackbarOpen(true);
+            }}
+            title="Copy Tracking URL"
+          >
+            <ContentCopyIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              window.open(`/campaigns/${params.row.id}`, '_blank');
+            }}
+            title="View Campaign Details"
+          >
+            <LaunchIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ),
+    },
+  ];
+
+  const fetchCampaigns = () => {
+    setLoading(true);
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => {
+        const campaignsWithIds = res.data.map((campaign) => ({
+          ...campaign,
+          id: campaign.id || campaign._id || campaign.campaign_id,
+        }));
+        setCampaigns(campaignsWithIds);
+        setLoading(false);
+        
+        // Fetch metrics for these campaigns
+        fetchMetrics(campaignsWithIds.map(c => c.id));
+      })
+      .catch((err) => {
+        console.error("Error fetching campaigns:", err);
+        setLoading(false);
+        setSnackbarMessage("Failed to load campaigns. Please try again.");
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
+      });
+  };
+  
+  const fetchMetrics = (campaignIds) => {
+    // Format date range for API
+    const startDate = format(dateRange[0], 'yyyy-MM-dd');
+    const endDate = format(dateRange[1], 'yyyy-MM-dd');
+    
+    // Create metrics object to store by campaign ID
+    const metricsData = {};
+    
+    // Fetch metrics for each campaign
+    const fetchPromises = campaignIds.map(id => 
+      axios.get(`${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`)
+        .then(res => {
+          // Sum up metrics if multiple records are returned
+          const campaignMetrics = res.data.reduce((acc, curr) => {
+            Object.keys(curr).forEach(key => {
+              if (typeof curr[key] === 'number') {
+                acc[key] = (acc[key] || 0) + curr[key];
+              }
+            });
+            return acc;
+          }, {});
+          
+          metricsData[id] = campaignMetrics;
+        })
+        .catch(err => {
+          console.error(`Error fetching metrics for campaign ${id}:`, err);
+        })
+    );
+    
+    Promise.all(fetchPromises)
+      .then(() => {
+        setMetrics(metricsData);
+      })
+      .catch(err => {
+        console.error("Error fetching metrics:", err);
+      });
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+  
+  useEffect(() => {
+    if (campaigns.length > 0) {
+      fetchMetrics(campaigns.map(c => c.id));
+    }
+  }, [dateRange, campaigns]);
+
+  const handleCreateClick = () => {
+    setCreateOpen(true);
+  };
+
+  const handleCreateClose = () => {
+    setCreateOpen(false);
+    fetchCampaigns(); // Refresh the campaigns list
+  };
+
+  const handleEditClick = (campaign) => {
+    setSelectedCampaign(campaign);
+    setEditOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setEditOpen(false);
+    setSelectedCampaign(null);
+    fetchCampaigns(); // Refresh the campaigns list
+  };
+
+  const handleCreate = (newCampaign) => {
+    fetchCampaigns(); // Refresh to get the updated list
+    setSnackbarMessage("Campaign created successfully!");
+    setSnackbarSeverity("success");
+    setSnackbarOpen(true);
+  };
+  
   const predefinedRanges = {
     Today: [startOfToday(), startOfToday()],
     Yesterday: [subDays(new Date(), 1), subDays(new Date(), 1)],
@@ -192,76 +666,92 @@ export default function CampaignsPage() {
     "Last Month": [startOfMonth(subDays(new Date(), 30)), endOfMonth(subDays(new Date(), 30))],
   };
 
-  const columns = [
-    { field: "id", headerName: "#", width: 70 },
-    { field: "name", headerName: "Title", flex: 1 },
-    {
-      field: "status",
-      headerName: "Campaign Status",
-      flex: 1,
-      renderCell: (params) => (
-        <Chip label={params.value} color={params.value === "ACTIVE" ? "primary" : "default"} />
-      ),
-    },
-    { field: "costType", headerName: "Cost Type", flex: 1 },
-    { field: "costValue", headerName: "Cost Value", flex: 1 },
-    { field: "tags", headerName: "Tags", flex: 1 },
-    { field: "offer", headerName: "Offer", flex: 1 },
-    { field: "offerWeight", headerName: "Weight", flex: 1 },
-    { field: "autoOptimize", headerName: "Auto Optimize", flex: 1, renderCell: (params) => (params.value ? "Yes" : "No") },
-  ];
-
-  useEffect(() => {
-    axios.get(`${API_URL}`)
-      .then((res) => {
-        const campaignsWithIds = res.data.map((campaign, index) => ({
-          ...campaign,
-          id: campaign.id || campaign._id || index, // Ensure each row has an `id`
-        }));
-        setCampaigns(campaignsWithIds);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching campaigns:", err);
-        setLoading(false);
-      });
-  }, []);
-
-  const handleCreateClick = () => {
-    setCreateOpen(true);
-  };
-
-  const handleCreateClose = () => {
-    setCreateOpen(false);
-  };
-
-  const handleCreate = (newCampaign) => {
-    setCampaigns([...campaigns, newCampaign]);
-  };
-
   return (
     <Layout>
-      <Typography variant="h4">Campaigns</Typography>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleCreateClick}
-        startIcon={<AddIcon />}
-      >
-        Add Campaign
-      </Button>
+      <Box mb={3}>
+        <Typography variant="h4" gutterBottom>Campaigns</Typography>
+        
+        <Grid container spacing={2} alignItems="center" mb={2}>
+          <Grid item>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleCreateClick}
+              startIcon={<AddIcon />}
+            >
+              Create Campaign
+            </Button>
+          </Grid>
+          
+          <Grid item flexGrow={1}>
+            <Box display="flex" justifyContent="flex-end">
+              <ToggleButtonGroup
+                value={JSON.stringify(dateRange)}
+                exclusive
+                onChange={(e, newValue) => {
+                  if (newValue) {
+                    setDateRange(predefinedRanges[JSON.parse(newValue)]);
+                  }
+                }}
+                size="small"
+              >
+                {Object.keys(predefinedRanges).map((label) => (
+                  <ToggleButton 
+                    key={label} 
+                    value={label}
+                  >
+                    {label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+          </Grid>
+        </Grid>
+      </Box>
 
-      <DataGrid
-        rows={campaigns}
-        columns={columns}
-        pageSize={10}
-        loading={loading}
-        rowsPerPageOptions={[5, 10, 25]}
-        checkboxSelection
-        disableSelectionOnClick
+      <Paper elevation={2}>
+        <DataGrid
+          rows={campaigns}
+          columns={columns}
+          pageSize={10}
+          loading={loading}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          checkboxSelection
+          onSelectionModelChange={(ids) => setSelectedRows(ids)}
+          disableSelectionOnClick
+          autoHeight
+          sx={{ minHeight: 400 }}
+        />
+      </Paper>
+
+      {/* Create Campaign Modal */}
+      <CampaignModal 
+        open={createOpen} 
+        onClose={handleCreateClose} 
+        onCreate={handleCreate} 
       />
-
-      <CampaignModal open={createOpen} onClose={handleCreateClose} onCreate={handleCreate} />
+      
+      {/* Edit Campaign Modal */}
+      {selectedCampaign && (
+        <CampaignModal 
+          open={editOpen} 
+          onClose={handleEditClose} 
+          onCreate={handleCreate} 
+          editMode={true}
+          campaignData={selectedCampaign}
+        />
+      )}
+      
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 }
