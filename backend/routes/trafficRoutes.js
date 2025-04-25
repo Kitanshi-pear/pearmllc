@@ -99,148 +99,87 @@ router.get('/auth/google/callback', async (req, res) => {
     }
 });
 
-
-// Create a new channel
-// routes/trafficChannels.js
-// routes/trafficChannels.js
-
 // Create Traffic Channel
 router.post('/', async (req, res) => {
     try {
-      console.log("Received data:", req.body); // Log to debug
-  
-      const newChannel = await TrafficChannel.create({
-        channelName: req.body.channelName,
-        aliasChannel: req.body.aliasChannel,
-        costUpdateDepth: req.body.costUpdateDepth,
-        costUpdateFrequency: req.body.costUpdateFrequency,
-        currency: req.body.currency,
-        s2sPostbackUrl: req.body.s2sPostbackUrl,
-        clickRefId: req.body.clickRefId,
-        externalId: req.body.externalId,
-        pixelId: req.body.pixelId,
-        apiAccessToken: req.body.apiAccessToken,
-        defaultEventName: req.body.defaultEventName,
-        customConversionMatching: req.body.customConversionMatching,
-        googleAdsAccountId: req.body.googleAdsAccountId,
-        googleMccAccountId: req.body.googleMccAccountId,
-      });
-  
-      res.status(201).json(newChannel);
+        console.log("Received data:", req.body); // Log to debug
+
+        const newChannel = await TrafficChannel.create({
+            channelName: req.body.channelName,
+            aliasChannel: req.body.aliasChannel,
+            costUpdateDepth: req.body.costUpdateDepth,
+            costUpdateFrequency: req.body.costUpdateFrequency,
+            currency: req.body.currency,
+            s2sPostbackUrl: req.body.s2sPostbackUrl,
+            clickRefId: req.body.clickRefId,
+            externalId: req.body.externalId,
+            pixelId: req.body.pixelId,
+            apiAccessToken: req.body.apiAccessToken,
+            defaultEventName: req.body.defaultEventName,
+            customConversionMatching: req.body.customConversionMatching,
+            googleAdsAccountId: req.body.googleAdsAccountId,
+            googleMccAccountId: req.body.googleMccAccountId,
+        });
+
+        res.status(201).json(newChannel);
     } catch (error) {
-      console.error("❌ Error saving channel:", error);
-      res.status(500).json({ error: "Failed to save channel." });
+        console.error("❌ Error saving channel:", error);
+        res.status(500).json({ error: "Failed to save channel." });
     }
-  });
-  
-  // Get all traffic channels with associated data
- // Route to get all traffic channels with their associations
-router.get("/", async (req, res) => {
-    try {
-      console.log("Fetching traffic channels...");
-  
-      // Ensure correct model association
-      const channels = await TrafficChannel.findAll({
-        include: [
-          {
-            model: Metrics,
-            attributes: [
-              'impressions', 'clicks', 'ctc', 'cpm', 'cpc', 'ctr', 'lpclicks',
-              'lpviews', 'conversions', 'cr', 'total_revenue', 'total_cost', 'profit',
-              'roi', 'total_roi', 'total_cpa', 'offer_cr', 'epc', 'lpepc',
-            ],
-            required: false,
-          },
-          {
-            model: Clicks,
-            attributes: ['click_id', 'timestamp'],
-            required: false,
-          },
-          {
-            model: Offer,
-            attributes: ['offer_id', 'name'],
-            required: false,
-          },
-          {
-            model: Campaigns,
-            attributes: ['campaign_id', 'name'],
-            required: false,
-          },
-          {
-            model: Macro,
-            attributes: [
-              'click_id', 'traffic_channel_id', 'sub1', 'sub2', 'sub3', 'sub4', 
-              'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11', 'sub12', 
-              'sub13', 'sub14', 'sub15', 'sub16', 'sub17', 'sub18', 'sub19', 'sub20',
-              'sub21', 'sub22', 'sub23'
-            ],
-            required: false,
-          }
-        ]
-      });
-  
-      console.log("Channels fetched:", channels); // Debug log to inspect the data
-      res.json(channels);
-    } catch (error) {
-      console.error("❌ Error fetching channels:", error);
-      res.status(500).json({ error: "Failed to fetch traffic channels" });
-    }
-  });
-  
-
-// Get a single traffic channel by ID with metrics and macros
-router.get("/:id", async (req, res) => {
-  try {
-      const channel = await TrafficChannel.findByPk(req.params.id, {
-          include: [
-              {
-                  model: Metrics,
-                  attributes: [
-                      'impressions', 'clicks', 'ctc', 'cpm', 'cpc', 'ctr', 'lpclicks',
-                      'lpviews', 'conversions', 'cr', 'total_revenue', 'total_cost', 'profit',
-                      'roi', 'total_roi', 'total_cpa', 'offer_cr', 'epc', 'lpepc',
-                  ],
-                  required: false,
-              },
-              {
-                  model: Clicks,
-                  attributes: ['click_id', 'timestamp'],
-                  required: false,
-              },
-           
-              {
-                  model: Offer,
-                  attributes: ['offer_id', 'name'],
-                  required: false,
-              },
-              {
-                  model: Campaigns,
-                  attributes: ['campaign_id', 'name'],
-                  required: false,
-              },
-              {
-                  model: Macro,
-                  attributes: [
-                      'click_id', 'traffic_channel_id', 'sub1', 'sub2', 'sub3', 'sub4', 
-                      'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11', 'sub12', 
-                      'sub13', 'sub14', 'sub15', 'sub16', 'sub17', 'sub18', 'sub19', 'sub20',
-                      'sub21', 'sub22', 'sub23'
-                  ],
-                  required: false,
-              }
-          ]
-      });
-
-      if (!channel) {
-          return res.status(404).json({ error: "Channel not found" });
-      }
-
-      res.json(channel);
-  } catch (error) {
-      console.error("❌ Error fetching channel:", error);
-      res.status(500).json({ error: "Failed to fetch channel" });
-  }
 });
 
+// Get all traffic channels with associated data (Mapped, not included)
+router.get("/", async (req, res) => {
+    try {
+        console.log("Fetching traffic channels...");
+
+        // Fetch all traffic channels and map the necessary data
+        const channels = await TrafficChannel.findAll({
+            attributes: ['id', 'channelName', 'aliasChannel', 'costUpdateDepth', 'costUpdateFrequency', 'currency', 's2sPostbackUrl'],
+            order: [['id', 'ASC']],
+        });
+
+        const mappedChannels = channels.map(channel => ({
+            id: channel.id,
+            channelName: channel.channelName,
+            aliasChannel: channel.aliasChannel,
+            costUpdateDepth: channel.costUpdateDepth,
+            costUpdateFrequency: channel.costUpdateFrequency,
+            currency: channel.currency,
+            s2sPostbackUrl: channel.s2sPostbackUrl,
+        }));
+
+        res.json(mappedChannels);
+    } catch (error) {
+        console.error("❌ Error fetching channels:", error);
+        res.status(500).json({ error: "Failed to fetch traffic channels" });
+    }
+});
+
+// Get a single traffic channel by ID with mapped data
+router.get("/:id", async (req, res) => {
+    try {
+        const channel = await TrafficChannel.findByPk(req.params.id);
+
+        if (!channel) {
+            return res.status(404).json({ error: "Channel not found" });
+        }
+
+        const mappedChannel = {
+            id: channel.id,
+            channelName: channel.channelName,
+            aliasChannel: channel.aliasChannel,
+            costUpdateDepth: channel.costUpdateDepth,
+            costUpdateFrequency: channel.costUpdateFrequency,
+            currency: channel.currency,
+            s2sPostbackUrl: channel.s2sPostbackUrl,
+        };
+
+        res.json(mappedChannel);
+    } catch (error) {
+        console.error("❌ Error fetching channel:", error);
+        res.status(500).json({ error: "Failed to fetch channel" });
+    }
+});
 
 module.exports = router;

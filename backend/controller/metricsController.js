@@ -533,12 +533,12 @@ class MetricsController {
           date: {
             [db.Sequelize.Op.between]: [startDate, endDate]
           },
-          campaign_id: {
+          unique_id: {
             [db.Sequelize.Op.not]: null
           }
         },
         attributes: [
-          'campaign_id',
+          'unique_id',
           [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'impressions'],
           [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'clicks'],
           [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'lpviews'],
@@ -553,7 +553,7 @@ class MetricsController {
             attributes: ['name']
           }
         ],
-        group: ['campaign_id'],
+        group: ['unique_id'],
         raw: true
       });
       
@@ -568,8 +568,8 @@ class MetricsController {
         const profit = parseFloat(record.profit) || 0;
         
         return {
-          dimension: record['Campaign.name'] || `Campaign ${record.campaign_id}`,
-          id: record.campaign_id,
+          dimension: record['Campaign.name'] || `Campaign ${record.unique_id}`,
+          id: record.unique_id,
           impressions,
           clicks,
           lpviews,
@@ -852,7 +852,7 @@ class MetricsController {
       };
       
       if (campaignId) {
-        whereConditions.campaign_id = campaignId;
+        whereConditions.unique_id = campaignId;
       }
       
       if (trafficChannelId) {

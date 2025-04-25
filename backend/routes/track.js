@@ -9,8 +9,8 @@ console.log('📝 Initializing track routes...');
 // Constants for macro handling
 const MACRO_PLACEHOLDERS = {
   CLICK_ID: '{click_id}',
-  CAMPAIGN_ID: '{campaign_id}',
-  TRAFFIC_SOURCE: '{traffic_source}',
+  CAMPAIGN_ID: '{unique_id}',
+  TRAFFIC_SOURCE: '{traffic_channel_id}',
   OFFER_ID: '{offer_id}',
   PAYOUT: '{payout}',
   SUB1: '{sub1}',
@@ -25,17 +25,17 @@ const MACRO_PLACEHOLDERS = {
 router.get('/click', async (req, res) => {
   console.log("✅ Track click request received:", req.query);
   try {
-    const { campaign_id, tc, ...params } = req.query;
+    const { unique_id, tc, ...params } = req.query;
     
-    if (!campaign_id) {
-      console.error("❌ Missing campaign_id in tracking request");
-      return res.status(400).json({ error: 'Missing campaign_id parameter' });
+    if (!unique_id) {
+      console.error("❌ Missing unique_id in tracking request");
+      return res.status(400).json({ error: 'Missing unique_id parameter' });
     }
 
     // Get campaign info
-    const campaign = await Campaigns.findByPk(campaign_id);
+    const campaign = await Campaigns.findByPk(unique_id);
     if (!campaign) {
-      console.error(`❌ Campaign not found: ${campaign_id}`);
+      console.error(`❌ Campaign not found: ${unique_id}`);
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
@@ -53,9 +53,9 @@ router.get('/click', async (req, res) => {
     const userAgent = req.headers['user-agent'];
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     
-    console.log(`✅ Creating click record for campaign ${campaign_id}`);
+    console.log(`✅ Creating click record for campaign ${unique_id}`);
     const click = await Clicks.create({
-      campaign_id: campaign_id,
+      unique_id: unique_id,
       traffic_channel_id: tc || null,
       ip: ip,
       user_agent: userAgent,
@@ -68,7 +68,7 @@ router.get('/click', async (req, res) => {
       const macroData = {
         click_id: click.click_id,
         traffic_channel_id: tc,
-        campaign_id: campaign_id
+        unique_id: unique_id
       };
       
       // Extract sub parameters from query
@@ -84,7 +84,7 @@ router.get('/click', async (req, res) => {
 
     // Update metrics
     console.log(`✅ Updating metrics for click event`);
-    await updateMetrics(campaign_id, tc, 'click');
+    await updateMetrics(unique_id, tc, 'click');
 
     // Determine redirect destination (lander or offer)
     let redirectUrl = '';
@@ -92,7 +92,7 @@ router.get('/click', async (req, res) => {
       // Redirect to lander
       const lander = await Lander.findByPk(campaign.lander_id);
       if (!lander) {
-        console.error(`❌ Lander not found for campaign: ${campaign_id}`);
+        console.error(`❌ Lander not found for campaign: ${unique_id}`);
         return res.status(404).json({ error: 'Lander not found' });
       }
       
@@ -106,7 +106,7 @@ router.get('/click', async (req, res) => {
       // Direct linking to offer
       const offer = await Offer.findByPk(campaign.offer_id);
       if (!offer) {
-        console.error(`❌ Offer not found for campaign: ${campaign_id}`);
+        console.error(`❌ Offer not found for campaign: ${unique_id}`);
         return res.status(404).json({ error: 'Offer not found' });
       }
       
@@ -114,11 +114,11 @@ router.get('/click', async (req, res) => {
       // Replace macros in URL
       redirectUrl = replaceMacros(redirectUrl, {
         click_id: click.click_id,
-        campaign_id: campaign_id,
+        unique_id: unique_id,
         offer_id: campaign.offer_id
       });
     } else {
-      console.error(`❌ No valid redirect destination for campaign: ${campaign_id}`);
+      console.error(`❌ No valid redirect destination for campaign: ${unique_id}`);
       return res.status(404).json({ error: 'No redirect destination found' });
     }
 
@@ -155,14 +155,14 @@ router.get('/lander', async (req, res) => {
     // Create lander click record
     await Lpclicks.create({
       click_id: click_id,
-      campaign_id: click.campaign_id,
+      unique_id: click.unique_id,
       traffic_channel_id: click.traffic_channel_id,
       timestamp: new Date()
     });
 
     // Update metrics
     console.log(`✅ Updating metrics for lander view event`);
-    await updateMetrics(click.campaign_id, click.traffic_channel_id, 'lpview');
+    await updateMetrics(click.unique_id, click.traffic_channel_id, 'lpview');
 
     // Return success
     return res.status(200).json({ success: true });
@@ -211,7 +211,7 @@ router.get('/conversion', async (req, res) => {
     // Update metrics
     console.log(`✅ Updating metrics for conversion event`);
     await updateMetrics(
-      click.campaign_id, 
+      click.unique_id, 
       click.traffic_channel_id, 
       'conversion',
       parseFloat(conversionPayout)
@@ -248,13 +248,13 @@ router.get('/conversion', async (req, res) => {
 // API endpoint to get metrics
 router.get('/metrics', async (req, res) => {
   try {
-    const { campaign_id, traffic_channel_id, start_date, end_date } = req.query;
+    const { unique_id, traffic_channel_id, start_date, end_date } = req.query;
     
     // Build query conditions
     const where = {};
     
-    if (campaign_id) {
-      where.campaign_id = campaign_id;
+    if (unique_id) {
+      where.unique_id = unique_id;
     }
     
     if (traffic_channel_id) {
@@ -296,7 +296,7 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
     // Find or create metrics record for campaign
     let [campaignMetrics] = await Metrics.findOrCreate({
       where: {
-        campaign_id: campaignId,
+        unique_id: campaignId,
         date: today
       },
       defaults: {
@@ -363,7 +363,7 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
       // Also update combined campaign + traffic channel metrics
       let [combinedMetrics] = await Metrics.findOrCreate({
         where: {
-          campaign_id: campaignId,
+          unique_id: campaignId,
           traffic_channel_id: trafficChannelId,
           date: today
         },
@@ -468,7 +468,7 @@ function generatePostbackUrl(baseUrl, click, payout) {
   // Gather values for replacement
   const values = {
     click_id: click.click_id,
-    campaign_id: click.campaign_id,
+    unique_id: click.unique_id,
     campaign_name: click.Campaigns?.name || '',
     traffic_source: click.TrafficChannel?.channelName || '',
     offer_id: click.Campaigns?.offer_id || '',

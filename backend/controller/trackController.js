@@ -12,14 +12,14 @@ class TrackingController {
   async handleClick(req, res) {
     try {
       const query = req.query;
-      const { campaign_id, tc: traffic_channel_id } = query;
+      const { unique_id, tc: traffic_channel_id } = query;
       
-      if (!campaign_id || !traffic_channel_id) {
+      if (!unique_id || !traffic_channel_id) {
         return res.status(400).send('Invalid tracking link');
       }
       
       // Get campaign with relationships
-      const campaign = await db.Campaign.findByPk(campaign_id, {
+      const campaign = await db.Campaign.findByPk(unique_id, {
         include: [
           { model: db.TrafficChannel },
           { model: db.Lander },
@@ -42,7 +42,7 @@ class TrackingController {
         ip,
         user_agent: userAgent,
         referer,
-        campaign_id: campaign.id,
+        unique_id: campaign.id,
         traffic_channel_id: campaign.traffic_channel_id,
         lander_id: campaign.lander_id,
         offer_id: campaign.offer_id,
@@ -53,7 +53,7 @@ class TrackingController {
       const macro = await macroService.parseAndStoreMacros(
         query, 
         traffic_channel_id, 
-        campaign_id
+        unique_id
       );
       
       // Associate macro with click
@@ -61,7 +61,7 @@ class TrackingController {
       
       // Increment metrics for this click
       await metricsService.incrementClickMetrics(
-        campaign_id, 
+        unique_id, 
         traffic_channel_id,
         campaign.lander_id,
         campaign.offer_id
@@ -96,7 +96,7 @@ class TrackingController {
           // Replace macros in offer URL
           const macroValues = {
             click_id: click.id.toString(),
-            campaign_id: campaign.id.toString()
+            unique_id: campaign.id.toString()
           };
           
           // Add sub values from the macro
@@ -151,9 +151,9 @@ class TrackingController {
       await click.save();
       
       // Increment lander view metrics
-      if (click.campaign_id && click.lander_id) {
+      if (click.unique_id && click.lander_id) {
         await metricsService.incrementLanderViewMetrics(
-          click.campaign_id,
+          click.unique_id,
           click.traffic_channel_id,
           click.lander_id
         );
@@ -234,7 +234,7 @@ class TrackingController {
       
       // Update metrics for this conversion
       await metricsService.incrementConversionMetrics(
-        click.campaign_id,
+        click.unique_id,
         click.traffic_channel_id,
         click.lander_id,
         click.offer_id,

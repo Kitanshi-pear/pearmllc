@@ -53,9 +53,9 @@ class MacroController {
    */
   async generateTrackingUrl(req, res) {
     try {
-      const { traffic_channel_id, campaign_id, params } = req.body;
+      const { traffic_channel_id, unique_id, params } = req.body;
       
-      if (!traffic_channel_id || !campaign_id) {
+      if (!traffic_channel_id || !unique_id) {
         return res.status(400).json({ 
           success: false, 
           message: 'Traffic channel ID and campaign ID are required' 
@@ -64,7 +64,7 @@ class MacroController {
       
       const trackingUrl = await macroService.generateTrackingUrl(
         traffic_channel_id, 
-        campaign_id, 
+        unique_id, 
         params || {}
       );
       
