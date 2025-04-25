@@ -3,15 +3,15 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 
 // Import your page components here
-import AdminPanel from "./pages/AdminPanel";
-import CampaignsPage from "./pages/CampaignsPage";
-import TrafficChannelsPage from "./pages/TrafficChannelsPage";
-import OffersPage from "./pages/OffersPage";
-import OfferSourcePage from "./pages/OfferSourcePage";
-import ClickLogsPage from "./pages/ClickLogsPage";
-import ConversionLogsPage from "./pages/ConversionLogsPage";
-import LandersPage from "./pages/LandersPage";
-import DomainsPage from "./pages/DomainsPage";
+import AdminPanel from "./components/AdminPanel";
+import CampaignsPage from "./components/CampaignsPage";
+import TrafficChannelsPage from "./components/TrafficChannelsPage";
+import OffersPage from "./components/OffersPage";
+import OfferSourcePage from "./components/OfferSourcePage";
+import ClickLogsPage from "./components/ClickLogsPage";
+import ConversionLogsPage from "./components/ConversionLogsPage";
+import LandersPage from "./components/LandersPage";
+import DomainsPage from "./components/DomainsPage";
 
 function App() {
   return (
