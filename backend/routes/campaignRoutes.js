@@ -13,10 +13,10 @@ router.get("/", async (req, res) => {
   try {
     const campaigns = await Campaigns.findAll({
       include: [
-        { model: Domain, as: 'domain' },
-        { model: TrafficChannel, as: 'traffic_channel' },
-        { model: Lander, as: 'lander' },
-        { model: Offer, as: 'offer' }
+        { model: Domain, as: 'domain_id' },
+        { model: TrafficChannel, as: 'traffic_channel_id' },
+        { model: Lander, as: 'lander_id' },
+        { model: Offer, as: 'offer_id' }
       ]
     });
     res.status(200).json(campaigns);
@@ -118,10 +118,10 @@ router.get("/:id", async (req, res) => {
   try {
     const campaign = await Campaigns.findByPk(req.params.id, {
       include: [
-        { model: Domain, as: 'domain' },
-        { model: TrafficChannel, as: 'traffic_channel' },
-        { model: Lander, as: 'lander' },
-        { model: Offer, as: 'offer' }
+        { model: Domain, as: 'domain_id' },
+        { model: TrafficChannel, as: 'traffic_channel_id' },
+        { model: Lander, as: 'lander_id' },
+        { model: Offer, as: 'offer_id' }
       ]
     });
     
