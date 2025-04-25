@@ -66,7 +66,7 @@ const Layout = ({ children }) => {
 
       <List>
         <Tooltip title="Admin Panel" placement="right">
-          <ListItem button component={Link} to="/Admin%20Panel">
+          <ListItem button component={Link} to="/admin">
             <AdminPanelSettingsIcon sx={{ mr: 2 }} />
             <ListItemText primary="Admin panel" />
           </ListItem>
