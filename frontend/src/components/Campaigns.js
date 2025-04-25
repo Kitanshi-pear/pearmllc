@@ -34,7 +34,7 @@ const CampaignModal = ({ open, onClose, onCreate }) => {
 
   useEffect(() => {
     if (open) {
-      fetch(`${API_URL}/api/traffic-channels`)
+      fetch(`${API_URL}/api/traffic/facebook`)
         .then((res) => res.json())
         .then((data) => setTrafficChannels(data))
         .catch((err) => console.error("Error fetching traffic channels:", err));
