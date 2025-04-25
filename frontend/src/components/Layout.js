@@ -61,14 +61,13 @@ const Layout = ({ children }) => {
         display: "flex",
         flexDirection: "column",
         boxShadow: "3px 0 10px rgba(0,0,0,0.1)"
-      }}>
-
-
+      }}
+    >
       <List>
         <Tooltip title="Admin Panel" placement="right">
-          <ListItem button component={Link} to="/Admin Panel">
+          <ListItem button component={Link} to="/admin-panel">
             <AdminPanelSettingsIcon sx={{ mr: 2 }} />
-            <ListItemText primary="Admin panel" />
+            <ListItemText primary="Admin Panel" />
           </ListItem>
         </Tooltip>
 
@@ -138,8 +137,6 @@ const Layout = ({ children }) => {
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
-
-      {/* AppBar */}
       <AppBar
         position="fixed"
         sx={{
@@ -159,7 +156,6 @@ const Layout = ({ children }) => {
             <MenuIcon />
           </IconButton>
 
-          {/* Clickable logo */}
           <Box
             sx={{ display: "flex", alignItems: "center", cursor: "pointer" }}
             onClick={navigateToFirstTab}
@@ -181,7 +177,7 @@ const Layout = ({ children }) => {
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
+      {/* Permanent Drawer for desktop */}
       <Drawer
         variant="permanent"
         sx={{
@@ -190,15 +186,16 @@ const Layout = ({ children }) => {
           [`& .MuiDrawer-paper`]: {
             width: drawerWidth,
             boxSizing: "border-box",
-            top: 64,
+            top: 64
           },
-          display: { xs: "none", sm: "block" },
+          display: { xs: "none", sm: "block" }
         }}
         open
       >
         {drawer}
       </Drawer>
 
+      {/* Temporary Drawer for mobile */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -206,13 +203,12 @@ const Layout = ({ children }) => {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", sm: "none" },
-          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: "border-box" },
+          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: "border-box" }
         }}
       >
         {drawer}
       </Drawer>
 
-      {/* Main content */}
       <Box
         component="main"
         sx={{
@@ -221,7 +217,7 @@ const Layout = ({ children }) => {
           bgcolor: "#f5f5f5",
           minHeight: "100vh",
           mt: 8,
-          overflowY: "auto",
+          overflowY: "auto"
         }}
       >
         {children}
