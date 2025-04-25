@@ -104,6 +104,7 @@ router.get('/auth/google/callback', async (req, res) => {
 // routes/trafficChannels.js
 // routes/trafficChannels.js
 
+// Create Traffic Channel
 router.post('/', async (req, res) => {
     try {
       console.log("Received data:", req.body); // Log to debug
@@ -132,60 +133,60 @@ router.post('/', async (req, res) => {
     }
   });
   
-  
-  // Get all traffic channels along with calculated metrics and macros
+  // Get all traffic channels with associated data
+ // Route to get all traffic channels with their associations
 router.get("/", async (req, res) => {
-  try {
+    try {
+      console.log("Fetching traffic channels...");
+  
+      // Ensure correct model association
       const channels = await TrafficChannel.findAll({
-          include: [
-              {
-                  model: Metrics,
-                  attributes: [
-                      'impressions', 'clicks', 'ctc', 'cpm', 'cpc', 'ctr', 'lpclicks',
-                      'lpviews', 'conversions', 'cr', 'total_revenue', 'total_cost', 'profit',
-                      'roi', 'total_roi', 'total_cpa', 'offer_cr', 'epc', 'lpepc',
-                  ],
-                  required: false,
-              },
-              {
-                  model: Clicks,
-                  attributes: ['click_id', 'timestamp'],
-                  required: false,
-              },
-              {
-                  model: Lpclicks,
-                  attributes: ['lpclick_id', 'timestamp'],
-                  required: false,
-              },
-              {
-                  model: Offer,
-                  attributes: ['offer_id', 'name'],
-                  required: false,
-              },
-              {
-                  model: Campaigns,
-                  attributes: ['campaign_id', 'name'],
-                  required: false,
-              },
-              {
-                  model: Macro,
-                  attributes: [
-                      'click_id', 'traffic_channel_id', 'sub1', 'sub2', 'sub3', 'sub4', 
-                      'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11', 'sub12', 
-                      'sub13', 'sub14', 'sub15', 'sub16', 'sub17', 'sub18', 'sub19', 'sub20',
-                      'sub21', 'sub22', 'sub23'
-                  ],
-                  required: false,
-              }
-          ]
+        include: [
+          {
+            model: Metrics,
+            attributes: [
+              'impressions', 'clicks', 'ctc', 'cpm', 'cpc', 'ctr', 'lpclicks',
+              'lpviews', 'conversions', 'cr', 'total_revenue', 'total_cost', 'profit',
+              'roi', 'total_roi', 'total_cpa', 'offer_cr', 'epc', 'lpepc',
+            ],
+            required: false,
+          },
+          {
+            model: Clicks,
+            attributes: ['click_id', 'timestamp'],
+            required: false,
+          },
+          {
+            model: Offer,
+            attributes: ['offer_id', 'name'],
+            required: false,
+          },
+          {
+            model: Campaigns,
+            attributes: ['campaign_id', 'name'],
+            required: false,
+          },
+          {
+            model: Macro,
+            attributes: [
+              'click_id', 'traffic_channel_id', 'sub1', 'sub2', 'sub3', 'sub4', 
+              'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11', 'sub12', 
+              'sub13', 'sub14', 'sub15', 'sub16', 'sub17', 'sub18', 'sub19', 'sub20',
+              'sub21', 'sub22', 'sub23'
+            ],
+            required: false,
+          }
+        ]
       });
-
+  
+      console.log("Channels fetched:", channels); // Debug log to inspect the data
       res.json(channels);
-  } catch (error) {
+    } catch (error) {
       console.error("❌ Error fetching channels:", error);
       res.status(500).json({ error: "Failed to fetch traffic channels" });
-  }
-});
+    }
+  });
+  
 
 // Get a single traffic channel by ID with metrics and macros
 router.get("/:id", async (req, res) => {
