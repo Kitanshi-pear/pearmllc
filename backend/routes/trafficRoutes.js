@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 require('dotenv').config();
-const { TrafficChannel, Metrics, Clicks, Lpclicks, Offer, Campaigns } = require('../models'); // Adjust the path as necessary
+const { TrafficChannel, Metrics, Clicks, Lpclicks, Offer, Campaigns, Macro } = require('../models'); // Adjust the path as necessary
 
 const FB_CLIENT_ID = process.env.FB_CLIENT_ID || '1002084978515659';
 const FB_CLIENT_SECRET = process.env.FB_CLIENT_SECRET || 'your_fb_client_secret';
