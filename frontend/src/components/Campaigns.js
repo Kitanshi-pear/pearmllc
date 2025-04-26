@@ -56,32 +56,71 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
       // Fetch traffic channels
       fetch(`${API_URL}/api/traffic/facebook`)
         .then((res) => res.json())
-        .then((data) => setTrafficChannels(data))
-        .catch((err) => console.error("Error fetching traffic channels:", err));
+        .then((data) => {
+          // Ensure data is an array
+          if (Array.isArray(data)) {
+            setTrafficChannels(data);
+          } else {
+            console.error("Traffic channels data is not an array:", data);
+            setTrafficChannels([]);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching traffic channels:", err);
+          setTrafficChannels([]);
+        });
 
       // Fetch domains
       fetch(`${API_URL}/api/domains`)
         .then(res => res.json())
         .then(data => {
-          const cleaned = data.map(domain => ({
-            id: domain.id,
-            url: domain.url.replace(/^https?:\/\//, '')
-          }));
-          setDomains(cleaned);
+          if (Array.isArray(data)) {
+            const cleaned = data.map(domain => ({
+              id: domain.id,
+              url: domain.url.replace(/^https?:\/\//, '')
+            }));
+            setDomains(cleaned);
+          } else {
+            console.error("Domains data is not an array:", data);
+            setDomains([]);
+          }
         })
-        .catch(err => console.error('Error fetching domains:', err));
+        .catch(err => {
+          console.error('Error fetching domains:', err);
+          setDomains([]);
+        });
         
       // Fetch offers
       fetch(`${API_URL}/api/offers`)
         .then(res => res.json())
-        .then(data => setOffers(data))
-        .catch(err => console.error('Error fetching offers:', err));
+        .then(data => {
+          if (Array.isArray(data)) {
+            setOffers(data);
+          } else {
+            console.error("Offers data is not an array:", data);
+            setOffers([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching offers:', err);
+          setOffers([]);
+        });
         
       // Fetch landers
       fetch(`${API_URL}/api/landers`)
         .then(res => res.json())
-        .then(data => setLanders(data))
-        .catch(err => console.error('Error fetching landers:', err));
+        .then(data => {
+          if (Array.isArray(data)) {
+            setLanders(data);
+          } else {
+            console.error("Landers data is not an array:", data);
+            setLanders([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching landers:', err);
+          setLanders([]);
+        });
         
       setLoading(false);
     }
@@ -211,7 +250,6 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
       }
     }
   };
-  
   const handleAddTag = () => {
     if (tagInput && !tags.includes(tagInput)) {
       setTags([...tags, tagInput]);
@@ -269,7 +307,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                     onChange={(e) => setTrafficChannel(e.target.value)} 
                     label="Traffic Channel"
                   >
-                    {trafficChannels.map((channel) => (
+                    {Array.isArray(trafficChannels) && trafficChannels.map((channel) => (
                       <MenuItem key={channel.id} value={channel.id}>
                         {channel.channelName} ({channel.aliasChannel || "N/A"})
                       </MenuItem>
@@ -284,7 +322,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                     onChange={(e) => setTrackingDomain(e.target.value)} 
                     label="Tracking Domain"
                   >
-                    {domains.map((domain) => (
+                    {Array.isArray(domains) && domains.map((domain) => (
                       <MenuItem key={domain.id} value={domain.id}>{domain.url}</MenuItem>
                     ))}
                   </Select>
@@ -369,9 +407,9 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                     label="Landing Page"
                     disabled={isDirectLinking}
                   >
-                    {landers.map((lander) => (
-                      <MenuItem key={lander.id} value={lander.id}>
-                        {lander.name} ({lander.url})
+                    {Array.isArray(landers) && landers.map((landerItem) => (
+                      <MenuItem key={landerItem.id} value={landerItem.id}>
+                        {landerItem.name} ({landerItem.url})
                       </MenuItem>
                     ))}
                   </Select>
@@ -385,7 +423,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                   onChange={(e) => setOffer(e.target.value)} 
                   label="Offer"
                 >
-                  {offers.map((offerItem) => (
+                  {Array.isArray(offers) && offers.map((offerItem) => (
                     <MenuItem key={offerItem.id} value={offerItem.id}>
                       {offerItem.name} (${offerItem.payout})
                     </MenuItem>
