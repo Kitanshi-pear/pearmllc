@@ -142,116 +142,126 @@ const [offerSelected, setOfferSelected] = useState("");
     }
   }, [selectedDomain, trafficChannel, editMode, campaignData]);
 
-  const handleSubmit = async () => {
-    setSubmitError("");
-    
-    // Validate required fields
-    if (!campaignName || !trafficChannel || !trackingDomain) {
-      setSubmitError("Campaign name, traffic channel, and tracking domain are required");
-      return;
-    }
+  // Modified handleSubmit function in CampaignModal component
+const handleSubmit = async () => {
+  setSubmitError("");
   
-    // If not direct linking, require a lander
-    if (!isDirectLinking && !lander) {
-      setSubmitError("Please select a landing page or enable direct linking");
-      return;
-    }
-    
-    // If offer is required
-    // if (!offer) {
-    //   setSubmitError("Please select an offer");
-    //   return;
-    // }
-    
-    const campaignPayload = {
-      name: campaignName,
-      traffic_channel_id: trafficChannel,
-      domain_id: trackingDomain,
-      costType,
-      costValue: parseFloat(costValue) || 0,
-      tags,
-      offer_id: offer,
-      offerWeight: parseInt(offerWeight) || 100,
-      autoOptimize,
-      isDirectLinking,
-      lander_id: isDirectLinking ? null : lander,
-      status: "ACTIVE"
-    };
+  // Validate required fields
+  if (!campaignName || !trafficChannel || !trackingDomain) {
+    setSubmitError("Campaign name, traffic channel, and tracking domain are required");
+    return;
+  }
+
+  // If not direct linking, require a lander
+  if (!isDirectLinking && !lander) {
+    setSubmitError("Please select a landing page or enable direct linking");
+    return;
+  }
   
-    try {
-      console.log("Submitting campaign with payload:", campaignPayload);
+  const campaignPayload = {
+    name: campaignName,
+    traffic_channel_id: trafficChannel,
+    domain_id: trackingDomain,
+    costType,
+    costValue: parseFloat(costValue) || 0,
+    tags,
+    offer_id: offerSelected, // Use the selected offer ID from state
+    offerWeight: parseInt(offerWeight) || 100,
+    autoOptimize,
+    isDirectLinking,
+    lander_id: isDirectLinking ? null : lander,
+    status: "ACTIVE"
+  };
+
+  try {
+    console.log("Submitting campaign with payload:", campaignPayload);
+    
+    let res;
+    if (editMode) {
+      const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+      console.log("Making PUT request to:", editUrl);
+      res = await axios.put(editUrl, campaignPayload);
+      console.log("Successfully updated campaign:", res.data);
+      onClose(res.data);
+    } else {
+      // Try the correct endpoint based on API structure
+      const createUrl = `${API_URL}/api/campaigns/create`; // Use a create endpoint
+      console.log("Making POST request to:", createUrl);
       
-      let res;
-      if (editMode) {
-        const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
-        console.log("Making PUT request to:", editUrl);
-        res = await axios.put(editUrl, campaignPayload);
-        console.log("Successfully updated campaign:", res.data);
-        onClose(res.data);
-      } else {
-        // Try the 'campaigns' endpoint first
+      try {
+        res = await axios.post(createUrl, campaignPayload);
+        console.log("Successfully created campaign:", res.data);
+        onCreate(res.data);
+        onClose();
+      } catch (createError) {
+        console.error("Error with /api/campaigns/create:", createError);
+        
+        // Try another common endpoint pattern
         try {
-          const createUrl = `${API_URL}/api/campaigns`;
-          console.log("Making POST request to:", createUrl);
-          res = await axios.post(createUrl, campaignPayload);
-          console.log("Successfully created campaign:", res.data);
+          console.log("Trying alternate endpoint: /api/campaigns");
+          res = await axios.post(`${API_URL}/api/campaigns`, campaignPayload);
+          console.log("Successfully created campaign with /api/campaigns:", res.data);
           onCreate(res.data);
           onClose();
         } catch (error) {
-          if (error.response && error.response.status === 404) {
-            // If 404, try the alternative endpoint
-            console.log("Primary endpoint failed, trying alternative:", `${API_URL}/api/campaign`);
-            const res = await axios.post(`${API_URL}/api/campaign`, campaignPayload);
-            console.log("Successfully created campaign with alternative endpoint:", res.data);
+          // Try one more potential endpoint structure
+          try {
+            console.log("Trying second alternate endpoint: /api/v1/campaigns");
+            res = await axios.post(`${API_URL}/api/v1/campaigns`, campaignPayload);
+            console.log("Successfully created campaign with /api/v1/campaigns:", res.data);
             onCreate(res.data);
             onClose();
-          } else {
-            // Re-throw for the outer catch block
-            throw error;
+          } catch (finalError) {
+            console.error("All campaign creation attempts failed:", finalError);
+            throw finalError;
           }
         }
       }
-  
-      // Reset form after submission
-      if (!editMode) {
-        setCampaignName("");
-        setTrafficChannel("");
-        setTrackingDomain("");
-        setCostType("CPC");
-        setCostValue("0");
-        setTags([]);
-        setTagInput("");
-        setOffer("");
-        setOfferWeight("100");
-        setAutoOptimize(false);
-        setIsDirectLinking(false);
-        setLander("");
-      }
-    } catch (error) {
-      console.error("Error saving campaign:", error);
-      
-      // Enhanced error logging
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        
-        // Provide more helpful error messages based on status codes
-        if (error.response.status === 400) {
-          setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
-        } else if (error.response.status === 401 || error.response.status === 403) {
-          setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
-        } else {
-          setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
-        }
-      } else if (error.request) {
-        console.error("Request made but no response received:", error.request);
-        setSubmitError("No response received from server. Please check your network connection.");
-      } else {
-        console.error("Error setting up request:", error.message);
-        setSubmitError(`Request error: ${error.message}`);
-      }
     }
-  };
+
+    // Reset form after submission
+    if (!editMode) {
+      setCampaignName("");
+      setTrafficChannel("");
+      setTrackingDomain("");
+      setCostType("CPC");
+      setCostValue("0");
+      setTags([]);
+      setTagInput("");
+      setOffer("");
+      setOfferWeight("100");
+      setAutoOptimize(false);
+      setIsDirectLinking(false);
+      setLander("");
+    }
+  } catch (error) {
+    console.error("Error saving campaign:", error);
+    
+    // Enhanced error logging
+    if (error.response) {
+      console.error("Response data:", error.response.data);
+      console.error("Response status:", error.response.status);
+      
+      // Provide more helpful error messages based on status codes
+      if (error.response.status === 400) {
+        setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
+      } else if (error.response.status === 401 || error.response.status === 403) {
+        setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
+      } else if (error.response.status === 404) {
+        setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
+      } else {
+        setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+      }
+    } else if (error.request) {
+      console.error("Request made but no response received:", error.request);
+      setSubmitError("No response received from server. Please check your network connection.");
+    } else {
+      console.error("Error setting up request:", error.message);
+      setSubmitError(`Request error: ${error.message}`);
+    }
+  }
+};
+
   const handleAddTag = () => {
     if (tagInput && !tags.includes(tagInput)) {
       setTags([...tags, tagInput]);
