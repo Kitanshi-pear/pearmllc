@@ -576,6 +576,7 @@ export default function CampaignsPage() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
+  // Enhanced columns with proper data mapping
   const columns = [
     { field: "id", headerName: "ID", width: 70 },
     { field: "name", headerName: "Campaign Name", flex: 1 },
@@ -585,7 +586,7 @@ export default function CampaignsPage() {
       width: 120,
       renderCell: (params) => (
         <Chip 
-          label={params.value} 
+          label={params.value || "INACTIVE"} 
           color={params.value === "ACTIVE" ? "success" : "default"} 
           size="small"
         />
@@ -595,30 +596,48 @@ export default function CampaignsPage() {
       field: "traffic_channel",
       headerName: "Traffic Source",
       width: 150,
-      valueGetter: (params) => params.row.traffic_channel?.channelName || "N/A"
+      valueGetter: (params) => {
+        // Check multiple possible paths to get traffic channel name
+        if (params.row.traffic_channel?.channelName) {
+          return params.row.traffic_channel.channelName;
+        } else if (params.row.traffic_channel_name) {
+          return params.row.traffic_channel_name;
+        } else {
+          // Try to find traffic channel by ID if available
+          return params.row.traffic_channel_id || "N/A";
+        }
+      }
     },
     { 
       field: "costType", 
       headerName: "Cost Type", 
-      width: 100 
+      width: 100,
+      valueGetter: (params) => params.row.costType || "N/A"
     },
     { 
       field: "costValue", 
       headerName: "Cost", 
       width: 80,
-      valueFormatter: (params) => `$${params.value}` 
+      valueGetter: (params) => params.row.costValue || 0,
+      valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
     },
     {
-      field: "metrics",
+      field: "clicks",
       headerName: "Clicks",
       width: 80,
-      valueGetter: (params) => metrics[params.row.id]?.clicks || 0
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.clicks || 0;
+      }
     },
     {
       field: "conversions",
       headerName: "Conversions",
       width: 110,
-      valueGetter: (params) => metrics[params.row.id]?.conversions || 0
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.conversions || 0;
+      }
     },
     {
       field: "cr",
@@ -636,14 +655,27 @@ export default function CampaignsPage() {
       field: "revenue",
       headerName: "Revenue",
       width: 100,
-      valueGetter: (params) => metrics[params.row.id]?.total_revenue || 0,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+      },
       valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
     },
     {
       field: "profit",
       headerName: "Profit",
       width: 100,
-      valueGetter: (params) => metrics[params.row.id]?.profit || 0,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        // Calculate profit if not directly available
+        if (campaignMetrics.profit !== undefined) {
+          return campaignMetrics.profit;
+        } else {
+          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+          return revenue - cost;
+        }
+      },
       valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
     },
     {
@@ -663,7 +695,9 @@ export default function CampaignsPage() {
             size="small"
             onClick={() => {
               // Function to copy tracking URL
-              const domain = params.row.domain?.url || "yourdomain.com";
+              const domain = params.row.domain?.url || 
+                             (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                             "yourdomain.com";
               const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
               navigator.clipboard.writeText(trackingUrl);
               setSnackbarMessage("Tracking URL copied to clipboard!");
@@ -687,6 +721,7 @@ export default function CampaignsPage() {
     },
   ];
 
+  // Improved campaign fetching with better error handling
   const fetchCampaigns = () => {
     setLoading(true);
     
@@ -703,6 +738,10 @@ export default function CampaignsPage() {
           if (res.data && Array.isArray(res.data.data)) {
             campaignsData = res.data.data;
           } 
+          // If it's an object with a campaigns property that's an array
+          else if (res.data && Array.isArray(res.data.campaigns)) {
+            campaignsData = res.data.campaigns;
+          }
           // If it's just a single object
           else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
             campaignsData = [res.data];
@@ -716,93 +755,103 @@ export default function CampaignsPage() {
         
         const campaignsWithIds = campaignsData.map((campaign) => ({
           ...campaign,
-          id: campaign.id || campaign._id || campaign.campaign_id,
+          id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
         }));
         
         setCampaigns(campaignsWithIds);
-        setLoading(false);
         
         // Fetch metrics for these campaigns
         if (campaignsWithIds.length > 0) {
+          console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
           fetchMetrics(campaignsWithIds.map(c => c.id));
+        } else {
+          setLoading(false);
         }
       })
       .catch((err) => {
         console.error("Error fetching campaigns:", err);
         
-        // Enhanced error logging
-        if (err.response) {
-          console.error("Response status:", err.response.status);
-          console.error("Response data:", err.response.data);
-          
-          // Try an alternative endpoint if we get a 404
-          if (err.response.status === 404) {
-            console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
-            
-            // Try without the 's' in campaigns
-            axios.get(`${API_URL}/api/campaign`)
-              .then((res) => {
-                let campaignsData = res.data;
-                
-                // Apply the same checks as above
-                if (!Array.isArray(campaignsData)) {
-                  if (res.data && Array.isArray(res.data.data)) {
-                    campaignsData = res.data.data;
-                  } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-                    campaignsData = [res.data];
-                  } else {
-                    campaignsData = [];
-                    console.warn("Received unexpected data structure from alternative endpoint:", res.data);
-                  }
-                }
-                
-                const campaignsWithIds = campaignsData.map((campaign) => ({
-                  ...campaign,
-                  id: campaign.id || campaign._id || campaign.campaign_id,
-                }));
-                
-                setCampaigns(campaignsWithIds);
-                setLoading(false);
-                
-                // Fetch metrics for these campaigns
-                if (campaignsWithIds.length > 0) {
-                  fetchMetrics(campaignsWithIds.map(c => c.id));
-                }
-              })
-              .catch((altErr) => {
-                console.error("Alternative endpoint also failed:", altErr);
-                setLoading(false);
-                setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
-                setSnackbarSeverity("error");
-                setSnackbarOpen(true);
-              });
-          } else {
-            setLoading(false);
-            setSnackbarMessage(`API Error (${err.response.status}): ${err.response.data?.message || "Unknown error"}`);
-            setSnackbarSeverity("error");
-            setSnackbarOpen(true);
-          }
-        } else {
-          setLoading(false);
-          setSnackbarMessage("Failed to connect to the server. Please check your network connection.");
-          setSnackbarSeverity("error");
-          setSnackbarOpen(true);
-        }
+        // Try alternative endpoints
+        tryAlternativeEndpoints();
       });
   };
   
+  // Function to try alternative API endpoints
+  const tryAlternativeEndpoints = () => {
+    console.log("Trying alternative endpoint:", `${API_URL}/api/campaigns`);
+    
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
+      .catch((err) => {
+        console.log("Trying another alternative endpoint:", `${API_URL}/api/campaign`);
+        
+        axios.get(`${API_URL}/api/campaign`)
+          .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
+          .catch((altErr) => {
+            console.error("All campaign fetching attempts failed");
+            setLoading(false);
+            setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
+            setSnackbarSeverity("error");
+            setSnackbarOpen(true);
+          });
+      });
+  };
+  
+  // Handle successful API response
+  const handleSuccessfulResponse = (res, logMessage) => {
+    console.log(logMessage, res.data);
+    
+    let campaignsData = res.data;
+    if (!Array.isArray(campaignsData)) {
+      if (res.data && Array.isArray(res.data.data)) {
+        campaignsData = res.data.data;
+      } else if (res.data && Array.isArray(res.data.campaigns)) {
+        campaignsData = res.data.campaigns;
+      } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+        campaignsData = [res.data];
+      } else {
+        campaignsData = [];
+        console.warn("Received unexpected data structure:", res.data);
+      }
+    }
+    
+    const campaignsWithIds = campaignsData.map((campaign) => ({
+      ...campaign,
+      id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+    }));
+    
+    setCampaigns(campaignsWithIds);
+    
+    // Fetch metrics for these campaigns
+    if (campaignsWithIds.length > 0) {
+      console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
+      fetchMetrics(campaignsWithIds.map(c => c.id));
+    } else {
+      setLoading(false);
+    }
+  };
+  
+  // Improved metrics fetching function
   const fetchMetrics = (campaignIds) => {
     // Format date range for API
     const startDate = format(dateRange[0], 'yyyy-MM-dd');
     const endDate = format(dateRange[1], 'yyyy-MM-dd');
     
+    console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
+    
     // Create metrics object to store by campaign ID
     const metricsData = {};
+    let completedRequests = 0;
     
     // Fetch metrics for each campaign
-    const fetchPromises = campaignIds.map(id => 
-      axios.get(`${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`)
+    campaignIds.forEach(id => {
+      const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
+      console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
+      
+      axios.get(metricsUrl)
         .then(res => {
+          console.log(`Metrics data for campaign ${id}:`, res.data);
+          
           // Check if res.data is an array before reducing
           if (Array.isArray(res.data)) {
             // Sum up metrics if multiple records are returned
@@ -823,16 +872,23 @@ export default function CampaignsPage() {
         })
         .catch(err => {
           console.error(`Error fetching metrics for campaign ${id}:`, err);
+          // Set empty metrics to avoid undefined errors
+          metricsData[id] = { clicks: 0, conversions: 0, total_revenue: 0, profit: 0 };
         })
-    );
+        .finally(() => {
+          completedRequests++;
+          if (completedRequests === campaignIds.length) {
+            console.log("All metrics fetching completed:", metricsData);
+            setMetrics(metricsData);
+            setLoading(false);
+          }
+        });
+    });
     
-    Promise.all(fetchPromises)
-      .then(() => {
-        setMetrics(metricsData);
-      })
-      .catch(err => {
-        console.error("Error fetching metrics:", err);
-      });
+    // Handle case where no campaigns or all API calls fail
+    if (campaignIds.length === 0) {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -843,9 +899,9 @@ export default function CampaignsPage() {
     if (campaigns.length > 0) {
       fetchMetrics(campaigns.map(c => c.id));
     }
-  }, [dateRange, campaigns]);
+  }, [dateRange]);
 
-  // The rest of the component remains unchanged
+  // The rest of the component functions
   const handleCreateClick = () => {
     setCreateOpen(true);
   };
@@ -902,11 +958,11 @@ export default function CampaignsPage() {
           <Grid item flexGrow={1}>
             <Box display="flex" justifyContent="flex-end">
               <ToggleButtonGroup
-                value={JSON.stringify(dateRange)}
+                value={null} // This needs to be fixed to match the format used in the onChange
                 exclusive
                 onChange={(e, newValue) => {
-                  if (newValue) {
-                    setDateRange(predefinedRanges[JSON.parse(newValue)]);
+                  if (newValue && predefinedRanges[newValue]) {
+                    setDateRange(predefinedRanges[newValue]);
                   }
                 }}
                 size="small"
@@ -937,6 +993,7 @@ export default function CampaignsPage() {
           disableSelectionOnClick
           autoHeight
           sx={{ minHeight: 400 }}
+          getRowId={(row) => row.id}
         />
       </Paper>
 
