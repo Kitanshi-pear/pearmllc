@@ -107,7 +107,8 @@ const routeConfig = [
   { path: 'track', mount: '/api/track' },
   { path: 'trafficRoutes', mount: '/api/traffic/facebook' },
   { path: 'auth', mount: '/api/auth' },
-  { path: 'admin', mount: '/api/admin' }
+  { path: 'admin', mount: '/api/admin' },
+  { path: 'campaigns', mount: '/api/campaigns' }
 ];
 
 let successfulRoutes = 0;
