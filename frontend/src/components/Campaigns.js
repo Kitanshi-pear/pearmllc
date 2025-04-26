@@ -575,6 +575,7 @@ export default function CampaignsPage() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [domains, setDomains] = useState([]);
 
   // Enhanced columns with proper data mapping
   const columns = [
