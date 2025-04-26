@@ -15,7 +15,6 @@ import LaunchIcon from "@mui/icons-material/Launch";
 import axios from "axios";
 import Layout from "./Layout";
 import { startOfToday, subDays, startOfMonth, endOfMonth, format } from "date-fns";
-import Offer from "../../../backend/models/Offer";
 
 // Ensure API_URL is correctly set - adjust this according to your backend configuration
 // If the server might be running locally during development or on a different URL in production
@@ -416,21 +415,21 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                   </Select>
                 </FormControl>
               )}
-
-<FormControl fullWidth required>
-                  <InputLabel>Offer</InputLabel>
-                  <Select 
-                    value={offer} 
-                    onChange={(e) => setOffer(e.target.value)} 
-                    label="Offer"
-                  >
-                    {Array.isArray(offer_id) && offers.map((offer) => (
-                      <MenuItem key={offer.id} value={offer.id}>{offer.url}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
               
-         
+              <FormControl fullWidth required>
+                <InputLabel>Offer</InputLabel>
+                <Select 
+                  value={offers} 
+                  onChange={(e) => setOffers(e.target.value)} 
+                  label="Offer"
+                >
+                  {Array.isArray(offers) && offers.map((offerItem) => (
+                    <MenuItem key={offerItem.id} value={offerItem.id}>
+                      {offerItem.name} (${offerItem.payout})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               
               <TextField 
                 label="Offer Weight" 
