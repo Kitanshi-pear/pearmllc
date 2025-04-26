@@ -46,6 +46,8 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [offersList, setOffersList] = useState([]);
+const [offerSelected, setOfferSelected] = useState("");
 
   const selectedDomain = domains.find(d => d.id === trackingDomain);
 
@@ -92,19 +94,19 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
         
       // Fetch offers
       fetch(`${API_URL}/api/offers`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setOffers(data);
-          } else {
-            console.error("Offers data is not an array:", data);
-            setOffers([]);
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching offers:', err);
-          setOffers([]);
-        });
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setOffersList(data);
+        } else {
+          console.error("Offers data is not an array:", data);
+          setOffersList([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching offers:', err);
+        setOffersList([]);
+    });
         
       // Fetch landers
       fetch(`${API_URL}/api/landers`)
@@ -416,20 +418,22 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                 </FormControl>
               )}
               
+              
               <FormControl fullWidth required>
                 <InputLabel>Offer</InputLabel>
                 <Select 
-                  value={offers} 
-                  onChange={(e) => setOffers(e.target.value)} 
+                  value={offerSelected}
+                  onChange={(e) => setOfferSelected(e.target.value)}
                   label="Offer"
                 >
-                  {Array.isArray(offers) && offers.map((offerItem) => (
-                    <MenuItem key={offerItem.id} value={offerItem.id}>
-                      {offerItem.name} (${offerItem.url})
+                  {offersList.map((offerItem) => (
+                    <MenuItem key={offerItem.Serial_No} value={offerItem.Serial_No}>
+                      {offerItem.Offer_name} (${offerItem.revenue})
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+
               
               <TextField 
                 label="Offer Weight" 
