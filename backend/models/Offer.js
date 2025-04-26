@@ -14,6 +14,22 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(50),
       allowNull: false
     },
+    url: {
+      type: DataTypes.STRING,
+      allowNull: true // You can change to false if you want to make it required
+    },
+    revenue: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
+    },
+    country: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    postbackUrl: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
   }, {
     tableName: 'Offers',
     timestamps: false // unless you're using createdAt/updatedAt

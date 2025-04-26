@@ -405,85 +405,27 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
 /**
  * Calculate derived metrics
  */
-function calculateDerivedMetrics(metrics) {
-  if (metrics.clicks > 0) {
-    metrics.ctr = (metrics.clicks / metrics.impressions) * 100 || 0;
-    metrics.cr = (metrics.conversions / metrics.clicks) * 100 || 0;
-    metrics.cpc = metrics.total_cost / metrics.clicks || 0;
-    metrics.epc = metrics.total_revenue / metrics.clicks || 0;
-  }
-  
-  if (metrics.lpviews > 0) {
-    metrics.offer_cr = (metrics.conversions / metrics.lpviews) * 100 || 0;
-    metrics.lpepc = metrics.total_revenue / metrics.lpviews || 0;
-  }
-  
-  if (metrics.total_cost > 0) {
-    metrics.roi = ((metrics.total_revenue - metrics.total_cost) / metrics.total_cost) * 100 || 0;
-    metrics.total_roi = metrics.roi;
-  }
-  
-  if (metrics.conversions > 0) {
-    metrics.ctc = metrics.total_cost / metrics.conversions || 0;
-    metrics.total_cpa = metrics.ctc;
-  }
-  
-  if (metrics.impressions > 0) {
-    metrics.cpm = (metrics.total_cost / metrics.impressions) * 1000 || 0;
-  }
-}
+function calculateDerivedMetrics(metrics) { if (metrics.clicks > 0) { metrics.ctr = (metrics.clicks / metrics.impressions) * 100 || 0; metrics.cr = (metrics.conversions / metrics.clicks) * 100 || 0; metrics.cpc = metrics.total_cost / metrics.clicks || 0; metrics.epc = metrics.total_revenue / metrics.clicks || 0; } if (metrics.lpviews > 0) { metrics.offer_cr = (metrics.conversions / metrics.lpviews) * 100 || 0; metrics.lpepc = metrics.total_revenue / metrics.lpviews || 0; } if (metrics.total_cost > 0) { metrics.roi = ((metrics.total_revenue - metrics.total_cost) / metrics.total_cost) * 100 || 0; metrics.total_roi = metrics.roi; } if (metrics.conversions > 0) { metrics.ctc = metrics.total_cost / metrics.conversions || 0; metrics.total_cpa = metrics.ctc; } if (metrics.impressions > 0) { metrics.cpm = (metrics.total_cost / metrics.impressions) * 1000 || 0; } }
 
 /**
  * Replace macros in a URL with actual values
  */
-function replaceMacros(url, values) {
-  let processedUrl = url;
-  
+function replaceMacros(url, values) { let processedUrl = url;
   // Replace system macros
-  for (const [key, macro] of Object.entries(MACRO_PLACEHOLDERS)) {
-    if (values[key.toLowerCase()]) {
-      const regex = new RegExp(escapeRegExp(macro), 'g');
-      processedUrl = processedUrl.replace(regex, values[key.toLowerCase()]);
-    }
-  }
+  for (const [key, macro] of Object.entries(MACRO_PLACEHOLDERS)) { if (values[key.toLowerCase()]) { const regex = new RegExp(escapeRegExp(macro), 'g'); processedUrl = processedUrl.replace(regex, values[key.toLowerCase()]); } }
   
   // Replace custom sub macros
-  for (let i = 1; i <= 23; i++) {
-    const subKey = `sub${i}`;
-    const subMacro = MACRO_PLACEHOLDERS[`SUB${i}`] || `{${subKey}}`;
-    
-    if (values[subKey]) {
-      const regex = new RegExp(escapeRegExp(subMacro), 'g');
-      processedUrl = processedUrl.replace(regex, values[subKey]);
-    }
-  }
-  
-  return processedUrl;
-}
+  for (let i = 1; i <= 23; i++) { const subKey = `sub${i}`; const subMacro = MACRO_PLACEHOLDERS[`SUB${i}`] || `{${subKey}}`; if (values[subKey]) { const regex = new RegExp(escapeRegExp(subMacro), 'g'); processedUrl = processedUrl.replace(regex, values[subKey]); } } return processedUrl; }
 
 /**
  * Generate postback URL for traffic source
  */
 function generatePostbackUrl(baseUrl, click, payout) {
   // Gather values for replacement
-  const values = {
-    click_id: click.click_id,
-    unique_id: click.unique_id,
-    campaign_name: click.Campaigns?.name || '',
-    traffic_source: click.TrafficChannel?.channelName || '',
-    offer_id: click.Campaigns?.offer_id || '',
-    payout: payout.toString()
-  };
+  const values = { click_id: click.click_id, unique_id: click.unique_id, campaign_name: click.Campaigns?.name || '', traffic_source: click.TrafficChannel?.channelName || '', offer_id: click.Campaigns?.offer_id || '', payout: payout.toString() };
   
   // Add sub values from the macro
-  if (click.Macro) {
-    for (let i = 1; i <= 23; i++) {
-      const subKey = `sub${i}`;
-      if (click.Macro[subKey]) {
-        values[subKey] = click.Macro[subKey];
-      }
-    }
-  }
+  if (click.Macro) { for (let i = 1; i <= 23; i++) { const subKey = `sub${i}`; if (click.Macro[subKey]) { values[subKey] = click.Macro[subKey]; } } }
   
   // Replace macros in the postback URL
   return replaceMacros(baseUrl, values);
@@ -492,24 +434,12 @@ function generatePostbackUrl(baseUrl, click, payout) {
 /**
  * Send postback to traffic source
  */
-async function sendPostback(url) {
-  try {
-    const axios = require('axios');
-    await axios.get(url);
-    console.log(`✅ Postback sent successfully to: ${url}`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Error sending postback to: ${url}`, error);
-    throw error;
-  }
-}
+async function sendPostback(url) { try { const axios = require('axios'); await axios.get(url); console.log(`✅ Postback sent successfully to: ${url}`); return true; } catch (error) { console.error(`❌ Error sending postback to: ${url}`, error); throw error; } }
 
 /**
  * Helper function to escape special characters in macros for regex
  */
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 console.log('📝 Track routes initialized and exported');
 module.exports = router;
