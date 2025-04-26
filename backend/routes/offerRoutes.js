@@ -10,7 +10,7 @@ router.get('/', offerController.getAllOffers);
 router.post('/', offerController.createOffer);
 
 // Alternative routes for compatibility
-router.get('/offers', offerController.getAllOffers);
-router.post('/offers', offerController.createOffer);
+router.get('/', offerController.getAllOffers);
+router.post('/', offerController.createOffer);
 
 module.exports = router;
