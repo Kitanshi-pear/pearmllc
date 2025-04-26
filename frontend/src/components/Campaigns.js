@@ -158,10 +158,10 @@ const [offerSelected, setOfferSelected] = useState("");
     }
     
     // If offer is required
-    if (!offer) {
-      setSubmitError("Please select an offer");
-      return;
-    }
+    // if (!offer) {
+    //   setSubmitError("Please select an offer");
+    //   return;
+    // }
     
     const campaignPayload = {
       name: campaignName,
