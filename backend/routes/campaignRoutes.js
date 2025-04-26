@@ -48,31 +48,15 @@ router.post("/", async (req, res) => {
   }
 });
 
-
-// GET /api/campaigns - Fetch all campaigns with related data
+// GET /api/campaigns - Fetch all campaigns without including any related data
 router.get("/", async (req, res) => {
   try {
-    const campaigns = await Campaigns.findAll({
-      include: [
-        {
-          model: TrafficChannel, // Include TrafficChannel data
-          attributes: ['name', 'description'], // Choose the fields you want
-        },
-        {
-          model: Domain, // Include Domain data
-          attributes: ['domain'], // Choose the fields you want
-        },
-        {
-          model: Lander, // Include Lander data
-          attributes: ['url', 'name'], // Choose the fields you want
-        }
-      ]
-    });
+    const campaigns = await Campaigns.findAll(); // Fetch only campaigns data
 
     // Log the number of campaigns found
     console.log(`Found ${campaigns.length} campaigns`);
 
-    // Return the campaigns with related data
+    // Return the campaigns data
     res.json(campaigns || []);
   } catch (error) {
     console.error("Error fetching campaigns:", error);
