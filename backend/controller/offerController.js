@@ -4,17 +4,28 @@ const { Offer, OfferSource } = require('../models');
 exports.getAllOffers = async (req, res) => {
   try {
     const offers = await Offer.findAll({
+      attributes: [
+        'Serial_No',
+        'Offer_name',
+        'offer_status',
+        'offer_source_id',
+        'url',
+        'revenue',
+        'country',
+        'postbackUrl',
+        // Add other fields you want to return here
+      ],
       include: [
         {
           model: OfferSource,
-          as: 'offerSource', // Ensure this alias matches the one defined in the Offer model
-          attributes: ['name']
+          as: 'OfferSource', // This is the alias defined in the Offer model
+          attributes: ['name'], // Only include the 'name' field from OfferSource
         }
       ]
     });
 
     console.log(`Found ${offers.length} offers`);
-    res.json(offers || []);
+    res.json(offers || []); // Return the offers, with OfferSource details
   } catch (err) {
     console.error("Error fetching offers:", err);
     res.status(500).json({ error: "Failed to fetch offers", details: err.message });
