@@ -185,7 +185,7 @@ const handleSubmit = async () => {
       onClose(res.data);
     } else {
       // Try the correct endpoint based on API structure
-      const createUrl = `${API_URL}/create`; // Use a create endpoint
+      const createUrl = `${API_URL}`; // Use a create endpoint
       console.log("Making POST request to:", createUrl);
       
       try {
@@ -194,21 +194,21 @@ const handleSubmit = async () => {
         onCreate(res.data);
         onClose();
       } catch (createError) {
-        console.error("Error with /create:", createError);
+        console.error("Error with :", createError);
         
         // Try another common endpoint pattern
         try {
-          console.log("Trying alternate endpoint: /api/campaigns");
-          res = await axios.post(`${API_URL}/api/campaigns`, campaignPayload);
-          console.log("Successfully created campaign with /api/campaigns:", res.data);
+          console.log("Trying alternate endpoint: /");
+          res = await axios.post(`${API_URL}/`, campaignPayload);
+          console.log("Successfully created campaign with /:", res.data);
           onCreate(res.data);
           onClose();
         } catch (error) {
           // Try one more potential endpoint structure
           try {
-            console.log("Trying second alternate endpoint: /api/v1/campaigns");
-            res = await axios.post(`${API_URL}/api/v1/campaigns`, campaignPayload);
-            console.log("Successfully created campaign with /api/v1/campaigns:", res.data);
+            console.log("Trying second alternate endpoint: /");
+            res = await axios.post(`${API_URL}/`, campaignPayload);
+            console.log("Successfully created campaign with /:", res.data);
             onCreate(res.data);
             onClose();
           } catch (finalError) {
@@ -690,9 +690,9 @@ export default function CampaignsPage() {
   const fetchCampaigns = () => {
     setLoading(true);
     
-    console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
+    console.log("Fetching campaigns from:", `${API_URL}/`);
     
-    axios.get(`${API_URL}/api/campaigns`)
+    axios.get(`${API_URL}/`)
       .then((res) => {
         console.log("Campaign data received:", res.data);
         
