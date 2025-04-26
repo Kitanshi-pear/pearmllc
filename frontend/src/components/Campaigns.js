@@ -681,15 +681,37 @@ export default function CampaignsPage() {
     axios.get(`${API_URL}/api/campaigns`)
       .then((res) => {
         console.log("Campaign data received:", res.data);
-        const campaignsWithIds = res.data.map((campaign) => ({
+        
+        // FIX: Check if res.data is an array, if not, try to convert it
+        let campaignsData = res.data;
+        if (!Array.isArray(campaignsData)) {
+          // If it's an object with a data property that's an array
+          if (res.data && Array.isArray(res.data.data)) {
+            campaignsData = res.data.data;
+          } 
+          // If it's just a single object
+          else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+            campaignsData = [res.data];
+          } 
+          // Last resort, create an empty array
+          else {
+            campaignsData = [];
+            console.warn("Received unexpected data structure:", res.data);
+          }
+        }
+        
+        const campaignsWithIds = campaignsData.map((campaign) => ({
           ...campaign,
           id: campaign.id || campaign._id || campaign.campaign_id,
         }));
+        
         setCampaigns(campaignsWithIds);
         setLoading(false);
         
         // Fetch metrics for these campaigns
-        fetchMetrics(campaignsWithIds.map(c => c.id));
+        if (campaignsWithIds.length > 0) {
+          fetchMetrics(campaignsWithIds.map(c => c.id));
+        }
       })
       .catch((err) => {
         console.error("Error fetching campaigns:", err);
@@ -706,15 +728,32 @@ export default function CampaignsPage() {
             // Try without the 's' in campaigns
             axios.get(`${API_URL}/api/campaign`)
               .then((res) => {
-                const campaignsWithIds = res.data.map((campaign) => ({
+                let campaignsData = res.data;
+                
+                // Apply the same checks as above
+                if (!Array.isArray(campaignsData)) {
+                  if (res.data && Array.isArray(res.data.data)) {
+                    campaignsData = res.data.data;
+                  } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+                    campaignsData = [res.data];
+                  } else {
+                    campaignsData = [];
+                    console.warn("Received unexpected data structure from alternative endpoint:", res.data);
+                  }
+                }
+                
+                const campaignsWithIds = campaignsData.map((campaign) => ({
                   ...campaign,
                   id: campaign.id || campaign._id || campaign.campaign_id,
                 }));
+                
                 setCampaigns(campaignsWithIds);
                 setLoading(false);
                 
                 // Fetch metrics for these campaigns
-                fetchMetrics(campaignsWithIds.map(c => c.id));
+                if (campaignsWithIds.length > 0) {
+                  fetchMetrics(campaignsWithIds.map(c => c.id));
+                }
               })
               .catch((altErr) => {
                 console.error("Alternative endpoint also failed:", altErr);
@@ -750,17 +789,23 @@ export default function CampaignsPage() {
     const fetchPromises = campaignIds.map(id => 
       axios.get(`${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`)
         .then(res => {
-          // Sum up metrics if multiple records are returned
-          const campaignMetrics = res.data.reduce((acc, curr) => {
-            Object.keys(curr).forEach(key => {
-              if (typeof curr[key] === 'number') {
-                acc[key] = (acc[key] || 0) + curr[key];
-              }
-            });
-            return acc;
-          }, {});
-          
-          metricsData[id] = campaignMetrics;
+          // Check if res.data is an array before reducing
+          if (Array.isArray(res.data)) {
+            // Sum up metrics if multiple records are returned
+            const campaignMetrics = res.data.reduce((acc, curr) => {
+              Object.keys(curr).forEach(key => {
+                if (typeof curr[key] === 'number') {
+                  acc[key] = (acc[key] || 0) + curr[key];
+                }
+              });
+              return acc;
+            }, {});
+            
+            metricsData[id] = campaignMetrics;
+          } else if (typeof res.data === 'object') {
+            // If it's a single object, use it directly
+            metricsData[id] = res.data;
+          }
         })
         .catch(err => {
           console.error(`Error fetching metrics for campaign ${id}:`, err);
@@ -786,6 +831,7 @@ export default function CampaignsPage() {
     }
   }, [dateRange, campaigns]);
 
+  // The rest of the component remains unchanged
   const handleCreateClick = () => {
     setCreateOpen(true);
   };
