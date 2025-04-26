@@ -425,7 +425,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                 >
                   {Array.isArray(offers) && offers.map((offerItem) => (
                     <MenuItem key={offerItem.id} value={offerItem.id}>
-                      {offerItem.name} (${offerItem.payout})
+                      {offerItem.name} (${offerItem.url})
                     </MenuItem>
                   ))}
                 </Select>
