@@ -48,21 +48,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/campaigns - Fetch all campaigns without including any related data
-router.get("/", async (req, res) => {
-  try {
-    const campaigns = await Campaigns.findAll(); // Fetch only campaigns data
 
-    // Log the number of campaigns found
-    console.log(`Found ${campaigns.length} campaigns`);
-
-    // Return the campaigns data
-    res.json(campaigns || []);
-  } catch (error) {
-    console.error("Error fetching campaigns:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 
 // GET /track?unique_id=abc123 → Redirect directly to lander URL
