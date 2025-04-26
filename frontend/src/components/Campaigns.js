@@ -417,19 +417,23 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
               )}
               
               <FormControl fullWidth required>
-                <InputLabel>Offer</InputLabel>
-                <Select 
-                  value={offer} 
-                  onChange={(e) => setOffer(e.target.value)} 
-                  label="Offer"
-                >
-                  {Array.isArray(offers) && offers.map((offerItem) => (
-                    <MenuItem key={offerItem.id} value={offerItem.id}>
-                      {offerItem.name} (${offerItem.payout})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+  <InputLabel>Offer</InputLabel>
+  <Select 
+    value={offer} 
+    onChange={(e) => setOffer(e.target.value)} 
+    label="Offer"
+    renderValue={(selected) => {
+      const selectedOffer = offers.find(o => o.id === selected);
+      return selectedOffer ? `${selectedOffer.name} ($${selectedOffer.payout})` : 'Select an offer';
+    }}
+  >
+    {Array.isArray(offers) && offers.map((offerItem) => (
+      <MenuItem key={offerItem.id} value={offerItem.id}>
+        {offerItem.name} (${offerItem.payout})
+      </MenuItem>
+    ))}
+  </Select>
+</FormControl>
               
               <TextField 
                 label="Offer Weight" 
