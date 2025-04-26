@@ -178,14 +178,14 @@ const handleSubmit = async () => {
     
     let res;
     if (editMode) {
-      const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+      const editUrl = `${API_URL}/${campaignData.id}`;
       console.log("Making PUT request to:", editUrl);
       res = await axios.put(editUrl, campaignPayload);
       console.log("Successfully updated campaign:", res.data);
       onClose(res.data);
     } else {
       // Try the correct endpoint based on API structure
-      const createUrl = `${API_URL}/api/campaigns/create`; // Use a create endpoint
+      const createUrl = `${API_URL}/create`; // Use a create endpoint
       console.log("Making POST request to:", createUrl);
       
       try {
@@ -194,7 +194,7 @@ const handleSubmit = async () => {
         onCreate(res.data);
         onClose();
       } catch (createError) {
-        console.error("Error with /api/campaigns/create:", createError);
+        console.error("Error with /create:", createError);
         
         // Try another common endpoint pattern
         try {
