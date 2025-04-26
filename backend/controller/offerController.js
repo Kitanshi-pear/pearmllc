@@ -7,16 +7,13 @@ exports.getAllOffers = async (req, res) => {
       include: [
         {
           model: OfferSource,
-          as: 'offerSource',
+          as: 'offerSource', // Ensure this alias matches the one defined in the Offer model
           attributes: ['name']
         }
       ]
     });
-    
-    // Add better debugging
+
     console.log(`Found ${offers.length} offers`);
-    
-    // Ensure we return an array even if empty
     res.json(offers || []);
   } catch (err) {
     console.error("Error fetching offers:", err);
