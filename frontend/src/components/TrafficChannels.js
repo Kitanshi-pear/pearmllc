@@ -27,11 +27,11 @@ import {
   Snackbar,
   Alert,
   Divider,
-  Chip,
-  CheckIcon
+  Chip
 } from "@mui/material";
 import Layout from "./Layout";
 import axios from "axios";
+import CheckIcon from "@mui/icons-material/Check";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 
