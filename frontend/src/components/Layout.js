@@ -353,14 +353,14 @@ const Layout = ({ children }) => {
             <ListItem
               button
               component={Link}
-              to="/logs/click-logs"
+              to="/logs/click-log"
               sx={{
                 pl: 4,
                 borderRadius: 2,
                 ml: 2,
                 mb: 1,
-                backgroundColor: isActive("/logs/click-logs") ? elegantTheme.secondary.main : alpha(elegantTheme.secondary.light, 0.1),
-                color: isActive("/logs/click-logs") ? "#ffffff" : "text.primary",
+                backgroundColor: isActive("/logs/click-log") ? elegantTheme.secondary.main : alpha(elegantTheme.secondary.light, 0.1),
+                color: isActive("/logs/click-log") ? "#ffffff" : "text.primary",
                 "&:hover": {
                   backgroundColor: elegantTheme.secondary.light,
                   color: "#ffffff",
@@ -371,7 +371,7 @@ const Layout = ({ children }) => {
               }}
             >
               <ListItemIcon sx={{ 
-                color: isActive("/logs/click-logs") ? "#ffffff" : elegantTheme.secondary.main,
+                color: isActive("/logs/click-log") ? "#ffffff" : elegantTheme.secondary.main,
                 minWidth: 40
               }}>
                 <ClickIcon />
@@ -381,14 +381,14 @@ const Layout = ({ children }) => {
             <ListItem
               button
               component={Link}
-              to="/logs/conversion-logs"
+              to="/logs/conversion-log"
               sx={{
                 pl: 4,
                 borderRadius: 2,
                 ml: 2,
                 mb: 1,
-                backgroundColor: isActive("/logs/conversion-logs") ? elegantTheme.secondary.main : alpha(elegantTheme.secondary.light, 0.1),
-                color: isActive("/logs/conversion-logs") ? "#ffffff" : "text.primary",
+                backgroundColor: isActive("/logs/conversion-log") ? elegantTheme.secondary.main : alpha(elegantTheme.secondary.light, 0.1),
+                color: isActive("/logs/conversion-log") ? "#ffffff" : "text.primary",
                 "&:hover": {
                   backgroundColor: elegantTheme.secondary.light,
                   color: "#ffffff",
@@ -399,7 +399,7 @@ const Layout = ({ children }) => {
               }}
             >
               <ListItemIcon sx={{ 
-                color: isActive("/logs/conversion-logs") ? "#ffffff" : elegantTheme.secondary.main,
+                color: isActive("/logs/conversion-log") ? "#ffffff" : elegantTheme.secondary.main,
                 minWidth: 40
               }}>
                 <SwapHorizIcon />

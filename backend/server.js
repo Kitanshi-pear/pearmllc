@@ -108,7 +108,8 @@ const routeConfig = [
   { path: 'trafficRoutes', mount: '/api/traffic' },
   { path: 'auth', mount: '/api/auth' },
   { path: 'admin', mount: '/api/admin' },
-  { path: 'campaigns', mount: '/api/campaigns' }
+  { path: 'click-logs', mount: '/api/click-logs' },
+  { path: 'conversion-logs', mount: '/api/conversion-logs' }
 ];
 
 let successfulRoutes = 0;
