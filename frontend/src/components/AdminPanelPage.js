@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -19,25 +19,24 @@ import {
   Select,
   Chip,
   Grid,
+  Card,
+  CardContent,
   Divider
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import RemoveIcon from "@mui/icons-material/Remove";
 
-// Role hierarchy definition
-const roleHierarchy = {
-  "Admin": {
-    "Manager": {
-      "TL": {
-        "STL": {
-          "Media Buyer": null,
-          "Accounts": null
-        }
-      }
-    }
-  }
+// Main role options
+const roleOptions = ["Admin", "Manager", "TL", "STL", "Media Buyer", "Accounts"];
+
+// Reporting structure definition
+const reportingOptions = {
+  "Manager": ["Admin"],
+  "TL": ["Manager"],
+  "STL": ["TL"],
+  "Media Buyer": ["STL"],
+  "Accounts": ["STL"]
 };
 
 // Traffic platform options
@@ -54,7 +53,8 @@ const defaultUser = {
   name: "",
   email: "",
   phone: "",
-  roleChain: ["Media Buyer"], // Default role path
+  role: "",
+  reportsTo: "",
   platforms: []  // Connected platforms
 };
 
@@ -83,7 +83,18 @@ const AdminPanelPage = () => {
   };
 
   const handleChange = (field) => (e) => {
-    setFormData({ ...formData, [field]: e.target.value });
+    const value = e.target.value;
+    
+    // If role is changing, reset the reportsTo field
+    if (field === "role") {
+      setFormData({ 
+        ...formData, 
+        [field]: value,
+        reportsTo: "" // Reset reporting relationship
+      });
+    } else {
+      setFormData({ ...formData, [field]: value });
+    }
   };
 
   const handleSave = () => {
@@ -103,27 +114,16 @@ const AdminPanelPage = () => {
     setUsers(filtered);
   };
 
-  // Role chain management
-  const handleRoleChange = (index) => (e) => {
-    const value = e.target.value;
-    const newRoleChain = [...formData.roleChain.slice(0, index), value];
-    
-    // Reset lower-level roles when higher-level role changes
-    setFormData({ ...formData, roleChain: newRoleChain });
-  };
-
-  // Get available options for role level based on the current role chain
-  const getOptionsForLevel = (level) => {
-    if (level === 0) return Object.keys(roleHierarchy);
-    
-    let currentLevel = roleHierarchy;
-    for (let i = 0; i < level; i++) {
-      if (!formData.roleChain[i]) return [];
-      currentLevel = currentLevel[formData.roleChain[i]];
-      if (!currentLevel) return [];
+  // Get possible reporting options based on selected role
+  const getReportingOptions = () => {
+    if (!formData.role || !reportingOptions[formData.role]) {
+      return [];
     }
     
-    return Object.keys(currentLevel || {});
+    const possibleSuperiors = reportingOptions[formData.role];
+    
+    // Filter users that have the appropriate roles to be a superior
+    return users.filter(user => possibleSuperiors.includes(user.role));
   };
 
   // Platform account management
@@ -152,145 +152,122 @@ const AdminPanelPage = () => {
     setFormData({ ...formData, platforms: newPlatforms });
   };
 
-  // Render role selection based on hierarchy
-  const renderRoleSelections = () => {
-    return formData.roleChain.map((role, index) => (
-      <FormControl key={index} fullWidth sx={{ mb: 2 }}>
-        <InputLabel>{index === 0 ? "Role" : `Reporting to ${formData.roleChain[index-1]}`}</InputLabel>
-        <Select
-          value={role}
-          label={index === 0 ? "Role" : `Reporting to ${formData.roleChain[index-1]}`}
-          onChange={handleRoleChange(index)}
-        >
-          {getOptionsForLevel(index).map((option) => (
-            <MenuItem key={option} value={option}>{option}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    ));
-  };
-
-  // Add next level in role chain if possible
-  const canAddNextLevel = () => {
-    if (!formData.roleChain.length) return false;
-    
-    let currentLevel = roleHierarchy;
-    for (const role of formData.roleChain) {
-      currentLevel = currentLevel[role];
-      if (!currentLevel) return false;
-    }
-    
-    return Object.keys(currentLevel).length > 0;
-  };
-
-  const addNextRoleLevel = () => {
-    if (!canAddNextLevel()) return;
-    
-    let currentLevel = roleHierarchy;
-    for (const role of formData.roleChain) {
-      currentLevel = currentLevel[role];
-    }
-    
-    const nextOptions = Object.keys(currentLevel);
-    if (nextOptions.length > 0) {
-      setFormData({ 
-        ...formData, 
-        roleChain: [...formData.roleChain, nextOptions[0]] 
-      });
-    }
-  };
-
-  const removeLastRoleLevel = () => {
-    if (formData.roleChain.length <= 1) return;
-    
-    setFormData({
-      ...formData,
-      roleChain: formData.roleChain.slice(0, -1)
-    });
-  };
-
-  // Get last role in chain (user's actual role)
-  const getUserRole = (roleChain) => {
-    return roleChain[roleChain.length - 1];
-  };
-
-  // Format role chain for display
-  const formatRoleChain = (roleChain) => {
-    return roleChain.join(" → ");
+  // Get superior's name by ID
+  const getSuperiorName = (userId) => {
+    if (!userId) return "None";
+    const superior = users.find(user => user.id === userId);
+    return superior ? superior.name : "Unknown";
   };
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" mb={3}>
-        <Typography variant="h5" fontWeight="bold">
-          Admin Panel - User Management
-        </Typography>
-        <Button variant="contained" color="primary" onClick={() => handleOpen()}>
-          Add User
-        </Button>
-      </Box>
+    <Box sx={{ p: 3, maxWidth: "1200px", mx: "auto" }}>
+      <Card elevation={3} sx={{ mb: 4 }}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h5" fontWeight="bold">
+              Admin Panel - User Management
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              startIcon={<AddIcon />}
+              onClick={() => handleOpen()}
+              size="large"
+            >
+              Add New User
+            </Button>
+          </Box>
 
-      <Paper>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Reporting Structure</TableCell>
-              <TableCell>Connected Platforms</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((user, index) => (
-              <TableRow key={index}>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.phone}</TableCell>
-                <TableCell>{getUserRole(user.roleChain)}</TableCell>
-                <TableCell>{formatRoleChain(user.roleChain)}</TableCell>
-                <TableCell>
-                  {user.platforms.map((platform, idx) => (
-                    <Chip 
-                      key={idx} 
-                      label={`${platform.platform}: ${platform.accountId}`} 
-                      size="small" 
-                      sx={{ mr: 0.5, mb: 0.5 }} 
-                    />
-                  ))}
-                </TableCell>
-                <TableCell align="right">
-                  <Tooltip title="Edit">
-                    <IconButton onClick={() => handleOpen(index)}>
-                      <EditIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton onClick={() => handleDelete(index)} color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
-            {users.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  No users added yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </Paper>
+          <Paper>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                  <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Contact Info</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Reports To</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Platform Accounts</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold" }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user, index) => (
+                  <TableRow key={index} sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{user.email}</Typography>
+                      <Typography variant="body2" color="text.secondary">{user.phone}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.role} 
+                        color={user.role === "Admin" ? "error" : 
+                              user.role === "Manager" ? "warning" : 
+                              user.role === "TL" ? "success" : 
+                              user.role === "STL" ? "info" : "default"} 
+                        size="small" 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {user.reportsTo ? 
+                        users.find(u => u.id === user.reportsTo)?.name || "Unknown" : 
+                        "None"}
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {user.platforms.map((platform, idx) => (
+                          <Chip 
+                            key={idx} 
+                            label={`${platform.platform}: ${platform.accountId}`} 
+                            size="small"
+                            variant="outlined"
+                          />
+                        ))}
+                        {user.platforms.length === 0 && (
+                          <Typography variant="body2" color="text.secondary">None</Typography>
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Edit User">
+                        <IconButton onClick={() => handleOpen(index)}>
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete User">
+                        <IconButton onClick={() => handleDelete(index)} color="error">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {users.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">No users added yet</Typography>
+                      <Button 
+                        variant="outlined" 
+                        size="small" 
+                        onClick={() => handleOpen()}
+                        sx={{ mt: 1 }}
+                      >
+                        Add Your First User
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Paper>
+        </CardContent>
+      </Card>
 
       {/* User Form Modal */}
       <Modal open={open} onClose={handleClose}>
         <Box
           sx={{
-            width: 500,
+            width: { xs: "90%", sm: 500 },
             p: 4,
             bgcolor: "white",
             boxShadow: 24,
@@ -301,13 +278,16 @@ const AdminPanelPage = () => {
             overflow: "auto"
           }}
         >
-          <Typography variant="h6" mb={2}>
-            {editingIndex !== null ? "Edit User" : "Add User"}
+          <Typography variant="h5" mb={3} fontWeight="bold">
+            {editingIndex !== null ? "Edit User" : "Add New User"}
           </Typography>
           
+          <Typography variant="subtitle1" mb={1} color="primary">
+            User Information
+          </Typography>
           <TextField
             fullWidth
-            label="Name"
+            label="Full Name"
             value={formData.name}
             onChange={handleChange("name")}
             sx={{ mb: 2 }}
@@ -315,7 +295,7 @@ const AdminPanelPage = () => {
           
           <TextField
             fullWidth
-            label="Email"
+            label="Email Address"
             value={formData.email}
             onChange={handleChange("email")}
             sx={{ mb: 2 }}
@@ -329,67 +309,103 @@ const AdminPanelPage = () => {
             sx={{ mb: 3 }}
           />
           
-          <Box mb={3}>
-            <Typography variant="subtitle1" mb={1}>Role Hierarchy</Typography>
-            <Box mb={1}>
-              {renderRoleSelections()}
-            </Box>
-            <Box display="flex" justifyContent="flex-end" gap={1}>
-              {formData.roleChain.length > 1 && (
-                <Button 
-                  startIcon={<RemoveIcon />} 
-                  onClick={removeLastRoleLevel}
-                  size="small"
-                  color="error"
-                >
-                  Remove Level
-                </Button>
-              )}
-              {canAddNextLevel() && (
-                <Button 
-                  startIcon={<AddIcon />} 
-                  onClick={addNextRoleLevel}
-                  size="small"
-                >
-                  Add Subrole
-                </Button>
-              )}
-            </Box>
-          </Box>
+          <Divider sx={{ mb: 3 }} />
+          
+          <Typography variant="subtitle1" mb={1} color="primary">
+            Role & Reporting
+          </Typography>
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>User Role</InputLabel>
+            <Select
+              value={formData.role}
+              label="User Role"
+              onChange={handleChange("role")}
+            >
+              {roleOptions.map((role) => (
+                <MenuItem key={role} value={role}>{role}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {formData.role && formData.role !== "Admin" && (
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Reports To</InputLabel>
+              <Select
+                value={formData.reportsTo}
+                label="Reports To"
+                onChange={handleChange("reportsTo")}
+                disabled={!formData.role || formData.role === "Admin"}
+              >
+                {getReportingOptions().map((superior) => (
+                  <MenuItem key={superior.id || superior.email} value={superior.id || superior.email}>
+                    {superior.name} ({superior.role})
+                  </MenuItem>
+                ))}
+                {getReportingOptions().length === 0 && (
+                  <MenuItem value="" disabled>
+                    No available superiors - add them first
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          )}
           
           <Divider sx={{ mb: 3 }} />
           
-          <Box mb={3}>
-            <Typography variant="subtitle1" mb={1}>Connected Platforms</Typography>
-            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-              {formData.platforms.length > 0 ? (
-                <Grid container spacing={1}>
-                  {formData.platforms.map((platform, index) => (
-                    <Grid item key={index}>
-                      <Chip 
-                        label={`${platform.platform}: ${platform.accountId}`} 
-                        onDelete={() => removePlatform(index)}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Typography color="text.secondary" align="center">No platforms connected</Typography>
-              )}
-            </Paper>
+          <Typography variant="subtitle1" mb={1} color="primary">
+            Platform Accounts
+          </Typography>
+          
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            {formData.platforms.length > 0 ? (
+              <Grid container spacing={1}>
+                {formData.platforms.map((platform, index) => (
+                  <Grid item key={index}>
+                    <Chip 
+                      label={`${platform.platform}: ${platform.accountId}`} 
+                      onDelete={() => removePlatform(index)}
+                      sx={{ my: 0.5 }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Typography color="text.secondary" align="center" sx={{ py: 1 }}>
+                No platforms connected
+              </Typography>
+            )}
+          </Paper>
+          
+          <Button 
+            variant="outlined" 
+            startIcon={<AddIcon />} 
+            onClick={openPlatformModal}
+            fullWidth
+            sx={{ mb: 3 }}
+          >
+            Connect Platform Account
+          </Button>
+          
+          <Divider sx={{ mb: 3 }} />
+          
+          <Box sx={{ display: 'flex', gap: 2 }}>
             <Button 
               variant="outlined" 
-              startIcon={<AddIcon />} 
-              onClick={openPlatformModal}
-              fullWidth
+              fullWidth 
+              onClick={handleClose}
             >
-              Connect Platform
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              fullWidth 
+              onClick={handleSave}
+              color="primary"
+            >
+              {editingIndex !== null ? "Update User" : "Save User"}
             </Button>
           </Box>
-          
-          <Button variant="contained" fullWidth onClick={handleSave}>
-            Save User
-          </Button>
         </Box>
       </Modal>
 
@@ -397,7 +413,7 @@ const AdminPanelPage = () => {
       <Modal open={platformAccountModal} onClose={closePlatformModal}>
         <Box
           sx={{
-            width: 400,
+            width: { xs: "90%", sm: 400 },
             p: 4,
             bgcolor: "white",
             boxShadow: 24,
@@ -429,11 +445,17 @@ const AdminPanelPage = () => {
             value={platformForm.accountId}
             onChange={handlePlatformChange("accountId")}
             sx={{ mb: 3 }}
+            placeholder="Enter account ID or username"
           />
           
-          <Button variant="contained" fullWidth onClick={addPlatform}>
-            Connect Account
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="outlined" fullWidth onClick={closePlatformModal}>
+              Cancel
+            </Button>
+            <Button variant="contained" fullWidth onClick={addPlatform}>
+              Connect
+            </Button>
+          </Box>
         </Box>
       </Modal>
     </Box>
