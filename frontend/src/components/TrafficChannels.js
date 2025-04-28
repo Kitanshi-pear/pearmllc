@@ -1,66 +1,108 @@
 import React, { useState, useEffect } from "react";
-import {useNavigate } from "react-router-dom"
-import {
-  DataGrid
-} from "@mui/x-data-grid";
+import { useNavigate } from "react-router-dom";
+import { DataGrid } from "@mui/x-data-grid";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import { Button, InputLabel, CircularProgress, Typography, Box, Modal, Card, CardContent, Grid, TextField, FormControl, Select, MenuItem, Stack, Switch, Tooltip, InputAdornment} from "@mui/material";
+import {
+  Button,
+  InputLabel,
+  CircularProgress,
+  Typography,
+  Box,
+  Modal,
+  Card,
+  CardContent,
+  Grid,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  Stack,
+  Switch,
+  Tooltip,
+  InputAdornment
+} from "@mui/material";
 import Layout from "./Layout"; // Importing Layout component
-import axios from "axios"; // Import  axios for API calls
+import axios from "axios"; // Import axios for API calls
 
-const API_URL = process.env.REACT_APP_API_URL ;
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ChannelTable = () => {
   const [isFacebookConnected, setIsFacebookConnected] = useState(false);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [rows, setRows] = useState([]);
-  const [data, setData] = useState([]); 
+  const [data, setData] = useState([]);
   const [filterText, setFilterText] = useState("");
   const navigate = useNavigate();
   const [openModal, setOpenModal] = useState(false);
   const [openSecondModal, setOpenSecondModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
-  const [formData, setFormData] = useState({ channelName: "", aliasChannel: "", costUpdateDepth: "", costUpdateFrequency: "5 minutes", currency: "USD", s2sPostbackUrl: "", clickRefId: "", externalId: "", pixelId: "", apiAccessToken: "", defaultEventName: "", customConversionMatching: false, googleAdsAccountId: "", googleMccAccountId: "", }); const [loading, setLoading] = useState({ facebook: false, google: false }); const [error, setError] = useState("");
-  // Define your columns here
+  const [formData, setFormData] = useState({
+    channelName: "",
+    aliasChannel: "",
+    costUpdateDepth: "",
+    costUpdateFrequency: "5 minutes",
+    currency: "USD",
+    s2sPostbackUrl: "",
+    clickRefId: "",
+    externalId: "",
+    pixelId: "",
+    apiAccessToken: "",
+    defaultEventName: "",
+    customConversionMatching: false,
+    googleAdsAccountId: "",
+    googleMccAccountId: "",
+    parameter: "",
+    macroToken: "",
+    nameDescription: "",
+    selectRole: ""
+  });
+  const [loading, setLoading] = useState({ facebook: false, google: false });
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-    // Fetching data from the API
-    useEffect(() => {
-      axios.get('/api/trafficChannels') // Adjust the API URL as needed
-        .then((response) => {
-          setData(response.data);  // Set the fetched data into state
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error('Error fetching data:', error);
-          setLoading(false);
-        });
-    }, []);
-  // Example using first entry's metrics to determine columns
-  const metricFields = data[0]?.Metrics
-  ? Object.keys(data[0].Metrics).map((key) => ({
-      field: key,
-      headerName: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      width: 120,
-    }))
-  : [];
+  // Fetching data from the API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get(`${API_URL}/api/trafficChannels`);
+        setData(response.data);
+        setRows(response.data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-const staticColumns = [
-  { field: "id", headerName: "ID", width: 90 },
-  { field: "channelName", headerName: "Channel Name", width: 150 },
-  { field: "aliasChannel", headerName: "Alias Channel", width: 150 },
-  { field: "costUpdateFrequency", headerName: "Cost Update Frequency", width: 180 },
-  { field: "currency", headerName: "Currency", width: 100 },
-  { field: "pixelId", headerName: "Pixel ID", width: 150 },
-];
+  // Define your columns here - FIX: Check if Metrics exists and is an object before attempting to get keys
+  const metricFields = data[0]?.Metrics && typeof data[0].Metrics === 'object'
+    ? Object.keys(data[0].Metrics).map((key) => ({
+        field: key,
+        headerName: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        width: 120,
+      }))
+    : [];
 
-const columns = [...staticColumns, ...metricFields];
+  const staticColumns = [
+    { field: "id", headerName: "ID", width: 90 },
+    { field: "channelName", headerName: "Channel Name", width: 150 },
+    { field: "aliasChannel", headerName: "Alias Channel", width: 150 },
+    { field: "costUpdateFrequency", headerName: "Cost Update Frequency", width: 180 },
+    { field: "currency", headerName: "Currency", width: 100 },
+    { field: "pixelId", headerName: "Pixel ID", width: 150 },
+  ];
 
-const mappedRows = data.map(item => ({
-  ...item,
-  ...item.Metrics,
-}));
+  const columns = [...staticColumns, ...metricFields];
 
-
+  // FIX: Make sure each item has Metrics property before spreading it
+  const mappedRows = data.map(item => ({
+    ...item,
+    ...(item.Metrics && typeof item.Metrics === 'object' ? item.Metrics : {}),
+    id: item.id || item.serial_no || Math.random().toString(36).substring(2, 9) // Ensure each row has an id
+  }));
 
   const filteredRows = mappedRows.filter((row) =>
     Object.values(row).some((value) =>
@@ -97,7 +139,7 @@ const mappedRows = data.map(item => ({
       // Redirect to another page after a delay (e.g., dashboard)
       setTimeout(() => navigate("/tarffic-channel"), 2000);
     }
-  }, []);
+  }, [navigate]);
 
   const fetchFacebookData = async (code) => {
     try {
@@ -133,12 +175,13 @@ const mappedRows = data.map(item => ({
   };
 
   const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevState) => ({ ...prevState, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    setFormData((prevState) => ({ ...prevState, [name]: newValue }));
   };
 
-  const handleRowClick = (channelName) => {
-    setSelectedChannel(channelName ?? null); // Ensure safe assignment
+  const handleRowClick = (params) => {
+    setSelectedChannel(params.row?.channelName ?? null); // Ensure safe assignment
     setOpenModal(true);
   };
 
@@ -147,7 +190,7 @@ const mappedRows = data.map(item => ({
   
     try {
       // Send data to backend
-      const response = await axios.post(`${API_URL}/api/traffic-channels`, formData);// 🔁 change the endpoint if needed
+      const response = await axios.post(`${API_URL}/api/traffic-channels`, formData);
   
       // Optionally update local state
       setRows((prevRows) => [...prevRows, response.data]);
@@ -169,6 +212,10 @@ const mappedRows = data.map(item => ({
         customConversionMatching: false,
         googleAdsAccountId: "",
         googleMccAccountId: "",
+        parameter: "",
+        macroToken: "",
+        nameDescription: "",
+        selectRole: ""
       });
   
     } catch (error) {
@@ -176,17 +223,6 @@ const mappedRows = data.map(item => ({
       alert("Failed to save channel. Check the console for details.");
     }
   };
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/api/traffic-channels`);
-        setRows(response.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-    fetchData();
-  }, []);  
 
   return (
     <Layout>
@@ -223,7 +259,7 @@ const mappedRows = data.map(item => ({
             <Button variant="contained" color="primary" onClick={handleOpenModal}>
               New From Template
             </Button>
-            <Button variant="contained" color="secondary">
+            <Button variant="contained" color="secondary" onClick={() => handleOpenSecondModal(null)}>
               New From Scratch
             </Button>
           </Stack>
@@ -245,20 +281,26 @@ const mappedRows = data.map(item => ({
 
         {/* DataGrid */}
         <Box sx={{ height: 600, width: "100%" }}>
-          <DataGrid
-            rows={filteredRows}
-            columns={columns}
-            getRowId={(row) => row?.serial_no ?? Math.random()}
-            pageSize={10}
-            rowsPerPageOptions={[10, 20, 50]}
-            checkboxSelection
-            disableSelectionOnClick
-            onRowClick={(params) => handleRowClick(params?.row ?? {})}
-            sx={{
-              "& .MuiDataGrid-columnHeader": { backgroundColor: "#f0f0f0", fontWeight: "bold" },
-              "& .MuiDataGrid-row:hover": { backgroundColor: "#f1f1f1" },
-            }}
-          />
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <DataGrid
+              rows={filteredRows}
+              columns={columns}
+              pageSize={10}
+              rowsPerPageOptions={[10, 20, 50]}
+              checkboxSelection
+              disableSelectionOnClick
+              onRowClick={handleRowClick}
+              getRowId={(row) => row.id}
+              sx={{
+                "& .MuiDataGrid-columnHeader": { backgroundColor: "#f0f0f0", fontWeight: "bold" },
+                "& .MuiDataGrid-row:hover": { backgroundColor: "#f1f1f1" },
+              }}
+            />
+          )}
         </Box>
 
         {/* Modal for New From Template */}
@@ -378,34 +420,36 @@ const mappedRows = data.map(item => ({
               boxShadow: 3,
               maxHeight: "90vh",
               overflowY: "auto",
+              width: "80%",
+              maxWidth: "900px"
             }}
           >
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                padding: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                p: 2,
-                boxShadow: 2,
-                zIndex: 10,
-                backgroundColor: "white",
-              }}
-            >
-              <Typography variant="h6">New Traffic Channel</Typography>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 2 }}>
-                <Button variant="outlined" onClick={handleCloseSecondModal}>
-                  Cancel
-                </Button>
-                <Button variant="contained" color="primary" type="submit">
-                  Save
-                </Button>
-              </Box>
-            </Box>
-
             <form onSubmit={handleSubmit}>
+              <Box
+                sx={{
+                  position: "sticky",
+                  top: 0,
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  p: 2,
+                  boxShadow: 2,
+                  zIndex: 10,
+                  backgroundColor: "white",
+                }}
+              >
+                <Typography variant="h6">New Traffic Channel</Typography>
+                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
+                  <Button variant="outlined" onClick={handleCloseSecondModal}>
+                    Cancel
+                  </Button>
+                  <Button variant="contained" color="primary" type="submit">
+                    Save
+                  </Button>
+                </Box>
+              </Box>
+
               <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
                 <CardContent>
                   <Grid container spacing={2}>
@@ -415,7 +459,7 @@ const mappedRows = data.map(item => ({
                         fullWidth
                         label="Channel Name"
                         name="channelName"
-                        value={ formData.channelName}
+                        value={formData.channelName}
                         onChange={handleFormChange}
                         required
                       />
@@ -425,7 +469,7 @@ const mappedRows = data.map(item => ({
                         fullWidth
                         label="Alias Channel"
                         name="aliasChannel"
-                        value={selectedChannel || formData.channelName}
+                        value={selectedChannel || formData.aliasChannel}
                         onChange={handleFormChange}
                         required
                       />
@@ -439,8 +483,10 @@ const mappedRows = data.map(item => ({
                           name="costUpdateDepth"
                           value={formData.costUpdateDepth}
                           onChange={handleFormChange}
+                          displayEmpty
                           required
                         >
+                          <MenuItem value="">Select depth</MenuItem>
                           <MenuItem value="None">None</MenuItem>
                           <MenuItem value="Campaign Level">Campaign Level</MenuItem>
                           <MenuItem value="Adset Level">Adset Level</MenuItem>
@@ -599,8 +645,9 @@ const mappedRows = data.map(item => ({
                           name="selectRole"
                           value={formData.selectRole}
                           onChange={handleFormChange}
-                          required
+                          displayEmpty
                         >
+                          <MenuItem value="">Select role</MenuItem>
                           <MenuItem value="Aid">Aid</MenuItem>
                         </Select>
                       </FormControl>
@@ -610,223 +657,322 @@ const mappedRows = data.map(item => ({
               </Card>
 
               {/* Conditional Rendering Based on selectedChannel */}
-              <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
-                <CardContent>
-                  <Grid container spacing={2}>
-                    {selectedChannel && (
-                      <>
-                     {selectedChannel === "Facebook" && (
-  <>
-    {/* Facebook API Integration Section */}
-    <Box
-      sx={{
-        border: "1px solid #ddd",
-        borderRadius: 2,
-        p: 2,
-        mb: 2,
-        backgroundColor: "#fafafa",
-      }}
-    >
-      <Grid container spacing={2} alignItems="center">
-        <Grid item xs={6}>
-          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            Facebook API Integration
-          </Typography>
-        </Grid>
-        <Grid item xs={6} sx={{ textAlign: "right" }}>
-          <Button
-            variant={isFacebookConnected ? "contained" : "outlined"}
-            color={isFacebookConnected ? "success" : "primary"}
-            sx={{ textTransform: "none" }}
-            onClick={() => handleAuth("facebook")}
-          >
-            {isFacebookConnected ? "Connected" : "Connect Facebook"}
-          </Button>
-        </Grid>
-        <Grid item xs={12}>
-          <Typography variant="body2" color="textSecondary">
-            Please allow access to activate integrations:  
-            <br /> #1 Click on “Connect” and accept integration permissions  
-            <br /> #2 Once accepted, fill in all mandatory fields and save changes.  
-          </Typography>
-        </Grid>
-      </Grid>
-    </Box>
+              {selectedChannel && (
+                <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
+                  <CardContent>
+                    <Grid container spacing={2}>
+                      {selectedChannel === "Facebook" && (
+                        <>
+                          {/* Facebook API Integration Section */}
+                          <Grid item xs={12}>
+                            <Box
+                              sx={{
+                                border: "1px solid #ddd",
+                                borderRadius: 2,
+                                p: 2,
+                                mb: 2,
+                                backgroundColor: "#fafafa",
+                              }}
+                            >
+                              <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={6}>
+                                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                                    Facebook API Integration
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} sx={{ textAlign: "right" }}>
+                                  <Button
+                                    variant={isFacebookConnected ? "contained" : "outlined"}
+                                    color={isFacebookConnected ? "success" : "primary"}
+                                    sx={{ textTransform: "none" }}
+                                    onClick={() => handleAuth("facebook")}
+                                    disabled={loading.facebook}
+                                  >
+                                    {loading.facebook ? <CircularProgress size={24} /> : isFacebookConnected ? "Connected" : "Connect Facebook"}
+                                  </Button>
+                                </Grid>
+                                <Grid item xs={12}>
+                                  <Typography variant="body2" color="textSecondary">
+                                    Please allow access to activate integrations:  
+                                    <br /> #1 Click on "Connect" and accept integration permissions  
+                                    <br /> #2 Once accepted, fill in all mandatory fields and save changes.  
+                                  </Typography>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Grid>
 
-    {/* Facebook Pixel Data Section */}
-    <Box
-      sx={{
-        border: "1px solid #ddd",
-        borderRadius: 2,
-        p: 2,
-        mb: 2,
-        backgroundColor: "#fafafa",
-         width: '100%'
-      }}
-    >
-     <Grid container spacing={2} flexDirection="column" >
-  {/* Section Title */}
-  <Grid item xs={16}>
-    <Typography variant="h6" sx={{ mt: 1, fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
-      Facebook default data source (pixel)
-      <Tooltip title="Info about pixel data">
-        <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer" }} />
-      </Tooltip>
-    </Typography>
-  </Grid>
+                          {/* Facebook Pixel Data Section */}
+                          <Grid item xs={12}>
+                            <Box
+                              sx={{
+                                border: "1px solid #ddd",
+                                borderRadius: 2,
+                                p: 2,
+                                mb: 2,
+                                backgroundColor: "#fafafa",
+                              }}
+                            >
+                              <Grid container spacing={2}>
+                                {/* Section Title */}
+                                <Grid item xs={12}>
+                                  <Typography variant="h6" sx={{ mt: 1, fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
+                                    Facebook default data source (pixel)
+                                    <Tooltip title="Info about pixel data">
+                                      <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer" }} />
+                                    </Tooltip>
+                                  </Typography>
+                                </Grid>
 
-  {/* Pixel ID */}
-  <Grid item xs={6}>
-    <TextField
-      fullWidth
-      label="Pixel ID"
-      name="pixelId"
-      value={formData.pixelId}
-      onChange={handleFormChange}
-      required
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <Tooltip title="Enter your Pixel ID">
-              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
-            </Tooltip>
-          </InputAdornment>
-        ),
-      }}
-    />
-  </Grid>
+                                {/* Pixel ID */}
+                                <Grid item xs={12}>
+                                  <TextField
+                                    fullWidth
+                                    label="Pixel ID"
+                                    name="pixelId"
+                                    value={formData.pixelId}
+                                    onChange={handleFormChange}
+                                    required
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Tooltip title="Enter your Pixel ID">
+                                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+                                          </Tooltip>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                  />
+                                </Grid>
 
-  {/* Conversions API Access Token */}
-  <Grid item xs={6}>
-    <TextField
-      fullWidth
-      label="Conversions API Access token"
-      name="apiAccessToken"
-      value={formData.apiAccessToken}
-      onChange={handleFormChange}
-      required
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <Tooltip title="Enter your API Access Token">
-              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
-            </Tooltip>
-          </InputAdornment>
-        ),
-      }}
-    />
-  </Grid>
+                                {/* Conversions API Access Token */}
+                                <Grid item xs={12}>
+                                  <TextField
+                                    fullWidth
+                                    label="Conversions API Access token"
+                                    name="apiAccessToken"
+                                    value={formData.apiAccessToken}
+                                    onChange={handleFormChange}
+                                    required
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Tooltip title="Enter your API Access Token">
+                                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+                                          </Tooltip>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                  />
+                                </Grid>
 
-  {/* Default Event Name */}
-  <Grid item xs={6}>
-    <TextField
-      fullWidth
-      label="Default Event name"
-      name="defaultEventName"
-      value={formData.defaultEventName}
-      onChange={handleFormChange}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <Tooltip title="Default event triggered in your pixel">
-              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
-            </Tooltip>
-          </InputAdornment>
-        ),
-      }}
-    />
-  </Grid>
+                                {/* Default Event Name */}
+                                <Grid item xs={12}>
+                                  <TextField
+                                    fullWidth
+                                    label="Default Event name"
+                                    name="defaultEventName"
+                                    value={formData.defaultEventName}
+                                    onChange={handleFormChange}
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Tooltip title="Default event triggered in your pixel">
+                                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+                                          </Tooltip>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                  />
+                                </Grid>
 
-  {/* Custom Conversion Matching */}
-  <Grid item xs={6} sx={{ display: "flex", alignItems: "center" }}>
-    <Switch
-      checked={formData.customConversionMatching}
-      onChange={(e) =>
-        setFormData((prevState) => ({
-          ...prevState,
-          customConversionMatching: e.target.checked,
-        }))
-      }
-      name="customConversionMatching"
-      inputProps={{ "aria-label": "toggle custom conversion matching" }}
-    />
-    <Typography variant="body2" sx={{ ml: 1, color: "#666" }}>
-      Custom Conversion Matching
-    </Typography>
-  </Grid>
-</Grid>
+                                {/* Custom Conversion Matching */}
+                                <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
+                                  <Switch
+                                    checked={formData.customConversionMatching}
+                                    onChange={(e) =>
+                                      setFormData((prevState) => ({
+                                        ...prevState,
+                                        customConversionMatching: e.target.checked,
+                                      }))
+                                    }
+                                    name="customConversionMatching"
+                                    inputProps={{ "aria-label": "toggle custom conversion matching" }}
+                                  />
+                                  <Typography variant="body2" sx={{ ml: 1, color: "#666" }}>
+                                    Custom Conversion Matching
+                                  </Typography>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Grid>
+                        </>
+                      )}
 
-    </Box>
-  </>
-)}
+                      {selectedChannel === "Google" && (
+                        <>
+                          <Grid item xs={12}>
+                            <Box
+                              sx={{
+                                border: "1px solid #ddd",
+                                borderRadius: 2,
+                                p: 2,
+                                mb: 2,
+                                backgroundColor: "#fafafa",
+                              }}
+                            >
+                              <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={6}>
+                                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                                    Google API Integration
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} sx={{ textAlign: "right" }}>
+                                  <Button
+                                    variant={isGoogleConnected ? "contained" : "outlined"}
+                                    color={isGoogleConnected ? "success" : "primary"}
+                                    sx={{ textTransform: "none" }}
+                                    onClick={() => handleAuth("google")}
+                                    disabled={loading.google}
+                                  >
+                                    {loading.google ? <CircularProgress size={24} /> : isGoogleConnected ? "Connected" : "Connect Google"}
+                                  </Button>
+                                </Grid>
+                                <Grid item xs={12}>
+                                  <Typography variant="body2" color="textSecondary">
+                                    Please allow access to activate Google Ads integrations:  
+                                    <br /> #1 Click on "Connect" and accept integration permissions  
+                                    <br /> #2 Once accepted, fill in all mandatory fields and save changes.  
+                                  </Typography>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Grid>
 
+                          <Grid item xs={12}>
+                            <Box
+                              sx={{
+                                border: "1px solid #ddd",
+                                borderRadius: 2,
+                                p: 2,
+                                mb: 2,
+                                backgroundColor: "#fafafa",
+                              }}
+                            >
+                              <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                  <TextField
+                                    fullWidth
+                                    label="Google Ads Account ID *"
+                                    name="googleAdsAccountId"
+                                    value={formData.googleAdsAccountId}
+                                    onChange={handleFormChange}
+                                    required
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Tooltip title="Enter your Google Ads Account ID">
+                                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+                                          </Tooltip>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                  />
+                                </Grid>
 
+                                <Grid item xs={12}>
+                                  <Typography variant="h6" sx={{ mt: 2 }}>Google MCC Account ID (optional)</Typography>
+                                  <TextField
+                                    fullWidth
+                                    label="Google MCC Account ID (optional)"
+                                    name="googleMccAccountId"
+                                    value={formData.googleMccAccountId}
+                                    onChange={handleFormChange}
+                                  />
+                                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                                    Add MCC account ID to send conversions to it and not the ad account (optional).
+                                    Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
+                                  </Typography>
+                                </Grid>
 
-                        {/* Google API Integration Section */}
-                        {selectedChannel === "Google" && (
-                          <>
-                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                              <Typography>Google API Integration</Typography>
-                         
-                                
-                             {isGoogleConnected ? "Connected" : "Connect Google"}
-                            </Grid>
-
-                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                              <TextField
-                                fullWidth
-                                label="Google Ads Account ID *"
-                                name="googleAdsAccountId"
-                                value={formData.googleAdsAccountId}
-                                onChange={handleFormChange}
-                                required
-                              />
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                sx={{ width: '400px', height: '60px', mt: 1, mb: 1 }} 
-                                onClick={() => handleAuth("google")}
-                              >
-                                Google Connect
-                              </Button>
-                            </Grid>
-
-                            <Grid item xs={8.4}>
-                              <Typography variant="h6" sx={{ mt: 2 }}>Google MCC Account ID (optional)</Typography>
-                              <TextField
-                                fullWidth
-                                label="Google MCC Account ID (optional)"
-                                name="googleMccAccountId"
-                                value={formData.googleMccAccountId}
-                                onChange={handleFormChange}
-                              />
-                              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                                Add MCC account ID to send conversions to it and not the ad account (optional).
-                                Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
-                              </Typography>
-                            </Grid>
-
-                            {/* Conversion Matching Section */}
-                            <Grid item xs={12}>
-                              <Typography variant="h6" sx={{ mt: 2 }}>Conversion Matching</Typography>
-                            </Grid>
-
-                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mt: 1 }}>
-                              <Typography variant="body2" color="textSecondary">Conversion Type * ?</Typography>
-                              <Typography variant="body2" color="textSecondary">Conversion Name * ?</Typography>
-                              <Typography variant="body2" color="textSecondary">Category * ?</Typography>
-                              <Typography variant="body2" color="textSecondary">Include in conversions * ?</Typography>
-                            </Grid>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </Grid>
-                </CardContent>
-              </Card>
+                                {/* Conversion Matching Section */}
+                                <Grid item xs={12}>
+                                  <Typography variant="h6" sx={{ mt: 2 }}>Conversion Matching</Typography>
+                                  <Box sx={{ mt: 2, border: "1px solid #e0e0e0", borderRadius: 1, p: 2 }}>
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={3}>
+                                        <Typography variant="body2" color="textSecondary">Conversion Type * </Typography>
+                                        <FormControl fullWidth sx={{ mt: 1 }}>
+                                          <Select
+                                            name="conversionType"
+                                            value={formData.conversionType || ""}
+                                            onChange={handleFormChange}
+                                            displayEmpty
+                                          >
+                                            <MenuItem value="">Select type</MenuItem>
+                                            <MenuItem value="Purchase">Purchase</MenuItem>
+                                            <MenuItem value="Lead">Lead</MenuItem>
+                                            <MenuItem value="SignUp">Sign Up</MenuItem>
+                                          </Select>
+                                        </FormControl>
+                                      </Grid>
+                                      <Grid item xs={3}>
+                                        <Typography variant="body2" color="textSecondary">Conversion Name * </Typography>
+                                        <TextField
+                                          fullWidth
+                                          name="conversionName"
+                                          placeholder="Enter name"
+                                          value={formData.conversionName || ""}
+                                          onChange={handleFormChange}
+                                          sx={{ mt: 1 }}
+                                        />
+                                      </Grid>
+                                      <Grid item xs={3}>
+                                        <Typography variant="body2" color="textSecondary">Category * </Typography>
+                                        <FormControl fullWidth sx={{ mt: 1 }}>
+                                          <Select
+                                            name="conversionCategory"
+                                            value={formData.conversionCategory || ""}
+                                            onChange={handleFormChange}
+                                            displayEmpty
+                                          >
+                                            <MenuItem value="">Select category</MenuItem>
+                                            <MenuItem value="Default">Default</MenuItem>
+                                            <MenuItem value="Purchase">Purchase</MenuItem>
+                                            <MenuItem value="Other">Other</MenuItem>
+                                          </Select>
+                                        </FormControl>
+                                      </Grid>
+                                      <Grid item xs={3}>
+                                        <Typography variant="body2" color="textSecondary">Include in conversions *</Typography>
+                                        <FormControl fullWidth sx={{ mt: 1 }}>
+                                          <Select
+                                            name="includeInConversions"
+                                            value={formData.includeInConversions || ""}
+                                            onChange={handleFormChange}
+                                            displayEmpty
+                                          >
+                                            <MenuItem value="">Select option</MenuItem>
+                                            <MenuItem value="Yes">Yes</MenuItem>
+                                            <MenuItem value="No">No</MenuItem>
+                                          </Select>
+                                        </FormControl>
+                                      </Grid>
+                                    </Grid>
+                                  </Box>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Grid>
+                        </>
+                      )}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Buttons */}
-              <Box sx={{ mt: 3, display: "flex", gap: 2, justifyContent: "flex-end" }}>
+              <Box sx={{ mt: 3, mb: 3, display: "flex", gap: 2, justifyContent: "flex-end", p: 2 }}>
                 <Button variant="outlined" onClick={handleCloseSecondModal}>Cancel</Button>
                 <Button variant="contained" color="primary" type="submit">Save</Button>
               </Box>
