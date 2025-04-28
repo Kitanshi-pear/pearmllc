@@ -1,6 +1,4 @@
-// routes/metrics.js
-const express = require("express");
-const router = express.Router();
+// services/MetricsService.js
 const { Op } = require('sequelize');
 const db = require('../models');
 
@@ -45,6 +43,44 @@ class MetricsService {
       return metrics;
     } catch (error) {
       console.error('Error getting metrics record:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Increment metrics for various events (clicks, impressions, etc.)
+   * @param {String} eventType - Type of event (click, lpview, lpclick, conversion)
+   * @param {Object} params - Event parameters
+   * @returns {Boolean} - Success status
+   */
+  async incrementMetrics(eventType, params) {
+    try {
+      const { campaignId, trafficChannelId, landerId, offerId, cost = 0, revenue = 0 } = params;
+      
+      // Determine which increment method to call based on event type
+      switch(eventType) {
+        case 'impression':
+          await this.incrementImpressionMetrics(campaignId, trafficChannelId, params.impressions || 1);
+          break;
+        case 'click':
+          await this.incrementClickMetrics(campaignId, trafficChannelId, landerId, offerId, cost);
+          break;
+        case 'lpview':
+          await this.incrementLanderViewMetrics(campaignId, trafficChannelId, landerId);
+          break;
+        case 'lpclick':
+          await this.incrementLanderClickMetrics(campaignId, trafficChannelId, landerId, offerId);
+          break;
+        case 'conversion':
+          await this.incrementConversionMetrics(campaignId, trafficChannelId, landerId, offerId, revenue, cost);
+          break;
+        default:
+          throw new Error(`Unknown event type: ${eventType}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`Error incrementing ${eventType} metrics:`, error);
       throw error;
     }
   }
@@ -355,6 +391,102 @@ class MetricsService {
   }
 
   /**
+   * Increment landing page click metrics
+   * @param {Number} campaignId - Campaign ID
+   * @param {Number} trafficChannelId - Traffic channel ID
+   * @param {Number} landerId - Lander ID
+   * @param {Number} offerId - Offer ID 
+   */
+  async incrementLanderClickMetrics(campaignId, trafficChannelId, landerId, offerId) {
+    try {
+      // Update campaign metrics
+      const campaignMetrics = await this.getMetricsRecord({
+        campaign_id: campaignId,
+        hourly: true
+      });
+      
+      campaignMetrics.lpclicks += 1;
+      await campaignMetrics.save();
+      
+      // Update traffic channel metrics
+      if (trafficChannelId) {
+        const trafficChannelMetrics = await this.getMetricsRecord({
+          traffic_channel_id: trafficChannelId,
+          hourly: true
+        });
+        
+        trafficChannelMetrics.lpclicks += 1;
+        await trafficChannelMetrics.save();
+      }
+      
+      // Update lander metrics
+      if (landerId) {
+        const landerMetrics = await this.getMetricsRecord({
+          lander_id: landerId,
+          hourly: true
+        });
+        
+        landerMetrics.lpclicks += 1;
+        await landerMetrics.save();
+      }
+      
+      // Update offer metrics
+      if (offerId) {
+        const offerMetrics = await this.getMetricsRecord({
+          offer_id: offerId,
+          hourly: true
+        });
+        
+        offerMetrics.lpclicks += 1;
+        await offerMetrics.save();
+      }
+      
+      // Update combined metrics
+      if (trafficChannelId && landerId) {
+        const tcLanderMetrics = await this.getMetricsRecord({
+          traffic_channel_id: trafficChannelId,
+          lander_id: landerId,
+          hourly: true
+        });
+        
+        tcLanderMetrics.lpclicks += 1;
+        await tcLanderMetrics.save();
+      }
+      
+      if (landerId && offerId) {
+        const landerOfferMetrics = await this.getMetricsRecord({
+          lander_id: landerId,
+          offer_id: offerId,
+          hourly: true
+        });
+        
+        landerOfferMetrics.lpclicks += 1;
+        await landerOfferMetrics.save();
+      }
+      
+      // Update campaign-specific combinations
+      if (campaignId && landerId && offerId) {
+        const campaignLanderOfferMetrics = await this.getMetricsRecord({
+          campaign_id: campaignId,
+          lander_id: landerId,
+          offer_id: offerId,
+          hourly: true
+        });
+        
+        campaignLanderOfferMetrics.lpclicks += 1;
+        await campaignLanderOfferMetrics.save();
+      }
+      
+      // Recalculate derived metrics
+      await this.updateDerivedMetrics(campaignId, trafficChannelId, landerId, offerId);
+      
+    } catch (error) {
+      console.error('Error incrementing lander click metrics:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Increment conversion metrics
    * @param {Number} campaignId - Campaign ID
    * @param {Number} trafficChannelId - Traffic channel ID
@@ -497,6 +629,11 @@ class MetricsService {
           record.ctr = (record.clicks / record.impressions) * 100;
         }
         
+        // Calculate LP CTR (Landing Page Click-Through Rate)
+        if (record.lpviews > 0) {
+          record.lpctr = (record.lpclicks / record.lpviews) * 100;
+        }
+        
         // Calculate CPC (Cost per Click)
         if (record.clicks > 0) {
           record.cpc = record.total_cost / record.clicks;
@@ -530,13 +667,24 @@ class MetricsService {
         // Calculate CTC (Cost to Conversion)
         if (record.conversions > 0) {
           record.ctc = record.total_cost / record.conversions;
-          record.total_cpa = record.total_cost / record.conversions;
+          record.total_cpa = record.ctc;
         }
         
         // Calculate ROI (Return on Investment)
         if (record.total_cost > 0) {
           record.roi = ((record.total_revenue - record.total_cost) / record.total_cost) * 100;
-          record.total_roi = ((record.total_revenue - record.total_cost) / record.total_cost) * 100;
+          record.total_roi = record.roi;
+        }
+        
+        // Additional RedTrack-like metrics
+        // Profit per Click
+        if (record.clicks > 0) {
+          record.ppc = record.profit / record.clicks;
+        }
+        
+        // Revenue per Mile (RPM)
+        if (record.impressions > 0) {
+          record.rpm = (record.total_revenue / record.impressions) * 1000;
         }
         
         await record.save();
@@ -590,6 +738,191 @@ class MetricsService {
   }
 
   /**
+   * Get metrics for traffic channels with aggregation options
+   * @param {Object} filters - Filters for metrics query
+   * @param {Object} options - Options for aggregation
+   * @returns {Array} - Traffic channel metrics
+   */
+  async getTrafficChannelMetrics(filters = {}, options = {}) {
+    try {
+      const { startDate, endDate, trafficChannelIds, campaignIds, groupBy } = filters;
+      const { includeHourly = false } = options;
+      
+      // Build where clause
+      const whereClause = {};
+      
+      if (startDate && endDate) {
+        whereClause.date = {
+          [Op.between]: [startDate, endDate]
+        };
+      } else if (startDate) {
+        whereClause.date = {
+          [Op.gte]: startDate
+        };
+      } else if (endDate) {
+        whereClause.date = {
+          [Op.lte]: endDate
+        };
+      }
+      
+      if (trafficChannelIds && trafficChannelIds.length > 0) {
+        whereClause.traffic_channel_id = {
+          [Op.in]: trafficChannelIds
+        };
+      }
+      
+      // Must have traffic_channel_id
+      whereClause.traffic_channel_id = {
+        [Op.ne]: null
+      };
+      
+      // Include campaign filter if provided
+      if (campaignIds && campaignIds.length > 0) {
+        whereClause.campaign_id = {
+          [Op.in]: campaignIds
+        };
+      }
+      
+      // Determine group by and attributes
+      let groupByFields = [];
+      let attributes = [];
+      
+      if (groupBy === 'traffic_channel') {
+        groupByFields = ['traffic_channel_id'];
+        attributes = [
+          'traffic_channel_id',
+          [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'impressions'],
+          [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'clicks'],
+          [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'lpviews'],
+          [db.sequelize.fn('SUM', db.sequelize.col('lpclicks')), 'lpclicks'],
+          [db.sequelize.fn('SUM', db.sequelize.col('conversions')), 'conversions'],
+          [db.sequelize.fn('SUM', db.sequelize.col('total_revenue')), 'total_revenue'],
+          [db.sequelize.fn('SUM', db.sequelize.col('total_cost')), 'total_cost'],
+          [db.sequelize.fn('SUM', db.sequelize.col('profit')), 'profit']
+        ];
+      } else if (groupBy === 'date') {
+        groupByFields = ['date', 'traffic_channel_id'];
+        attributes = [
+          'date', 
+          'traffic_channel_id',
+          'impressions',
+          'clicks',
+          'lpviews',
+          'lpclicks',
+          'conversions',
+          'total_revenue',
+          'total_cost',
+          'profit',
+          'ctr',
+          'lpctr',
+          'cr',
+          'offer_cr',
+          'cpc',
+          'cpm',
+          'epc',
+          'lpepc',
+          'roi',
+          'ctc'
+        ];
+      } else if (groupBy === 'hour' && includeHourly) {
+        groupByFields = ['date', 'hour', 'traffic_channel_id'];
+        attributes = [
+          'date', 
+          'hour',
+          'traffic_channel_id',
+          'impressions',
+          'clicks',
+          'lpviews',
+          'lpclicks',
+          'conversions',
+          'total_revenue',
+          'total_cost',
+          'profit',
+          'ctr',
+          'lpctr',
+          'cr',
+          'offer_cr',
+          'cpc',
+          'cpm',
+          'epc',
+          'lpepc',
+          'roi',
+          'ctc'
+        ];
+      } else {
+        // Default - aggregate all metrics
+        attributes = [
+          'traffic_channel_id',
+          [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'impressions'],
+          [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'clicks'],
+          [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'lpviews'],
+          [db.sequelize.fn('SUM', db.sequelize.col('lpclicks')), 'lpclicks'],
+          [db.sequelize.fn('SUM', db.sequelize.col('conversions')), 'conversions'],
+          [db.sequelize.fn('SUM', db.sequelize.col('total_revenue')), 'total_revenue'],
+          [db.sequelize.fn('SUM', db.sequelize.col('total_cost')), 'total_cost'],
+          [db.sequelize.fn('SUM', db.sequelize.col('profit')), 'profit']
+        ];
+        groupByFields = ['traffic_channel_id'];
+      }
+      
+      // Query for metrics
+      const metrics = await db.Metrics.findAll({
+        attributes,
+        where: whereClause,
+        group: groupByFields,
+        include: [
+          {
+            model: db.TrafficChannel,
+            as: 'traffic_channel',
+            attributes: ['id', 'channelName', 'aliasChannel']
+          }
+        ],
+        order: groupBy === 'date' ? [['date', 'ASC']] : 
+               groupBy === 'hour' ? [['date', 'ASC'], ['hour', 'ASC']] : 
+               [['traffic_channel_id', 'ASC']]
+      });
+      
+      // Calculate derived metrics if aggregated
+      if (groupBy === 'traffic_channel' || !groupBy) {
+        return metrics.map(metric => {
+          const data = metric.get({ plain: true });
+          
+          // Calculate derived metrics
+          const clicks = parseInt(data.clicks) || 0;
+          const impressions = parseInt(data.impressions) || 0;
+          const lpviews = parseInt(data.lpviews) || 0;
+          const lpclicks = parseInt(data.lpclicks) || 0;
+          const conversions = parseInt(data.conversions) || 0;
+          const revenue = parseFloat(data.total_revenue) || 0;
+          const cost = parseFloat(data.total_cost) || 0;
+          const profit = parseFloat(data.profit) || 0;
+          
+          // Calculate ratios
+          data.ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+          data.lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
+          data.cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
+          data.offer_cr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
+          data.cpc = clicks > 0 ? cost / clicks : 0;
+          data.cpm = impressions > 0 ? (cost / impressions) * 1000 : 0;
+          data.epc = clicks > 0 ? revenue / clicks : 0;
+          data.lpepc = lpviews > 0 ? revenue / lpviews : 0;
+          data.roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+          data.ctc = conversions > 0 ? cost / conversions : 0;
+          data.ppc = clicks > 0 ? profit / clicks : 0;
+          data.rpm = impressions > 0 ? (revenue / impressions) * 1000 : 0;
+          
+          return data;
+        });
+      }
+      
+      return metrics;
+    } catch (error) {
+      console.error('Error getting traffic channel metrics:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get aggregated metrics for a specific entity
    * @param {String} entityType - Type of entity (campaign, traffic_channel, lander, offer)
    * @param {Number} entityId - ID of the entity
@@ -617,6 +950,7 @@ class MetricsService {
           [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'total_impressions'],
           [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'total_clicks'],
           [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'total_lpviews'],
+          [db.sequelize.fn('SUM', db.sequelize.col('lpclicks')), 'total_lpclicks'],
           [db.sequelize.fn('SUM', db.sequelize.col('conversions')), 'total_conversions'],
           [db.sequelize.fn('SUM', db.sequelize.col('total_revenue')), 'sum_revenue'],
           [db.sequelize.fn('SUM', db.sequelize.col('total_cost')), 'sum_cost'],
@@ -630,16 +964,20 @@ class MetricsService {
           impressions: 0,
           clicks: 0,
           lpviews: 0,
+          lpclicks: 0,
           conversions: 0,
           revenue: 0,
           cost: 0,
           profit: 0,
           ctr: 0,
+          lpctr: 0,
           cr: 0,
           cpc: 0,
           cpm: 0,
           roi: 0,
-          epc: 0
+          epc: 0,
+          ppc: 0,
+          rpm: 0
         };
       }
       
@@ -649,12 +987,14 @@ class MetricsService {
       const impressions = parseInt(aggregated.total_impressions) || 0;
       const clicks = parseInt(aggregated.total_clicks) || 0;
       const lpviews = parseInt(aggregated.total_lpviews) || 0;
+      const lpclicks = parseInt(aggregated.total_lpclicks) || 0;
       const conversions = parseInt(aggregated.total_conversions) || 0;
       const revenue = parseFloat(aggregated.sum_revenue) || 0;
       const cost = parseFloat(aggregated.sum_cost) || 0;
       const profit = parseFloat(aggregated.sum_profit) || 0;
       
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+      const lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
       const cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
       const offerCr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
       const cpc = clicks > 0 ? cost / clicks : 0;
@@ -663,16 +1003,20 @@ class MetricsService {
       const epc = clicks > 0 ? revenue / clicks : 0;
       const lpepc = lpviews > 0 ? revenue / lpviews : 0;
       const ctc = conversions > 0 ? cost / conversions : 0;
+      const ppc = clicks > 0 ? profit / clicks : 0;
+      const rpm = impressions > 0 ? (revenue / impressions) * 1000 : 0;
       
       return {
         impressions,
         clicks,
         lpviews,
+        lpclicks,
         conversions,
         revenue,
         cost,
         profit,
         ctr,
+        lpctr,
         cr,
         offer_cr: offerCr,
         cpc,
@@ -680,7 +1024,9 @@ class MetricsService {
         roi,
         epc,
         lpepc,
-        ctc
+        ctc,
+        ppc,
+        rpm
       };
     } catch (error) {
       console.error('Error getting aggregated metrics:', error);
@@ -771,6 +1117,7 @@ class MetricsService {
           const epc = clicks > 0 ? revenue / clicks : 0;
           const lpepc = lpviews > 0 ? revenue / lpviews : 0;
           const roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+          const ppc = clicks > 0 ? profit / clicks : 0;
           
           return {
             dimension: country.country || 'Unknown',
@@ -785,7 +1132,8 @@ class MetricsService {
             cpc,
             epc,
             lpepc,
-            roi
+            roi,
+            ppc
           };
         });
       } else {
@@ -797,6 +1145,7 @@ class MetricsService {
             [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'impressions'],
             [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'clicks'],
             [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'lpviews'],
+            [db.sequelize.fn('SUM', db.sequelize.col('lpclicks')), 'lpclicks'],
             [db.sequelize.fn('SUM', db.sequelize.col('conversions')), 'conversions'],
             [db.sequelize.fn('SUM', db.sequelize.col('total_revenue')), 'revenue'],
             [db.sequelize.fn('SUM', db.sequelize.col('total_cost')), 'cost'],
@@ -812,12 +1161,14 @@ class MetricsService {
           const impressions = parseInt(record.impressions) || 0;
           const clicks = parseInt(record.clicks) || 0;
           const lpviews = parseInt(record.lpviews) || 0;
+          const lpclicks = parseInt(record.lpclicks) || 0;
           const conversions = parseInt(record.conversions) || 0;
           const revenue = parseFloat(record.revenue) || 0;
           const cost = parseFloat(record.cost) || 0;
           const profit = parseFloat(record.profit) || 0;
           
           const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+          const lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
           const cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
           const offerCr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
           const cpc = clicks > 0 ? cost / clicks : 0;
@@ -825,6 +1176,8 @@ class MetricsService {
           const roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
           const epc = clicks > 0 ? revenue / clicks : 0;
           const lpepc = lpviews > 0 ? revenue / lpviews : 0;
+          const ppc = clicks > 0 ? profit / clicks : 0;
+          const rpm = impressions > 0 ? (revenue / impressions) * 1000 : 0;
           
           return {
             dimension: dimension === 'day' ? record.date : 
@@ -833,18 +1186,22 @@ class MetricsService {
             impressions,
             clicks,
             lpviews,
+            lpclicks,
             conversions,
             revenue,
             cost,
             profit,
             ctr,
+            lpctr,
             cr,
             offer_cr: offerCr,
             cpc,
             cpm,
             roi,
             epc,
-            lpepc
+            lpepc,
+            ppc,
+            rpm
           };
         });
       }

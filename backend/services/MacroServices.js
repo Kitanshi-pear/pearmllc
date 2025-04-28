@@ -1,238 +1,292 @@
-const { MACROS } = require('../../config/constants');
+// services/MacroService.js
 const db = require('../models');
 
 class MacroService {
-  /**
-   * Parse incoming URL query parameters and store macros
-   * @param {Object} query - URL query parameters
-   * @param {Number} trafficChannelId - ID of traffic channel
-   * @param {Number} campaignId - ID of campaign (optional)
-   * @return {Object} - Created macro object
-   */
-  async parseAndStoreMacros(query, trafficChannelId, campaignId = null) {
-    try {
-      // Find the traffic channel to get its macro format
-      const trafficChannel = await db.TrafficChannel.findByPk(trafficChannelId);
-      if (!trafficChannel) {
-        throw new Error(`Traffic channel with ID ${trafficChannelId} not found`);
-      }
+  constructor() {
+    // Standard system macros
+    this.SYSTEM_MACROS = {
+      CLICK_ID: '{click_id}',
+      CAMPAIGN_ID: '{campaign_id}',
+      CAMPAIGN_NAME: '{campaign_name}',
+      TRAFFIC_SOURCE: '{traffic_source}',
+      TRAFFIC_SOURCE_ID: '{traffic_source_id}',
+      LANDER_ID: '{lander_id}',
+      LANDER_NAME: '{lander_name}',
+      OFFER_ID: '{offer_id}',
+      OFFER_NAME: '{offer_name}',
+      PAYOUT: '{payout}',
+      REVENUE: '{revenue}',
+      PROFIT: '{profit}',
+      USER_AGENT: '{user_agent}',
+      IP: '{ip}',
+      COUNTRY: '{country}',
+      CITY: '{city}',
+      REGION: '{region}',
+      ISP: '{isp}',
+      BROWSER: '{browser}',
+      OS: '{os}',
+      DEVICE: '{device}',
+      TIMESTAMP: '{timestamp}',
+      DATE: '{date}',
+      TIME: '{time}'
+    };
 
-      // Create a macro object with available sub values
+    // Sub token macros (1-23 like RedTrack)
+    this.SUB_MACROS = {};
+    for (let i = 1; i <= 23; i++) {
+      this.SUB_MACROS[`SUB${i}`] = `{sub${i}}`;
+    }
+
+    // Combined macros
+    this.ALL_MACROS = { ...this.SYSTEM_MACROS, ...this.SUB_MACROS };
+  }
+  
+  /**
+   * Extract macros from a URL or string
+   * @param {String} url - URL or string to extract macros from
+   * @returns {Array} - Array of extracted macros
+   */
+  extractMacros(url) {
+    if (!url) return [];
+    
+    const macros = [];
+    const macroPattern = /{([^{}]+)}/g;
+    let match;
+    
+    while ((match = macroPattern.exec(url)) !== null) {
+      macros.push(match[0]);
+    }
+    
+    return [...new Set(macros)]; // Remove duplicates
+  }
+  
+  /**
+   * Store macros for a specific click
+   * @param {String} clickId - Click ID
+   * @param {Object} values - Values for macros
+   * @returns {Object} - Created macro record
+   */
+  async storeMacros(clickId, values) {
+    try {
+      if (!clickId) {
+        throw new Error('Click ID is required');
+      }
+      
+      // Create basic macro data
       const macroData = {
-        traffic_channel_id: trafficChannelId,
-        campaign_id: campaignId
+        click_id: clickId,
+        traffic_channel_id: values.traffic_channel_id || null,
+        campaign_id: values.campaign_id || null
       };
-
-      // Dynamically map query parameters to sub values based on the
-      // traffic channel's macro format configuration
-      if (trafficChannel.macro_format) {
-        const macroFormat = trafficChannel.macro_format;
-        
-        // Loop through macro format to find corresponding query params
-        for (const [macroName, queryParam] of Object.entries(macroFormat)) {
-          if (macroName.startsWith('sub') && query[queryParam]) {
-            macroData[macroName] = query[queryParam];
-          }
-        }
-      } else {
-        // If no specific format, use default mapping (assume subs are named sub1, sub2, etc.)
-        for (let i = 1; i <= 23; i++) {
-          const subName = `sub${i}`;
-          if (query[subName]) {
-            macroData[subName] = query[subName];
-          }
+      
+      // Add system macro values
+      for (const [key, macro] of Object.entries(this.SYSTEM_MACROS)) {
+        const valueKey = key.toLowerCase();
+        if (values[valueKey] !== undefined) {
+          macroData[valueKey] = values[valueKey];
         }
       }
-
-      // Create the macro record
-      const macro = await db.Macro.create(macroData);
+      
+      // Add sub parameters
+      for (let i = 1; i <= 23; i++) {
+        const subKey = `sub${i}`;
+        if (values[subKey] !== undefined) {
+          macroData[subKey] = values[subKey];
+        }
+      }
+      
+      // Create or update macro record
+      const [macro, created] = await db.Macro.findOrCreate({
+        where: { click_id: clickId },
+        defaults: macroData
+      });
+      
+      if (!created) {
+        // Update existing record
+        await macro.update(macroData);
+      }
+      
       return macro;
     } catch (error) {
-      console.error('Error parsing and storing macros:', error);
+      console.error('Error storing macros:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Associate a macro with a click
-   * @param {Number} macroId - ID of the macro
-   * @param {Number} clickId - ID of the click
-   * @return {Object} - Updated macro object
+   * Get macro values for a specific click
+   * @param {String} clickId - Click ID
+   * @returns {Object} - Macro values
    */
-  async associateWithClick(macroId, clickId) {
+  async getMacroValues(clickId) {
     try {
-      const macro = await db.Macro.findByPk(macroId);
-      if (!macro) {
-        throw new Error(`Macro with ID ${macroId} not found`);
+      if (!clickId) {
+        throw new Error('Click ID is required');
       }
-
-      macro.click_id = clickId;
-      await macro.save();
-      return macro;
-    } catch (error) {
-      console.error('Error associating macro with click:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate a tracking URL with macros for a specific traffic channel
-   * @param {Number} trafficChannelId - ID of traffic channel
-   * @param {Number} campaignId - ID of campaign
-   * @param {Object} params - Additional parameters to include
-   * @return {String} - Tracking URL with macros
-   */
-  async generateTrackingUrl(trafficChannelId, campaignId, params = {}) {
-    try {
-      // Get traffic channel and campaign information
-      const trafficChannel = await db.TrafficChannel.findByPk(trafficChannelId);
-      const campaign = await db.Campaign.findByPk(campaignId, {
+      
+      const macro = await db.Macro.findOne({ 
+        where: { click_id: clickId },
         include: [
-          { model: db.Offer },
-          { model: db.Lander }
+          {
+            model: db.Click,
+            as: 'click',
+            include: [
+              { model: db.Campaign, as: 'campaign' },
+              { model: db.TrafficChannel, as: 'traffic_channel' }
+            ]
+          }
         ]
       });
-
-      if (!trafficChannel || !campaign) {
-        throw new Error('Traffic channel or campaign not found');
-      }
-
-      // Base URL is either the template URL or the tracking URL
-      let baseUrl = trafficChannel.template_url || trafficChannel.tracking_url;
       
-      // Create URL object for manipulation
-      const url = new URL(baseUrl);
-      
-      // Add campaign ID parameter
-      url.searchParams.append('campaign_id', campaignId);
-      
-      // Add traffic channel ID parameter
-      url.searchParams.append('tc', trafficChannelId);
-      
-      // Add system macros
-      url.searchParams.append('click_id', MACROS.CLICK_ID);
-      
-      // Add custom parameters
-      for (const [key, value] of Object.entries(params)) {
-        url.searchParams.append(key, value);
+      if (!macro) {
+        throw new Error(`Macro with click_id ${clickId} not found`);
       }
       
-      // If this traffic channel has a specific macro format, use it
-      if (trafficChannel.macro_format) {
-        const macroFormat = trafficChannel.macro_format;
-        
-        // Add specific sub parameters based on the macro format
-        for (let i = 1; i <= 23; i++) {
-          const subName = `sub${i}`;
-          const formatParam = macroFormat[subName];
-          
-          if (formatParam) {
-            url.searchParams.append(formatParam, MACROS[`SUB${i}`]);
-          }
+      // Construct values object from macro data
+      const values = {
+        click_id: macro.click_id,
+        campaign_id: macro.campaign_id,
+        campaign_name: macro.click?.campaign?.name || '',
+        traffic_source_id: macro.traffic_channel_id,
+        traffic_source: macro.click?.traffic_channel?.channelName || '',
+        lander_id: macro.lander_id || '',
+        lander_name: macro.lander_name || '',
+        offer_id: macro.offer_id || '',
+        offer_name: macro.offer_name || '',
+        payout: macro.payout || '0',
+        revenue: macro.revenue || '0',
+        profit: macro.profit || '0',
+        user_agent: macro.click?.user_agent || '',
+        ip: macro.click?.ip || '',
+        country: macro.click?.country || '',
+        city: macro.click?.city || '',
+        region: macro.click?.region || '',
+        isp: macro.click?.isp || '',
+        browser: macro.click?.browser || '',
+        os: macro.click?.os || '',
+        device: macro.click?.device || '',
+        timestamp: macro.click?.createdAt ? macro.click.createdAt.toISOString() : '',
+        date: macro.click?.createdAt ? macro.click.createdAt.toISOString().split('T')[0] : '',
+        time: macro.click?.createdAt ? macro.click.createdAt.toISOString().split('T')[1].split('.')[0] : ''
+      };
+      
+      // Add sub values
+      for (let i = 1; i <= 23; i++) {
+        const subKey = `sub${i}`;
+        if (macro[subKey] !== undefined) {
+          values[subKey] = macro[subKey];
+        } else {
+          values[subKey] = '';
         }
       }
       
-      return url.toString();
+      return values;
     } catch (error) {
-      console.error('Error generating tracking URL:', error);
+      console.error('Error getting macro values:', error);
       throw error;
     }
   }
-
+  
+  /**
+   * Extract sub parameters from a URL or query object
+   * @param {Object} query - Query parameters object
+   * @returns {Object} - Extracted sub parameters
+   */
+  extractSubsFromQuery(query) {
+    if (!query) return {};
+    
+    const subs = {};
+    
+    // Extract sub parameters
+    for (let i = 1; i <= 23; i++) {
+      const subParam = `sub${i}`;
+      if (query[subParam] !== undefined) {
+        subs[subParam] = query[subParam];
+      }
+    }
+    
+    return subs;
+  }
+  
   /**
    * Replace macros in a URL with actual values
    * @param {String} url - URL with macros
-   * @param {Object} values - Values to replace macros with
-   * @return {String} - URL with replaced macros
+   * @param {Object} values - Values for macros
+   * @returns {String} - URL with replaced macros
    */
   replaceMacros(url, values) {
-    try {
-      let processedUrl = url;
-      
-      // Replace system macros
-      for (const [key, macro] of Object.entries(MACROS)) {
-        if (values[key.toLowerCase()]) {
-          const regex = new RegExp(this.escapeRegExp(macro), 'g');
-          processedUrl = processedUrl.replace(regex, values[key.toLowerCase()]);
-        }
+    if (!url) return '';
+    
+    let processedUrl = url;
+    
+    // Replace system macros
+    for (const [key, macro] of Object.entries(this.ALL_MACROS)) {
+      const valueKey = key.toLowerCase();
+      if (values[valueKey] !== undefined) {
+        const regex = new RegExp(this.escapeRegExp(macro), 'g');
+        processedUrl = processedUrl.replace(regex, values[valueKey]);
       }
-      
-      // Replace custom sub macros
-      for (let i = 1; i <= 23; i++) {
-        const subKey = `sub${i}`;
-        const subMacro = MACROS[`SUB${i}`] || `{${subKey}}`;
-        
-        if (values[subKey]) {
-          const regex = new RegExp(this.escapeRegExp(subMacro), 'g');
-          processedUrl = processedUrl.replace(regex, values[subKey]);
-        }
-      }
-      
-      return processedUrl;
-    } catch (error) {
-      console.error('Error replacing macros:', error);
-      throw error;
     }
+    
+    return processedUrl;
   }
-
+  
   /**
-   * Generate postback URL for conversions
-   * @param {Number} clickId - ID of the click that converted
-   * @param {Number} conversionValue - Value of the conversion
-   * @return {String} - Postback URL with replaced macros
+   * Generate tracking URL with macros
+   * @param {Object} campaign - Campaign object
+   * @param {Object} options - Additional options
+   * @returns {String} - Tracking URL
    */
-  async generatePostbackUrl(clickId, conversionValue) {
+  generateTrackingUrl(campaign, options = {}) {
+    if (!campaign) return '';
+    
+    const { baseUrl = process.env.TRACKING_DOMAIN || 'https://yourdomain.com', subParams = {} } = options;
+    
+    // Construct base tracking URL
+    let trackingUrl = `${baseUrl}/click?campaign_id=${campaign.id}`;
+    
+    // Add traffic source if provided
+    if (options.trafficSourceId) {
+      trackingUrl += `&tc=${options.trafficSourceId}`;
+    }
+    
+    // Add sub parameters
+    for (const [key, value] of Object.entries(subParams)) {
+      if (key.startsWith('sub') && value) {
+        trackingUrl += `&${key}=${encodeURIComponent(value)}`;
+      }
+    }
+    
+    return trackingUrl;
+  }
+  
+  /**
+   * Generate postback URL for traffic source
+   * @param {String} baseUrl - Base postback URL from traffic source
+   * @param {String} clickId - Click ID
+   * @returns {String} - Generated postback URL
+   */
+  async generatePostbackUrl(baseUrl, clickId) {
+    if (!baseUrl || !clickId) return '';
+    
     try {
-      // Get the click with related data
-      const click = await db.Click.findByPk(clickId, {
-        include: [
-          { model: db.TrafficChannel },
-          { model: db.Campaign },
-          { model: db.Offer },
-          { model: db.Macro }
-        ]
-      });
-
-      if (!click || !click.TrafficChannel || !click.TrafficChannel.postback_url) {
-        throw new Error('Click data or postback URL not found');
-      }
-
-      // Get the base postback URL
-      const postbackUrl = click.TrafficChannel.postback_url;
+      // Get macro values for this click
+      const values = await this.getMacroValues(clickId);
       
-      // Gather values for replacement
-      const values = {
-        click_id: clickId,
-        campaign_id: click.campaign_id,
-        campaign_name: click.Campaign?.name || '',
-        traffic_source: click.TrafficChannel.name,
-        offer_id: click.offer_id,
-        offer_name: click.Offer?.name || '',
-        payout: conversionValue.toString()
-      };
+      // Replace macros in postback URL
+      const postbackUrl = this.replaceMacros(baseUrl, values);
       
-      // Add sub values from the macro
-      if (click.Macro) {
-        for (let i = 1; i <= 23; i++) {
-          const subKey = `sub${i}`;
-          if (click.Macro[subKey]) {
-            values[subKey] = click.Macro[subKey];
-          }
-        }
-      }
-      
-      // Replace macros in the postback URL
-      return this.replaceMacros(postbackUrl, values);
+      return postbackUrl;
     } catch (error) {
       console.error('Error generating postback URL:', error);
       throw error;
     }
   }
-
+  
   /**
    * Helper function to escape special characters in macros for regex
    * @param {String} string - String to escape
-   * @return {String} - Escaped string
+   * @returns {String} - Escaped string
    */
   escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
