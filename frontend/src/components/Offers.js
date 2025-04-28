@@ -29,7 +29,7 @@ const POSTBACK_MACROS = {
 };
 
 // Generate a default postback URL template
-const generatePostbackTemplate = (baseUrl = 'https://your-domain.com/postback') => {
+const generatePostbackTemplate = (baseUrl = 'https://your-domain.com/') => {
     return `${baseUrl}?clickid=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}&offer=${POSTBACK_MACROS.OFFER_ID}&status=1`;
 };
 
