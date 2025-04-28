@@ -13,10 +13,15 @@ import {
   MenuItem,
   IconButton,
   Divider,
+  Tooltip,
+  Tab,
+  Tabs,
+  Paper,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -27,7 +32,50 @@ import {
   faCaretDown,
 } from "@fortawesome/free-solid-svg-icons";
 
-const OffersourcePage = () => {
+// Postback Macros
+const POSTBACK_MACROS = {
+  CLICKID: '{clickid}',
+  PAYOUT: '{payout}',
+  REVENUE: '{revenue}',
+  CONVERSION_ID: '{conversionid}',
+  OFFER_ID: '{offerid}',
+  CAMPAIGN_ID: '{campaignid}',
+  IP: '{ip}',
+  COUNTRY: '{country}',
+  DEVICE: '{device}',
+  BROWSER: '{browser}',
+  OS: '{os}',
+  DATE: '{date}',
+  TIME: '{time}',
+  AFFILIATE_ID: '{affiliateid}',
+  STATUS: '{status}',
+  CUSTOM1: '{custom1}',
+  CUSTOM2: '{custom2}',
+  CUSTOM3: '{custom3}',
+};
+
+// Generate sample postback URL
+const generatePostbackTemplate = (baseUrl = 'https://yourdomain.com/postback') => {
+  return `${baseUrl}?clickid=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}&status=1`;
+};
+
+// Parse a postback URL template and replace macros with test values
+const parsePostbackUrl = (template, data) => {
+  if (!template) return '';
+  
+  let url = template;
+  
+  // Replace all macros with test values
+  Object.entries(POSTBACK_MACROS).forEach(([key, macro]) => {
+    const valueKey = key.toLowerCase();
+    const value = data[valueKey] || '';
+    url = url.replace(new RegExp(macro, 'g'), encodeURIComponent(value));
+  });
+  
+  return url;
+};
+
+const OfferSourcePage = () => {
   const [openTemplateModal, setOpenTemplateModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
@@ -35,6 +83,24 @@ const OffersourcePage = () => {
   const [filterText, setFilterText] = useState("");
   const [date, setDate] = useState("");
   const [titleText, setTitle] = useState("");
+  const [tabValue, setTabValue] = useState(0);
+  
+  // Postback testing state
+  const [testPostbackData, setTestPostbackData] = useState({
+    clickid: 'test_' + Math.random().toString(36).substring(2, 10),
+    payout: '10.00',
+    revenue: '10.00',
+    conversionid: 'conv_' + Date.now(),
+    offerid: '12345',
+    campaignid: 'camp_1',
+    ip: '192.168.0.1',
+    country: 'US',
+    device: 'desktop',
+    status: '1'
+  });
+  const [processedUrl, setProcessedUrl] = useState('');
+  const [testResult, setTestResult] = useState(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   const currencies = ["USD", "EUR", "INR", "GBP"];
   const roles = [
@@ -59,7 +125,7 @@ const OffersourcePage = () => {
     name: "",
     alias: "",
     postbackUrl: "",
-    currency: "",
+    currency: "USD",
     offerUrl: "",
     clickid: "",
     sum: "",
@@ -71,6 +137,10 @@ const OffersourcePage = () => {
 
   const handleDateChange = (e) => {
     setDate(e.target.value);
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
   };
 
   const fetchOfferSources = async () => {
@@ -123,7 +193,7 @@ const OffersourcePage = () => {
       name: row.source_name,
       alias: row.source_name.toLowerCase().replace(/\s+/g, "-"),
       postbackUrl: row.postback || "",
-      currency: row.currency || "",
+      currency: row.currency || "USD",
       offerUrl: row.offer_url || "",
       clickid: row.clickid || "",
       sum: row.sum || "",
@@ -173,7 +243,7 @@ const OffersourcePage = () => {
         name: "",
         alias: "",
         postbackUrl: "",
-        currency: "",
+        currency: "USD",
         offerUrl: "",
         clickid: "",
         sum: "",
@@ -184,6 +254,67 @@ const OffersourcePage = () => {
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
+    }
+  };
+
+  const handleCopyPostback = () => {
+    navigator.clipboard.writeText(newTemplate.postbackUrl);
+    // Could add a snackbar notification here
+  };
+
+  const handleGeneratePostbackTemplate = () => {
+    const template = generatePostbackTemplate();
+    setNewTemplate({
+      ...newTemplate,
+      postbackUrl: template
+    });
+  };
+
+  const handleInsertMacro = (macro) => {
+    setNewTemplate({
+      ...newTemplate,
+      postbackUrl: newTemplate.postbackUrl + macro
+    });
+  };
+
+  // Postback testing functions
+  const handleTestDataChange = (e) => {
+    const { name, value } = e.target;
+    setTestPostbackData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleGenerateTestUrl = () => {
+    const url = parsePostbackUrl(newTemplate.postbackUrl, testPostbackData);
+    setProcessedUrl(url);
+    return url;
+  };
+
+  const handleTestPostback = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    
+    try {
+      const url = handleGenerateTestUrl();
+      
+      // This is just a simulation since we can't actually make the request due to CORS
+      // In a real app, you might use a proxy or server-side code to test the actual URL
+      setTimeout(() => {
+        setTestResult({
+          success: true,
+          message: 'Postback test completed! Note: This is a simulation. In production, the actual request would be sent.'
+        });
+        setIsTesting(false);
+      }, 1500);
+      
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: `Error: ${error.message}`
+      });
+      setIsTesting(false);
     }
   };
 
@@ -213,7 +344,22 @@ const OffersourcePage = () => {
       valueGetter: (params) =>
         params?.value ? new Date(params?.value).toLocaleString() : "N/A",
     },
-    { field: "postback", headerName: "Postback", width: 180 },
+    { 
+      field: "postback", 
+      headerName: "Postback", 
+      width: 180,
+      renderCell: (params) => (
+        <Tooltip title={params.value || "No postback URL"}>
+          <Typography sx={{ 
+            overflow: "hidden", 
+            textOverflow: "ellipsis", 
+            whiteSpace: "nowrap" 
+          }}>
+            {params.value || "—"}
+          </Typography>
+        </Tooltip>
+      )
+    },
     { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
     { field: "lp_clicks", headerName: "LP Clicks", width: 120, type: "number" },
     { field: "conversion", headerName: "Conversions", width: 150, type: "number" },
@@ -232,9 +378,6 @@ const OffersourcePage = () => {
   ];
 
   // Date grid component from the image, converted to React + MUI + Tailwind style
-  // Using inline styles and MUI components for layout, FontAwesome for icons
-  // This component can be placed above the DataGrid or wherever needed
-
   const DateGrid = () => {
     return (
       <Box className="max-w-full p-4 bg-white font-sans text-gray-800">
@@ -306,264 +449,6 @@ const OffersourcePage = () => {
             </Typography>
           </Box>
         </Box>
-
-        <Box sx={{ display: "flex", borderTop: "1px solid #d1d5db", pt: 4, flexWrap: "wrap" }}>
-          <Box
-            component="nav"
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              pr: 3,
-              borderRight: "1px solid #d1d5db",
-              minWidth: 140,
-              fontSize: "0.875rem",
-              color: "#1f2937",
-              fontWeight: 400,
-              flexShrink: 0,
-            }}
-          >
-            {[
-              "Today",
-              "Last 60 minutes",
-              "Yesterday",
-              "This week",
-              "Last 7 days",
-              "Last week",
-              "This month",
-              "Last 30 days",
-              "Last month",
-            ].map((item) => (
-              <Button
-                key={item}
-                sx={{
-                  justifyContent: "flex-start",
-                  textTransform: "none",
-                  color: "#1f2937",
-                  fontWeight: 400,
-                  fontSize: "0.875rem",
-                  mb: 1,
-                  p: 0,
-                  minWidth: "auto",
-                }}
-              >
-                {item}
-              </Button>
-            ))}
-          </Box>
-
-          <Box sx={{ display: "flex", px: 6, gap: 12, flexWrap: "wrap" }}>
-            {/* Left calendar */}
-            <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  mb: 1,
-                  fontSize: "0.875rem",
-                  color: "#1f2937",
-                  fontWeight: 400,
-                  userSelect: "none",
-                }}
-              >
-                <Button sx={{ minWidth: 24, p: 0, color: "#1f2937" }} aria-label="Previous month">
-                  <FontAwesomeIcon icon={faChevronLeft} />
-                </Button>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <Typography>Apr</Typography>
-                  <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: "0.75rem" }} />
-                </Box>
-                <Box
-                  sx={{
-                    borderBottom: "1px solid #9ca3af",
-                    fontWeight: 400,
-                    cursor: "pointer",
-                    userSelect: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Typography>2025</Typography>
-                  <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: "0.75rem" }} />
-                </Box>
-                <Button sx={{ minWidth: 24, p: 0, color: "#1f2937" }} aria-label="Next month">
-                  <FontAwesomeIcon icon={faChevronRight} />
-                </Button>
-              </Box>
-              <Box
-                component="table"
-                sx={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  textAlign: "center",
-                  fontSize: "0.75rem",
-                  color: "#4b5563",
-                  userSelect: "none",
-                }}
-              >
-                <thead>
-                  <tr>
-                    {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                      <th key={d} style={{ paddingBottom: 8, fontWeight: 400 }}>
-                        {d}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody style={{ color: "#374151", fontSize: "0.875rem", fontWeight: 400 }}>
-                  {[
-                    [30, 31, 1, 2, 3, 4, 5],
-                    [6, 7, 8, 9, 10, 11, 12],
-                    [13, 14, 15, 16, 17, 18, 19],
-                    [20, 21, 22, 23, 24, 25, 26],
-                    [27, 28, 29, 30, 1, 2, 3],
-                  ].map((week, i) => (
-                    <tr key={i}>
-                      {week.map((day, j) => {
-                        const isGray = i === 4 && day <= 3;
-                        const isSelected = day === 10 && i === 1;
-                        return (
-                          <td
-                            key={j}
-                            style={{
-                              paddingTop: 4,
-                              paddingBottom: 4,
-                              color: isGray ? "#9ca3af" : "#374151",
-                              position: "relative",
-                            }}
-                          >
-                            {day}
-                            {isSelected && (
-                              <span
-                                style={{
-                                  position: "absolute",
-                                  top: "50%",
-                                  left: "50%",
-                                  transform: "translate(-50%, -50%)",
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: "9999px",
-                                  border: "1.5px solid #1f2937",
-                                  pointerEvents: "none",
-                                }}
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </Box>
-            </Box>
-
-            {/* Right calendar */}
-            <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  mb: 1,
-                  fontSize: "0.875rem",
-                  color: "#1f2937",
-                  fontWeight: 400,
-                  userSelect: "none",
-                }}
-              >
-                <Button sx={{ minWidth: 24, p: 0, color: "#1f2937" }} aria-label="Previous month">
-                  <FontAwesomeIcon icon={faChevronLeft} />
-                </Button>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <Typography>May</Typography>
-                  <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: "0.75rem" }} />
-                </Box>
-                <Box
-                  sx={{
-                    borderBottom: "1px solid #9ca3af",
-                    fontWeight: 400,
-                    cursor: "pointer",
-                    userSelect: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Typography>2025</Typography>
-                  <FontAwesomeIcon icon={faCaretDown} style={{ fontSize: "0.75rem" }} />
-                </Box>
-                <Button sx={{ minWidth: 24, p: 0, color: "#1f2937" }} aria-label="Next month">
-                  <FontAwesomeIcon icon={faChevronRight} />
-                </Button>
-              </Box>
-              <Box
-                component="table"
-                sx={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  textAlign: "center",
-                  fontSize: "0.75rem",
-                  color: "#4b5563",
-                  userSelect: "none",
-                }}
-              >
-                <thead>
-                  <tr>
-                    {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                      <th key={d} style={{ paddingBottom: 8, fontWeight: 400 }}>
-                        {d}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody style={{ color: "#374151", fontSize: "0.875rem", fontWeight: 400 }}>
-                  {[
-                    [27, 28, 29, 30, 1, 2, 3],
-                    [4, 5, 6, 7, 8, 9, 10],
-                    [11, 12, 13, 14, 15, 16, 17],
-                    [18, 19, 20, 21, 22, 23, 24],
-                    [25, 26, 27, 28, 29, 30, 31],
-                  ].map((week, i) => (
-                    <tr key={i}>
-                      {week.map((day, j) => {
-                        const isGray = i === 0 && day <= 30;
-                        return (
-                          <td
-                            key={j}
-                            style={{
-                              paddingTop: 4,
-                              paddingBottom: 4,
-                              color: isGray ? "#9ca3af" : "#374151",
-                            }}
-                          >
-                            {day}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </Box>
-            </Box>
-          </Box>
-        </Box>
       </Box>
     );
   };
@@ -589,7 +474,7 @@ const OffersourcePage = () => {
                 name: "",
                 alias: "",
                 postbackUrl: "",
-                currency: "",
+                currency: "USD",
                 offerUrl: "",
                 clickid: "",
                 sum: "",
@@ -635,7 +520,7 @@ const OffersourcePage = () => {
           </Grid>
         </Grid>
 
-        {/* Insert the DateGrid component here */}
+        {/* DateGrid component */}
         <DateGrid />
 
         <Box
@@ -657,7 +542,7 @@ const OffersourcePage = () => {
           />
         </Box>
 
-        {/* Modal Component */}
+        {/* Enhanced Modal Component with Tabs */}
         <Modal open={openTemplateModal} onClose={() => setOpenTemplateModal(false)}>
           <Box
             sx={{
@@ -666,6 +551,9 @@ const OffersourcePage = () => {
               left: "50%",
               transform: "translate(-50%, -50%)",
               width: "900px",
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              overflow: "auto",
               bgcolor: "background.paper",
               boxShadow: 24,
               p: 4,
@@ -676,158 +564,370 @@ const OffersourcePage = () => {
               {editMode ? "Edit Offer Source" : "Add New Template"}
             </Typography>
 
-            {/* Template Details */}
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={12} sm={12}>
-                    <TextField
-                      fullWidth
-                      label="Name *"
-                      value={newTemplate.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setNewTemplate({
-                          ...newTemplate,
-                          name: value,
-                          alias: value.toLowerCase().replace(/\s+/g, "-"),
-                        });
-                      }}
-                    />
-                  </Grid>
-                  <Grid item md={4} or lg={3}>
-                    <TextField
-                      fullWidth
-                      label="Alias Offer Source"
-                      value={newTemplate.alias}
-                      disabled
-                    />
-                  </Grid>
-                </Grid>
-                <TextField
-                  fullWidth
-                  label="Postback URL"
-                  value={newTemplate.postbackUrl}
-                  onChange={(e) =>
-                    setNewTemplate({ ...newTemplate, postbackUrl: e.target.value })
-                  }
-                  sx={{ mt: 2 }}
-                  InputProps={{
-                    endAdornment: (
-                      <IconButton>
-                        <ContentCopyIcon />
-                      </IconButton>
-                    ),
-                  }}
-                />
-                <Select
-                  fullWidth
-                  value={newTemplate.currency}
-                  onChange={(e) =>
-                    setNewTemplate({ ...newTemplate, currency: e.target.value })
-                  }
-                  sx={{ mt: 2 }}
-                >
-                  {currencies.map((currency) => (
-                    <MenuItem key={currency} value={currency}>
-                      {currency}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <TextField
-                  fullWidth
-                  label="Offer URL Template"
-                  value={newTemplate.offerUrl}
-                  onChange={(e) =>
-                    setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </CardContent>
-            </Card>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange}>
+                <Tab label="Basic Details" />
+                <Tab label="Postback URL" />
+                <Tab label="Test Postback" />
+              </Tabs>
+            </Box>
 
-            {/* Postback Parameters */}
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Typography variant="subtitle1">Postback Parameters</Typography>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label="CLICKID"
-                      value={newTemplate.clickid}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, clickid: e.target.value })
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label="SUM"
-                      value={newTemplate.sum}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, sum: e.target.value })
-                      }
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Additional Parameters */}
-            <Card>
-              <CardContent>
-                <Typography variant="subtitle1">Additional Parameters</Typography>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={3}>
-                    <TextField
-                      fullWidth
-                      label="Parameter"
-                      value={newTemplate.parameter}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, parameter: e.target.value })
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={3}>
-                    <TextField
-                      fullWidth
-                      label="Macro / Token"
-                      value={newTemplate.token}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, token: e.target.value })
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={3}>
-                    <TextField
-                      fullWidth
-                      label="Name / Description"
-                      value={newTemplate.description}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, description: e.target.value })
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={3}>
+            {/* Tab 1: Basic Details */}
+            {tabValue === 0 && (
+              <>
+                <Card sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={12} sm={12}>
+                        <TextField
+                          fullWidth
+                          label="Name *"
+                          value={newTemplate.name}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setNewTemplate({
+                              ...newTemplate,
+                              name: value,
+                              alias: value.toLowerCase().replace(/\s+/g, "-"),
+                            });
+                          }}
+                        />
+                      </Grid>
+                      <Grid item md={4} or lg={3}>
+                        <TextField
+                          fullWidth
+                          label="Alias Offer Source"
+                          value={newTemplate.alias}
+                          disabled
+                        />
+                      </Grid>
+                    </Grid>
+                    
                     <Select
                       fullWidth
-                      value={newTemplate.role}
+                      value={newTemplate.currency}
                       onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, role: e.target.value })
+                        setNewTemplate({ ...newTemplate, currency: e.target.value })
                       }
+                      sx={{ mt: 2 }}
+                      displayEmpty
+                      label="Currency"
                     >
-                      {roles.map((role) => (
-                        <MenuItem key={role} value={role}>
-                          {role}
+                      <MenuItem value="" disabled>Select Currency</MenuItem>
+                      {currencies.map((currency) => (
+                        <MenuItem key={currency} value={currency}>
+                          {currency}
                         </MenuItem>
                       ))}
                     </Select>
+                    
+                    <TextField
+                      fullWidth
+                      label="Offer URL Template"
+                      value={newTemplate.offerUrl}
+                      onChange={(e) =>
+                        setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
+                      }
+                      sx={{ mt: 2 }}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Postback Parameters */}
+                <Card sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="subtitle1">Postback Parameters</Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="CLICKID"
+                          value={newTemplate.clickid}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, clickid: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          label="SUM"
+                          value={newTemplate.sum}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, sum: e.target.value })
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+
+                {/* Additional Parameters */}
+                <Card>
+                  <CardContent>
+                    <Typography variant="subtitle1">Additional Parameters</Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Parameter"
+                          value={newTemplate.parameter}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, parameter: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Macro / Token"
+                          value={newTemplate.token}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, token: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Name / Description"
+                          value={newTemplate.description}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, description: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Select
+                          fullWidth
+                          value={newTemplate.role}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, role: e.target.value })
+                          }
+                          displayEmpty
+                        >
+                          <MenuItem value="" disabled>Select Role</MenuItem>
+                          {roles.map((role) => (
+                            <MenuItem key={role} value={role}>
+                              {role}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Tab 2: Postback URL Editor */}
+            {tabValue === 1 && (
+              <Card sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Postback URL Configuration
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Create a postback URL template with dynamic parameters. Traffic sources will use this URL to notify you about conversions.
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <TextField
+                      fullWidth
+                      label="Postback URL"
+                      value={newTemplate.postbackUrl}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, postbackUrl: e.target.value })}
+                      multiline
+                      rows={3}
+                      sx={{ mr: 1 }}
+                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <IconButton onClick={handleCopyPostback} title="Copy URL">
+                        <ContentCopyIcon />
+                      </IconButton>
+                      <IconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
+                        <HelpOutlineIcon />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="subtitle2" gutterBottom>
+                    Available Parameters:
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                    {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
+                      <Button 
+                        key={key}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleInsertMacro(value)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        {value}
+                      </Button>
+                    ))}
+                  </Box>
+                  
+                  <Typography variant="subtitle2" gutterBottom>
+                    Example preview:
+                  </Typography>
+                  
+                  <TextField
+                    fullWidth
+                    disabled
+                    value={parsePostbackUrl(newTemplate.postbackUrl, {
+                      clickid: 'abc123',
+                      payout: '10.00',
+                      revenue: '10.00',
+                      conversionid: '123456',
+                      offerid: '789',
+                      campaignid: 'camp_1',
+                      status: '1'
+                    })}
+                  />
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    This URL will be used to receive conversion data from your traffic sources. Replace placeholders with macros from your traffic source.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Tab 3: Test Postback */}
+            {tabValue === 2 && (
+              <Card sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Test Your Postback URL
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Test your postback URL with sample data to ensure it works correctly.
+                  </Typography>
+                  
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Current postback URL template:
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      disabled
+                      value={newTemplate.postbackUrl || 'No postback URL configured'}
+                      sx={{ mb: 2 }}
+                    />
+                  </Box>
+                  
+                  <Typography variant="subtitle2" gutterBottom>
+                    Test Parameters:
+                  </Typography>
+                  
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Click ID"
+                        name="clickid"
+                        value={testPostbackData.clickid}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Payout"
+                        name="payout"
+                        value={testPostbackData.payout}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Revenue"
+                        name="revenue"
+                        value={testPostbackData.revenue}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Conversion ID"
+                        name="conversionid"
+                        value={testPostbackData.conversionid}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Offer ID"
+                        name="offerid"
+                        value={testPostbackData.offerid}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Campaign ID"
+                        name="campaignid"
+                        value={testPostbackData.campaignid}
+                        onChange={handleTestDataChange}
+                      />
+                    </Grid>
                   </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
+                  
+                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleGenerateTestUrl}
+                      disabled={!newTemplate.postbackUrl}
+                    >
+                      Generate Test URL
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleTestPostback}
+                      disabled={!newTemplate.postbackUrl || isTesting}
+                    >
+                      {isTesting ? 'Testing...' : 'Send Test Postback'}
+                    </Button>
+                  </Box>
+                  
+                  {processedUrl && (
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Generated URL:
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={processedUrl}
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                      />
+                    </Box>
+                  )}
+                  
+                  {testResult && (
+                    <Paper 
+                      sx={{ 
+                        p: 2, 
+                        bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Typography>
+                        {testResult.message}
+                      </Typography>
+                    </Paper>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Divider sx={{ my: 3 }} />
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
@@ -835,7 +935,7 @@ const OffersourcePage = () => {
                 Cancel
               </Button>
               <Button variant="contained" color="primary" onClick={handleSaveTemplate}>
-                {editMode ? "Save Changes" : "Save Changes"}
+                {editMode ? "Save Changes" : "Save Template"}
               </Button>
             </Box>
           </Box>
@@ -845,4 +945,4 @@ const OffersourcePage = () => {
   );
 };
 
-export default OffersourcePage;
+export default OfferSourcePage;
