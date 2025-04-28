@@ -90,8 +90,8 @@ const ChannelTable = () => {
     }
   }, [navigate]);
 
-  // Generate columns from first data item's metrics if available
-  const metricFields = data.length > 0 && data[0]?.Metrics
+  // Fixed the error by ensuring Metrics is a valid object before using Object.keys
+  const metricFields = data.length > 0 && data[0]?.Metrics && typeof data[0].Metrics === 'object'
     ? Object.keys(data[0].Metrics).map((key) => ({
         field: key,
         headerName: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -110,12 +110,20 @@ const ChannelTable = () => {
 
   const columns = [...staticColumns, ...metricFields];
 
-  // Map metrics into row objects for DataGrid
-  const mappedRows = data.map(item => ({
-    ...item,
-    ...item.Metrics,
-    id: item.id || item.serial_no || Math.random().toString()
-  }));
+  // Map metrics into row objects for DataGrid, ensuring each row has a unique id
+  const mappedRows = data.map(item => {
+    const rowData = {
+      ...item,
+      id: item.id || item.serial_no || Math.random().toString()
+    };
+    
+    // Only spread Metrics if it exists and is an object
+    if (item.Metrics && typeof item.Metrics === 'object') {
+      Object.assign(rowData, item.Metrics);
+    }
+    
+    return rowData;
+  });
 
   const filteredRows = mappedRows.filter((row) =>
     Object.values(row).some((value) =>
