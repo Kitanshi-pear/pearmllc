@@ -97,7 +97,7 @@ const loadRoutes = (routePath, mountPath) => {
 // Load all routes
 const routeConfig = [
   { path: 'clicks', mount: '/api/clicks' },
-  { path: 'postback', mount: '/' },
+  { path: 'postback', mount: '/api/postback' },
   { path: 'OfferSource', mount: '/offersource' },
   { path: 'offerRoutes', mount: '/api/offers' },
   { path: 'domains', mount: '/api/domains' },
