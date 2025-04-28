@@ -12,6 +12,7 @@ import {
   IconButton,
   CssBaseline,
   Avatar,
+  Divider,
   Tooltip
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -23,13 +24,11 @@ import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import SourceIcon from "@mui/icons-material/Source";
 import DomainIcon from "@mui/icons-material/Language";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ClickIcon from "@mui/icons-material/TouchApp";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-// Import logo properly - ensure path is correct
-// import pmLogo from "./assets/pm1.png"; 
-// Placeholder if image isn't loading
-const pmLogo = "https://via.placeholder.com/40";
+import pmLogo from "./pm1.png"; // Path to the transparent logo
 
 const drawerWidth = 260;
 
@@ -63,6 +62,8 @@ const Layout = ({ children }) => {
         flexDirection: "column",
         boxShadow: "3px 0 10px rgba(0,0,0,0.1)"
       }}>
+
+
       <List>
         <Tooltip title="Admin Panel" placement="right">
           <ListItem button component={Link} to="/admin">
@@ -84,7 +85,7 @@ const Layout = ({ children }) => {
             <ListItemText primary="Traffic Channels" />
           </ListItem>
         </Tooltip>
-        
+
         <Tooltip title="Offers" placement="right">
           <ListItem button component={Link} to="/offers">
             <LocalOfferIcon sx={{ mr: 2 }} />
@@ -181,46 +182,35 @@ const Layout = ({ children }) => {
       </AppBar>
 
       {/* Sidebar */}
-      <Box
-        component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="navigation drawer"
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            top: 64,
+          },
+          display: { xs: "none", sm: "block" },
+        }}
+        open
       >
-        {/* Mobile drawer */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: "block", sm: "none" },
-            "& .MuiDrawer-paper": { 
-              width: drawerWidth, 
-              boxSizing: "border-box",
-              top: 0 // Fix positioning
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        
-        {/* Desktop drawer */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: "none", sm: "block" },
-            "& .MuiDrawer-paper": { 
-              width: drawerWidth, 
-              boxSizing: "border-box",
-              top: 64, // Position below AppBar
-              height: 'calc(100% - 64px)' // Ensure proper height
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+        {drawer}
+      </Drawer>
+
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", sm: "none" },
+          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: "border-box" },
+        }}
+      >
+        {drawer}
+      </Drawer>
 
       {/* Main content */}
       <Box
@@ -230,9 +220,7 @@ const Layout = ({ children }) => {
           p: 3,
           bgcolor: "#f5f5f5",
           minHeight: "100vh",
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          mt: 8, // Top margin to account for AppBar
-          ml: { sm: `${drawerWidth}px` }, // Left margin on desktop
+          mt: 8,
           overflowY: "auto",
         }}
       >
