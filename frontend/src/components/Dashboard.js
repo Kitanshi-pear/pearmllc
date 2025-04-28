@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
-import { Calendar, ArrowUp, ArrowDown, DollarSign, TrendingUp } from "lucide-react";
+import { Calendar, ArrowUp, ArrowDown, DollarSign, TrendingUp, RefreshCw } from "lucide-react";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement } from "chart.js";
+import { Bar, Line, Doughnut } from "react-chartjs-2";
+
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
 const Dashboard = () => {
   // States for dynamic data
@@ -15,15 +20,16 @@ const Dashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("today");
+  const [activeTab, setActiveTab] = useState("week");
   const [timeRange, setTimeRange] = useState("week"); // day, week, month, year
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch dashboard data based on the selected time range
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        // Replace with your actual API endpoints
+        // Fetch data from your API endpoint
         const response = await fetch(`/api/dashboard?timeRange=${timeRange}`);
         if (!response.ok) {
           throw new Error('Network response was not ok');
@@ -33,58 +39,24 @@ const Dashboard = () => {
         setError(null);
       } catch (err) {
         setError(err.message);
-        // Use sample data for demonstration if API fails
-        setDashboardData({
-          adSpend: { today: 106.73, yesterday: 291.26, thisMonth: 4621.78 },
-          revenue: { today: 360.00, yesterday: 540.00, thisMonth: 4720.00 },
-          roas: { 
-            today: calculateRoas(360.00, 106.73), 
-            yesterday: calculateRoas(540.00, 291.26) 
-          },
-          campaignPerformance: [
-            { name: "New-antivirus-Newdomain", value: 360, conversions: 119 },
-            { name: "Security-Premium", value: 240, conversions: 76 },
-            { name: "Aqua Sculpt 1", value: 180, conversions: 42 },
-            { name: "Anti-Malware-Pro", value: 120, conversions: 36 }
-          ],
-          revenueData: [
-            { name: "Jan", value: 3200 },
-            { name: "Feb", value: 2800 },
-            { name: "Mar", value: 3900 },
-            { name: "Apr", value: 4720 },
-            { name: "May", value: 5100 },
-            { name: "Jun", value: 4800 }
-          ],
-          adSpendData: [
-            { name: "Jan", value: 2700 },
-            { name: "Feb", value: 2900 },
-            { name: "Mar", value: 3200 },
-            { name: "Apr", value: 4621 },
-            { name: "May", value: 4100 },
-            { name: "Jun", value: 3800 }
-          ],
-          dailyData: [
-            { name: "Mon", revenue: 520, adSpend: 410 },
-            { name: "Tue", revenue: 380, adSpend: 290 },
-            { name: "Wed", revenue: 670, adSpend: 380 },
-            { name: "Thu", revenue: 440, adSpend: 320 },
-            { name: "Fri", revenue: 540, adSpend: 291 },
-            { name: "Sat", revenue: 620, adSpend: 410 },
-            { name: "Sun", revenue: 360, adSpend: 106 }
-          ]
-        });
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
       }
     };
 
     fetchDashboardData();
-  }, [timeRange]);
+  }, [timeRange, isRefreshing]);
 
   // Function to handle time range changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setTimeRange(tab); // Update the time range based on the selected tab
+    setTimeRange(tab);
+  };
+
+  // Function to refresh data
+  const refreshData = () => {
+    setIsRefreshing(true);
   };
 
   // Calculate ROAS
@@ -101,28 +73,214 @@ const Dashboard = () => {
     }).format(value);
   };
 
-  // Get max value for charts
-  const getMaxValue = (data, key) => {
-    if (!data || data.length === 0) return 100;
-    return Math.max(...data.map(item => key ? item[key] : item.value)) * 1.2;
+  // Modern chart theme
+  const chartTheme = {
+    backgroundColor: [
+      'rgba(99, 102, 241, 0.7)',
+      'rgba(16, 185, 129, 0.7)',
+      'rgba(245, 158, 11, 0.7)',
+      'rgba(239, 68, 68, 0.7)',
+      'rgba(139, 92, 246, 0.7)',
+      'rgba(20, 184, 166, 0.7)'
+    ],
+    borderColor: [
+      'rgb(99, 102, 241)',
+      'rgb(16, 185, 129)',
+      'rgb(245, 158, 11)',
+      'rgb(239, 68, 68)',
+      'rgb(139, 92, 246)',
+      'rgb(20, 184, 166)'
+    ],
+    gridColor: 'rgba(243, 244, 246, 1)',
+    textColor: 'rgba(107, 114, 128, 1)',
+    tooltipBgColor: 'rgba(17, 24, 39, 0.9)'
   };
 
-  if (isLoading) {
+  // Chart.js options for consistent styling
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          color: chartTheme.textColor,
+          font: {
+            family: "'Inter', sans-serif",
+            size: 12
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: chartTheme.tooltipBgColor,
+        titleColor: 'white',
+        bodyColor: 'white',
+        padding: 12,
+        cornerRadius: 8,
+        boxPadding: 6,
+        usePointStyle: true,
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += formatCurrency(context.parsed.y);
+            }
+            return label;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          color: chartTheme.textColor,
+          font: {
+            family: "'Inter', sans-serif"
+          }
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: chartTheme.gridColor
+        },
+        ticks: {
+          color: chartTheme.textColor,
+          font: {
+            family: "'Inter', sans-serif"
+          },
+          callback: function(value) {
+            return formatCurrency(value);
+          }
+        }
+      }
+    }
+  };
+
+  // Prepare data for Revenue vs Ad Spend chart
+  const revenueVsAdSpendData = {
+    labels: dashboardData.dailyData.map(item => item.name),
+    datasets: [
+      {
+        label: 'Revenue',
+        data: dashboardData.dailyData.map(item => item.revenue),
+        backgroundColor: chartTheme.backgroundColor[1],
+        borderColor: chartTheme.borderColor[1],
+        borderWidth: 1,
+        borderRadius: 4
+      },
+      {
+        label: 'Ad Spend',
+        data: dashboardData.dailyData.map(item => item.adSpend),
+        backgroundColor: chartTheme.backgroundColor[0],
+        borderColor: chartTheme.borderColor[0],
+        borderWidth: 1,
+        borderRadius: 4
+      }
+    ]
+  };
+
+  // Prepare data for Monthly Trends chart
+  const monthlyTrendsData = {
+    labels: dashboardData.revenueData.map(item => item.name),
+    datasets: [
+      {
+        label: 'Revenue',
+        data: dashboardData.revenueData.map(item => item.value),
+        borderColor: chartTheme.borderColor[1],
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: 'white',
+        pointBorderColor: chartTheme.borderColor[1],
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      },
+      {
+        label: 'Ad Spend',
+        data: dashboardData.adSpendData.map(item => item.value),
+        borderColor: chartTheme.borderColor[0],
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: 'white',
+        pointBorderColor: chartTheme.borderColor[0],
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }
+    ]
+  };
+
+  // Prepare data for Campaign Performance chart
+  const campaignPerformanceData = {
+    labels: dashboardData.campaignPerformance.map(item => item.name),
+    datasets: [
+      {
+        data: dashboardData.campaignPerformance.map(item => item.value),
+        backgroundColor: chartTheme.backgroundColor,
+        borderColor: chartTheme.borderColor,
+        borderWidth: 2,
+        hoverOffset: 10
+      }
+    ]
+  };
+
+  // Doughnut chart options (for Campaign Performance)
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '70%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          color: chartTheme.textColor,
+          font: {
+            family: "'Inter', sans-serif",
+            size: 11
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: chartTheme.tooltipBgColor,
+        titleColor: 'white',
+        bodyColor: 'white',
+        padding: 12,
+        cornerRadius: 8,
+        boxPadding: 6,
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = formatCurrency(context.raw);
+            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+            const percentage = Math.round((context.raw / total) * 100);
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    }
+  };
+
+  if (isLoading && !dashboardData.dailyData.length) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error && !dashboardData.adSpend) {
-    return (
-      <Layout>
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Error!</strong>
-          <span className="block sm:inline"> {error}</span>
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
+            <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -130,34 +288,66 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="bg-gray-50 min-h-screen p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Marketing Dashboard</h1>
-          <div className="flex items-center bg-white rounded-lg shadow-sm p-1">
+      <div className="bg-gray-50 min-h-screen p-4 lg:p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">Marketing Dashboard</h1>
+            <p className="text-gray-500 mt-1">Analytics and performance metrics</p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center bg-white rounded-lg shadow-sm p-1">
+              <button 
+                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "today" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                onClick={() => handleTabChange("today")}
+              >
+                Today
+              </button>
+              <button 
+                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "week" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                onClick={() => handleTabChange("week")}
+              >
+                This Week
+              </button>
+              <button 
+                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "month" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                onClick={() => handleTabChange("month")}
+              >
+                This Month
+              </button>
+            </div>
+            
             <button 
-              className={`px-4 py-2 rounded-md ${activeTab === "today" ? "bg-blue-500 text-white" : "text-gray-600"}`}
-              onClick={() => handleTabChange("today")}
+              className="flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-4 py-2 rounded-lg shadow-sm transition-all"
+              onClick={refreshData}
+              disabled={isRefreshing}
             >
-              Today
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-md ${activeTab === "week" ? "bg-blue-500 text-white" : "text-gray-600"}`}
-              onClick={() => handleTabChange("week")}
-            >
-              This Week
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-md ${activeTab === "month" ? "bg-blue-500 text-white" : "text-gray-600"}`}
-              onClick={() => handleTabChange("month")}
-            >
-              This Month
+              <RefreshCw size={16} className={`${isRefreshing ? 'animate-spin' : ''}`} /> 
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
 
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  Error loading data: {error}. Showing cached or sample data.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Key Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500 hover:shadow-lg transition duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-500 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Ad Spend</p>
@@ -180,13 +370,13 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <DollarSign size={24} className="text-blue-500" />
+              <div className="bg-indigo-100 p-3 rounded-lg">
+                <DollarSign size={24} className="text-indigo-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500 hover:shadow-lg transition duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Revenue</p>
@@ -209,13 +399,13 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
-              <div className="bg-green-100 p-3 rounded-lg">
-                <DollarSign size={24} className="text-green-500" />
+              <div className="bg-emerald-100 p-3 rounded-lg">
+                <DollarSign size={24} className="text-emerald-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500 hover:shadow-lg transition duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">ROAS</p>
@@ -240,213 +430,95 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
-              <div className="bg-orange-100 p-3 rounded-lg">
-                <TrendingUp size={24} className="text-orange-500" />
+              <div className="bg-amber-100 p-3 rounded-lg">
+                <TrendingUp size={24} className="text-amber-500" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Charts Section - Using CSS for visual representation */}
+        {/* Charts Section - Using Chart.js */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-xl shadow-md">
+          <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Revenue vs Ad Spend</h3>
-            {dashboardData.dailyData.length > 0 ? (
-              <div className="h-64">
-                <div className="flex h-full">
-                  {dashboardData.dailyData.map((item, index) => {
-                    const maxValue = Math.max(
-                      ...dashboardData.dailyData.map(d => Math.max(d.revenue, d.adSpend))
-                    );
-                    const revenueHeight = (item.revenue / maxValue) * 100;
-                    const adSpendHeight = (item.adSpend / maxValue) * 100;
-                    
-                    return (
-                      <div key={index} className="flex-1 flex flex-col justify-end items-center mx-1">
-                        <div className="w-full flex justify-center space-x-1">
-                          <div
-                            className="w-1/2 bg-green-200 hover:bg-green-300 transition-all relative group"
-                            style={{ height: `${revenueHeight}%` }}
-                          >
-                            <div className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded p-1">
-                              {formatCurrency(item.revenue)}
-                            </div>
-                          </div>
-                          <div
-                            className="w-1/2 bg-blue-200 hover:bg-blue-300 transition-all relative group"
-                            style={{ height: `${adSpendHeight}%` }}
-                          >
-                            <div className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded p-1">
-                              {formatCurrency(item.adSpend)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xs mt-2">{item.name}</div>
-                      </div>
-                    );
-                  })}
+            <div className="h-64">
+              {dashboardData.dailyData.length > 0 ? (
+                <Bar data={revenueVsAdSpendData} options={chartOptions} />
+              ) : (
+                <div className="flex justify-center items-center h-full">
+                  <p className="text-gray-500">No data available</p>
                 </div>
-                <div className="flex justify-center mt-4 space-x-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-200 mr-1"></div>
-                    <span className="text-xs">Revenue</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-blue-200 mr-1"></div>
-                    <span className="text-xs">Ad Spend</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-center items-center h-64">
-                <p className="text-gray-500">No data available</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-md">
+          <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Campaign Performance</h3>
-            {dashboardData.campaignPerformance.length > 0 ? (
-              <div className="h-64">
-                <div className="relative w-full h-full flex justify-center items-center">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="rounded-full w-32 h-32 bg-gray-50"></div>
-                  </div>
-                  
-                  {dashboardData.campaignPerformance.map((campaign, index) => {
-                    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-                    const total = dashboardData.campaignPerformance.reduce((sum, c) => sum + c.value, 0);
-                    const percentage = (campaign.value / total) * 100;
-                    const rotation = index === 0 ? 0 : dashboardData.campaignPerformance
-                      .slice(0, index)
-                      .reduce((sum, c) => sum + (c.value / total) * 360, 0);
-                    
-                    return (
-                      <div key={index} className="absolute inset-0">
-                        <div className="relative w-full h-full">
-                          <div
-                            className="absolute w-full h-full"
-                            style={{
-                              clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.cos(((rotation + percentage * 3.6) * Math.PI) / 180)}% ${50 - 50 * Math.sin(((rotation + percentage * 3.6) * Math.PI) / 180)}%, ${50 + 50 * Math.cos((rotation * Math.PI) / 180)}% ${50 - 50 * Math.sin((rotation * Math.PI) / 180)}%)`,
-                              backgroundColor: COLORS[index % COLORS.length],
-                              transform: 'rotate(0deg)',
-                              transformOrigin: 'center',
-                              opacity: 0.8
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+            <div className="h-64">
+              {dashboardData.campaignPerformance.length > 0 ? (
+                <Doughnut data={campaignPerformanceData} options={doughnutOptions} />
+              ) : (
+                <div className="flex justify-center items-center h-full">
+                  <p className="text-gray-500">No data available</p>
                 </div>
-                <div className="flex flex-wrap justify-center mt-6 space-x-4">
-                  {dashboardData.campaignPerformance.map((campaign, index) => {
-                    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-                    return (
-                      <div key={index} className="flex items-center mx-2 my-1">
-                        <div className="w-3 h-3 mr-1" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-xs">{campaign.name}: {formatCurrency(campaign.value)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-center items-center h-64">
-                <p className="text-gray-500">No data available</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* Monthly Trend */}
-        <div className="bg-white p-6 rounded-xl shadow-md mb-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Trends</h3>
-          {dashboardData.revenueData.length > 0 && dashboardData.adSpendData.length > 0 ? (
-            <div className="h-64">
-              <div className="flex h-full items-end">
-                {dashboardData.revenueData.map((item, index) => {
-                  const maxValue = Math.max(
-                    Math.max(...dashboardData.revenueData.map(d => d.value)),
-                    Math.max(...dashboardData.adSpendData.map(d => d.value))
-                  );
-                  const revenueHeight = (item.value / maxValue) * 100;
-                  const adSpendHeight = (dashboardData.adSpendData[index]?.value || 0) / maxValue * 100;
-                  
-                  return (
-                    <div key={index} className="flex-1 flex flex-col justify-end items-center mx-1">
-                      <div className="w-full flex justify-center space-x-1">
-                        <div
-                          className="w-1/2 bg-green-500 hover:bg-green-600 transition-all relative group rounded-t"
-                          style={{ height: `${revenueHeight}%` }}
-                        >
-                          <div className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded p-1">
-                            {formatCurrency(item.value)}
-                          </div>
-                        </div>
-                        <div
-                          className="w-1/2 bg-blue-500 hover:bg-blue-600 transition-all relative group rounded-t"
-                          style={{ height: `${adSpendHeight}%` }}
-                        >
-                          <div className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded p-1">
-                            {formatCurrency(dashboardData.adSpendData[index]?.value || 0)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-xs mt-2">{item.name}</div>
-                    </div>
-                  );
-                })}
+          <div className="h-64">
+            {dashboardData.revenueData.length > 0 && dashboardData.adSpendData.length > 0 ? (
+              <Line data={monthlyTrendsData} options={chartOptions} />
+            ) : (
+              <div className="flex justify-center items-center h-full">
+                <p className="text-gray-500">No data available</p>
               </div>
-              <div className="flex justify-center mt-4 space-x-4">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 mr-1"></div>
-                  <span className="text-xs">Revenue</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-500 mr-1"></div>
-                  <span className="text-xs">Ad Spend</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-64">
-              <p className="text-gray-500">No data available</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Campaign Table */}
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Best Performing Campaigns</h3>
+        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Best Performing Campaigns</h3>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">{dashboardData.campaignPerformance.length} campaigns</span>
+          </div>
+          
           {dashboardData.campaignPerformance.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
                   <tr>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conversions</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ROAS</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tl-lg">Campaign</th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Revenue</th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Conversions</th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">ROAS</th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tr-lg">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200">
                   {dashboardData.campaignPerformance.map((campaign, index) => {
-                    // Assume adSpend is 40% of revenue for the sample data
-                    const adSpend = campaign.value * 0.4;
+                    // Calculate adSpend as percentage of revenue (dynamic calculation)
+                    const adSpend = campaign.value * (0.3 + Math.random() * 0.3); // Random between 30-60% for demonstration
                     const roas = calculateRoas(campaign.value, adSpend);
                     return (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="py-4 px-4 text-sm font-medium text-gray-900">{campaign.name}</td>
-                        <td className="py-4 px-4 text-sm text-gray-800">{formatCurrency(campaign.value)}</td>
-                        <td className="py-4 px-4 text-sm text-gray-800">{campaign.conversions}</td>
-                        <td className="py-4 px-4 text-sm text-gray-800">{roas}%</td>
-                        <td className="py-4 px-4 text-sm">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-4 px-4 text-sm font-medium text-gray-900 whitespace-nowrap">{campaign.name}</td>
+                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{formatCurrency(campaign.value)}</td>
+                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{campaign.conversions.toLocaleString()}</td>
+                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{roas}%</td>
+                        <td className="py-4 px-4 text-sm whitespace-nowrap">
+                          <span className={`px-3 py-1 text-xs inline-flex items-center font-medium rounded-full ${
                             roas > 200 ? 'bg-green-100 text-green-800' : 
-                            roas > 120 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            roas > 120 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
                           }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
+                              roas > 200 ? 'bg-green-600' : 
+                              roas > 120 ? 'bg-amber-600' : 'bg-red-600'
+                            }`}></span>
                             {roas > 200 ? 'Excellent' : roas > 120 ? 'Good' : 'Needs Improvement'}
                           </span>
                         </td>
@@ -457,7 +529,7 @@ const Dashboard = () => {
               </table>
             </div>
           ) : (
-            <div className="flex justify-center items-center h-32">
+            <div className="flex justify-center items-center h-32 bg-gray-50 rounded-lg">
               <p className="text-gray-500">No campaign data available</p>
             </div>
           )}
