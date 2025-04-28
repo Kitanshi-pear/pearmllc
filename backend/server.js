@@ -105,7 +105,7 @@ const routeConfig = [
   { path: 'lp', mount: '/api/lp' },
   { path: 'campaignRoutes', mount: '/' },
   { path: 'track', mount: '/api/track' },
-  { path: 'trafficRoutes', mount: '/api/traffic/facebook' },
+  { path: 'trafficRoutes', mount: '/api/traffic' },
   { path: 'auth', mount: '/api/auth' },
   { path: 'admin', mount: '/api/admin' },
   { path: 'campaigns', mount: '/api/campaigns' }

@@ -10,14 +10,14 @@ const FB_REDIRECT_URI = 'https://pear-media-dash-2.onrender.com/traffic-channels
 const CONFIG_ID = '958823683130260'; // Include config_id
 
 // 🌟 1️⃣ Facebook OAuth Login Redirect
-router.get('/auth', (req, res) => {
+router.get('/auth/facebook', (req, res) => {
     console.log("✅ Redirecting to Facebook OAuth...");
     const fbAuthUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${FB_REDIRECT_URI}&scope=public_profile,email,ads_read&config_id=${CONFIG_ID}&response_type=code`;
     res.redirect(fbAuthUrl);
 });
 
 // 🚀 Exchange Authorization Code for Access Token
-router.get('/auth/callback', async (req, res) => {  // ✅ FIXED: Route should match your request
+router.get('/auth/facebook/callback', async (req, res) => {  // ✅ FIXED: Route should match your request
     const { code } = req.query;
     if (!code) return res.status(400).json({ error: "No authorization code provided" });
 
