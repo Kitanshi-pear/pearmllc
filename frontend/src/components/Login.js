@@ -130,25 +130,10 @@ const Login = () => {
             >
               {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
-
-            <div className="divider">
-              <span>Or continue with</span>
-            </div>
-
-            <div className="social-logins">
-              <button type="button" className="social-button google">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" />
-                Google
-              </button>
-              <button type="button" className="social-button microsoft">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft" />
-                Microsoft
-              </button>
-            </div>
           </form>
 
           <div className="login-footer">
-            <p>Don't have an account? <a href="#" className="signup-link">Contact sales</a></p>
+            <p>Don't have an account? <a href="#" className="signup-link">Contact IT support</a></p>
           </div>
         </div>
       </div>
