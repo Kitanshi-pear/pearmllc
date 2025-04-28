@@ -36,6 +36,7 @@ import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
+import DashboardIcon from "@mui/icons-material/Dashboard";
 import pmLogo from "./pm1.png"; // Path to the transparent logo
 
 const drawerWidth = 280;
@@ -68,7 +69,7 @@ const Layout = ({ children }) => {
 
   const userEmail = localStorage.getItem("userEmail") || "user@example.com";
 
-  const navigateToFirstTab = () => {
+  const navigateToDashboard = () => {
     navigate("/dashboard");
   };
 
@@ -83,6 +84,26 @@ const Layout = ({ children }) => {
       setActiveTab("logs");
     }
   }, [currentPath]);
+
+  // Enhanced modern green theme colors
+  const greenTheme = {
+    primary: {
+      main: "#2e7d32", // Medium green
+      light: "#4caf50", // Light green
+      dark: "#1b5e20", // Dark green
+      contrastText: "#ffffff" // White text
+    },
+    secondary: {
+      main: "#81c784", // Lighter accent green
+      light: "#c8e6c9", // Very light green
+      dark: "#388e3c", // Medium-dark green
+      contrastText: "#1b5e20" // Dark green text for contrast
+    },
+    background: {
+      paper: "#f9fbf9", // Very light green tint for paper
+      default: "#f0f4f0" // Light green tint for default background
+    }
+  };
 
   const drawer = (
     <Box
@@ -105,8 +126,7 @@ const Layout = ({ children }) => {
           alignItems: "center",
           borderBottom: 1,
           borderColor: "divider",
-          background: (theme) => 
-            `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.primary.light, 0.2)})`,
+          background: `linear-gradient(135deg, ${alpha(greenTheme.primary.main, 0.1)}, ${alpha(greenTheme.primary.light, 0.2)})`,
           mb: 2
         }}
       >
@@ -115,7 +135,7 @@ const Layout = ({ children }) => {
             width: 80,
             height: 80,
             mb: 2,
-            backgroundColor: "primary.main",
+            backgroundColor: greenTheme.primary.main,
             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
             transition: "all 0.3s ease",
             "&:hover": {
@@ -124,7 +144,7 @@ const Layout = ({ children }) => {
             }
           }}
         >
-          <AccountCircleIcon sx={{ fontSize: 50 }} />
+          <AccountCircleIcon sx={{ fontSize: 50, color: "#ffffff" }} />
         </Avatar>
         <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
           {userEmail}
@@ -136,23 +156,50 @@ const Layout = ({ children }) => {
         <ListItem
           button
           component={Link}
-          to="/admin"
+          to="/dashboard"
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/admin") ? "primary.light" : "transparent",
-            color: isActive("/admin") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/dashboard") ? greenTheme.primary.light : "transparent",
+            color: isActive("/dashboard") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/admin") ? "primary.contrastText" : "primary.main",
+            color: isActive("/dashboard") ? "#ffffff" : greenTheme.primary.main,
+            minWidth: 40
+          }}>
+            <DashboardIcon />
+          </ListItemIcon>
+          <ListItemText primary="Dashboard" />
+        </ListItem>
+
+        <ListItem
+          button
+          component={Link}
+          to="/admin"
+          sx={{
+            borderRadius: 2,
+            mb: 1,
+            backgroundColor: isActive("/admin") ? greenTheme.primary.light : "transparent",
+            color: isActive("/admin") ? "#ffffff" : "text.primary",
+            "&:hover": {
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
+              "& .MuiListItemIcon-root": {
+                color: "#ffffff"
+              }
+            }
+          }}
+        >
+          <ListItemIcon sx={{ 
+            color: isActive("/admin") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <AdminPanelSettingsIcon />
@@ -167,19 +214,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/campaigns") ? "primary.light" : "transparent",
-            color: isActive("/campaigns") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/campaigns") ? greenTheme.primary.light : "transparent",
+            color: isActive("/campaigns") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/campaigns") ? "primary.contrastText" : "primary.main",
+            color: isActive("/campaigns") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <HomeIcon />
@@ -194,19 +241,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/traffic-channels") ? "primary.light" : "transparent",
-            color: isActive("/traffic-channels") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/traffic-channels") ? greenTheme.primary.light : "transparent",
+            color: isActive("/traffic-channels") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/traffic-channels") ? "primary.contrastText" : "primary.main",
+            color: isActive("/traffic-channels") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <TrafficIcon />
@@ -221,19 +268,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/offers") ? "primary.light" : "transparent",
-            color: isActive("/offers") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/offers") ? greenTheme.primary.light : "transparent",
+            color: isActive("/offers") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/offers") ? "primary.contrastText" : "primary.main",
+            color: isActive("/offers") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <LocalOfferIcon />
@@ -248,19 +295,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/offer-source") ? "primary.light" : "transparent",
-            color: isActive("/offer-source") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/offer-source") ? greenTheme.primary.light : "transparent",
+            color: isActive("/offer-source") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/offer-source") ? "primary.contrastText" : "primary.main",
+            color: isActive("/offer-source") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <SourceIcon />
@@ -274,19 +321,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: activeTab === "logs" ? 0 : 1,
-            backgroundColor: currentPath.includes("/logs") ? "primary.light" : "transparent",
-            color: currentPath.includes("/logs") ? "primary.contrastText" : "text.primary",
+            backgroundColor: currentPath.includes("/logs") ? greenTheme.primary.light : "transparent",
+            color: currentPath.includes("/logs") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: currentPath.includes("/logs") ? "primary.contrastText" : "primary.main",
+            color: currentPath.includes("/logs") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <ListAltIcon />
@@ -306,19 +353,19 @@ const Layout = ({ children }) => {
                 borderRadius: 2,
                 ml: 2,
                 mb: 1,
-                backgroundColor: isActive("/logs/click-logs") ? "primary.light" : "transparent",
-                color: isActive("/logs/click-logs") ? "primary.contrastText" : "text.primary",
+                backgroundColor: isActive("/logs/click-logs") ? greenTheme.primary.light : alpha(greenTheme.primary.light, 0.1),
+                color: isActive("/logs/click-logs") ? "#ffffff" : "text.primary",
                 "&:hover": {
-                  backgroundColor: "primary.main",
-                  color: "primary.contrastText",
+                  backgroundColor: greenTheme.primary.main,
+                  color: "#ffffff",
                   "& .MuiListItemIcon-root": {
-                    color: "primary.contrastText"
+                    color: "#ffffff"
                   }
                 }
               }}
             >
               <ListItemIcon sx={{ 
-                color: isActive("/logs/click-logs") ? "primary.contrastText" : "primary.main",
+                color: isActive("/logs/click-logs") ? "#ffffff" : greenTheme.primary.main,
                 minWidth: 40
               }}>
                 <ClickIcon />
@@ -334,19 +381,19 @@ const Layout = ({ children }) => {
                 borderRadius: 2,
                 ml: 2,
                 mb: 1,
-                backgroundColor: isActive("/logs/conversion-logs") ? "primary.light" : "transparent",
-                color: isActive("/logs/conversion-logs") ? "primary.contrastText" : "text.primary",
+                backgroundColor: isActive("/logs/conversion-logs") ? greenTheme.primary.light : alpha(greenTheme.primary.light, 0.1),
+                color: isActive("/logs/conversion-logs") ? "#ffffff" : "text.primary",
                 "&:hover": {
-                  backgroundColor: "primary.main",
-                  color: "primary.contrastText",
+                  backgroundColor: greenTheme.primary.main,
+                  color: "#ffffff",
                   "& .MuiListItemIcon-root": {
-                    color: "primary.contrastText"
+                    color: "#ffffff"
                   }
                 }
               }}
             >
               <ListItemIcon sx={{ 
-                color: isActive("/logs/conversion-logs") ? "primary.contrastText" : "primary.main",
+                color: isActive("/logs/conversion-logs") ? "#ffffff" : greenTheme.primary.main,
                 minWidth: 40
               }}>
                 <SwapHorizIcon />
@@ -363,19 +410,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/landers") ? "primary.light" : "transparent",
-            color: isActive("/landers") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/landers") ? greenTheme.primary.light : "transparent",
+            color: isActive("/landers") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/landers") ? "primary.contrastText" : "primary.main",
+            color: isActive("/landers") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <VisibilityIcon />
@@ -390,19 +437,19 @@ const Layout = ({ children }) => {
           sx={{
             borderRadius: 2,
             mb: 1,
-            backgroundColor: isActive("/domains") ? "primary.light" : "transparent",
-            color: isActive("/domains") ? "primary.contrastText" : "text.primary",
+            backgroundColor: isActive("/domains") ? greenTheme.primary.light : "transparent",
+            color: isActive("/domains") ? "#ffffff" : "text.primary",
             "&:hover": {
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: greenTheme.primary.main,
+              color: "#ffffff",
               "& .MuiListItemIcon-root": {
-                color: "primary.contrastText"
+                color: "#ffffff"
               }
             }
           }}
         >
           <ListItemIcon sx={{ 
-            color: isActive("/domains") ? "primary.contrastText" : "primary.main",
+            color: isActive("/domains") ? "#ffffff" : greenTheme.primary.main,
             minWidth: 40
           }}>
             <DomainIcon />
@@ -419,17 +466,17 @@ const Layout = ({ children }) => {
           to="/logout"
           sx={{
             borderRadius: 2,
-            backgroundColor: "error.light",
-            color: "error.contrastText",
+            backgroundColor: alpha(greenTheme.primary.dark, 0.8),
+            color: "#ffffff",
             "&:hover": {
-              backgroundColor: "error.main",
+              backgroundColor: greenTheme.primary.dark,
               transform: "translateY(-2px)",
-              boxShadow: 3
+              boxShadow: "0 4px 12px rgba(27, 94, 32, 0.3)"
             },
             transition: "all 0.2s ease"
           }}
         >
-          <ListItemIcon sx={{ color: "error.contrastText", minWidth: 40 }}>
+          <ListItemIcon sx={{ color: "#ffffff", minWidth: 40 }}>
             <LogoutIcon />
           </ListItemIcon>
           <ListItemText primary="Logout" />
@@ -448,13 +495,13 @@ const Layout = ({ children }) => {
         elevation={0}
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+          background: `linear-gradient(135deg, ${greenTheme.primary.dark}, ${greenTheme.primary.main})`,
           backdropFilter: "blur(8px)",
           borderBottom: "1px solid",
-          borderColor: "divider",
+          borderColor: alpha(greenTheme.primary.light, 0.2),
           transition: "all 0.3s ease",
           "&:hover": {
-            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+            background: `linear-gradient(135deg, ${greenTheme.primary.main}, ${greenTheme.primary.dark})`,
           }
         }}
       >
@@ -489,7 +536,7 @@ const Layout = ({ children }) => {
                   transform: "scale(1.05)"
                 }
               }}
-              onClick={navigateToFirstTab}
+              onClick={navigateToDashboard}
             >
               <Avatar 
                 src={pmLogo} 
@@ -598,7 +645,7 @@ const Layout = ({ children }) => {
           px: { xs: 2, md: 4 },
           pb: 3,
           mt: "64px",
-          backgroundColor: (theme) => theme.palette.mode === "light" ? "#f5f7fa" : theme.palette.background.default,
+          backgroundColor: greenTheme.background.default,
           minHeight: "calc(100vh - 64px)",
           transition: "all 0.3s ease",
         }}
