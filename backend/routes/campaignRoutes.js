@@ -49,7 +49,9 @@ router.post("/", async (req, res) => {
 });
 
 
+const campaignController = require("../controller/campaignController");
 
+router.get("/", campaignController.getAllCampaigns);
 
 // GET /track?unique_id=abc123 → Redirect directly to lander URL
 router.get("/track", async (req, res) => {
