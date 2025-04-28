@@ -1,5 +1,5 @@
-// components/TrafficChannelTable.jsx
-import React, { useState, useEffect, useCallback } from "react";
+// src/components/TrafficChannels.js
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -7,13 +7,9 @@ import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DateRangeIcon from "@mui/icons-material/DateRange";
-import ShowChartIcon from "@mui/icons-material/ShowChart";
-import MacroIcon from "@mui/icons-material/Code";
-import LinkIcon from "@mui/icons-material/Link";
 import {
   Button,
   IconButton,
-  InputLabel,
   CircularProgress,
   Typography,
   Box,
@@ -32,30 +28,32 @@ import {
   Snackbar,
   Alert,
   Divider,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Tabs,
-  Tab,
-  Badge
+  Chip
 } from "@mui/material";
 import Layout from "./Layout";
 import axios from "axios";
 import CheckIcon from "@mui/icons-material/Check";
-import WarningIcon from "@mui/icons-material/Warning";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
 
-const TrafficChannelTable = () => {
+// Utility functions for formatting numbers and percentages
+const formatNumber = (num, decimals = 2) => {
+  if (num === undefined || num === null) return "0";
+  return Number(num).toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+};
+
+const formatPercent = (num) => {
+  if (num === undefined || num === null) return "0%";
+  return `${(Number(num) * 100).toFixed(2)}%`;
+};
+
+const TrafficChannels = () => {
   // State management
   const [authStatus, setAuthStatus] = useState({
     facebook: false,
@@ -65,29 +63,19 @@ const TrafficChannelTable = () => {
   const [filterText, setFilterText] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [openSecondModal, setOpenSecondModal] = useState(false);
-  const [openMetricsModal, setOpenMetricsModal] = useState(false);
-  const [openMacrosModal, setOpenMacrosModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
     endDate: new Date()
   });
-  const [metricsData, setMetricsData] = useState({
-    aggregated: null,
-    timeSeries: []
-  });
-  const [macrosData, setMacrosData] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState({
     table: true,
     form: false,
     facebook: false,
     google: false,
     save: false,
-    delete: false,
-    metrics: false,
-    macros: false
+    delete: false
   });
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -114,14 +102,124 @@ const TrafficChannelTable = () => {
     conversionType: "",
     conversionName: "",
     conversionCategory: "",
-    includeInConversions: "",
-    parameter: "",
-    macroToken: "",
-    nameDescription: "",
-    selectRole: ""
+    includeInConversions: ""
   });
 
   const navigate = useNavigate();
+
+  // Define the table columns
+  const columns = [
+    {
+      field: 'channelName',
+      headerName: 'Channel',
+      flex: 1,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {getChannelIcon(params.row.aliasChannel)}
+          <Typography variant="body2">{params.value}</Typography>
+          {params.row.status === 'Inactive' && (
+            <Chip size="small" label="Inactive" color="default" />
+          )}
+        </Box>
+      ),
+    },
+    {
+      field: 'costUpdateDepth',
+      headerName: 'Update Depth',
+      width: 150,
+    },
+    {
+      field: 'costUpdateFrequency',
+      headerName: 'Update Frequency',
+      width: 170,
+    },
+    {
+      field: 'clicks',
+      headerName: 'Clicks',
+      type: 'number',
+      width: 90,
+      valueFormatter: (params) => formatNumber(params.value, 0),
+    },
+    {
+      field: 'conversions',
+      headerName: 'Conversions',
+      type: 'number',
+      width: 120,
+      valueFormatter: (params) => formatNumber(params.value, 0),
+    },
+    {
+      field: 'revenue',
+      headerName: 'Revenue',
+      type: 'number',
+      width: 120,
+      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+    },
+    {
+      field: 'cost',
+      headerName: 'Cost',
+      type: 'number',
+      width: 120,
+      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+    },
+    {
+      field: 'profit',
+      headerName: 'Profit',
+      type: 'number',
+      width: 120,
+      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+      cellClassName: (params) => {
+        if (params.value == null) {
+          return '';
+        }
+        return params.value >= 0 ? 'profit-positive' : 'profit-negative';
+      },
+    },
+    {
+      field: 'roi',
+      headerName: 'ROI',
+      type: 'number',
+      width: 90,
+      valueFormatter: (params) => formatPercent(params.value),
+      cellClassName: (params) => {
+        if (params.value == null) {
+          return '';
+        }
+        return params.value >= 0 ? 'profit-positive' : 'profit-negative';
+      },
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      sortable: false,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Edit Channel">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditChannel(params.row);
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Channel">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteChannel(params.row.id);
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    },
+  ];
 
   // Template options with predefined settings
   const channelTemplates = {
@@ -132,6 +230,42 @@ const TrafficChannelTable = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase"
+    },
+    Google: {
+      channelName: "Google Ads",
+      aliasChannel: "Google",
+      costUpdateDepth: "Ad Level",
+      costUpdateFrequency: "15 Minutes",
+      currency: "USD",
+      defaultEventName: "Purchase"
+    },
+    TikTok: {
+      channelName: "TikTok Ads",
+      aliasChannel: "TikTok",
+      costUpdateDepth: "Ad Level",
+      costUpdateFrequency: "15 Minutes",
+      currency: "USD",
+      defaultEventName: "Purchase"
+    },
+    Custom: {
+      channelName: "",
+      aliasChannel: "",
+      costUpdateDepth: "",
+      costUpdateFrequency: "5 Minutes",
+      currency: "USD",
+      s2sPostbackUrl: "",
+      clickRefId: "",
+      externalId: "",
+      pixelId: "",
+      apiAccessToken: "",
+      defaultEventName: "Purchase",
+      customConversionMatching: false,
+      googleAdsAccountId: "",
+      googleMccAccountId: "",
+      conversionType: "",
+      conversionName: "",
+      conversionCategory: "",
+      includeInConversions: ""
     }
   };
 
@@ -150,6 +284,46 @@ const TrafficChannelTable = () => {
         return <InfoIcon style={iconSize} />;
     }
   };
+
+  // Fetch channels from API with metrics data
+  const fetchChannels = async () => {
+    try {
+      setLoading(prev => ({ ...prev, table: true }));
+      
+      // Format date range for API
+      const formattedStartDate = dateRange.startDate.toISOString().split('T')[0];
+      const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
+      
+      // Get channels with aggregated metrics data directly from MetricsService
+      const response = await axios.get(`${API_URL}/api/trafficChannels`, {
+        params: {
+          start_date: formattedStartDate,
+          end_date: formattedEndDate
+        }
+      });
+      
+      // Set the rows with metrics data already included from the backend
+      setRows(response.data);
+      
+      // Check auth status
+      const authResponse = await axios.get(`${API_URL}/api/trafficChannels/authStatus`);
+      setAuthStatus(authResponse.data);
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to load traffic channels data",
+        severity: "error"
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, table: false }));
+    }
+  };
+
+  // Load data on component mount and when date range changes
+  useEffect(() => {
+    fetchChannels();
+  }, [dateRange.startDate, dateRange.endDate]);
 
   // Filter rows based on search text
   const filteredRows = rows.filter((row) =>
@@ -198,17 +372,12 @@ const TrafficChannelTable = () => {
     setFormData(prev => ({ ...prev, [name]: newValue }));
   };
 
-  // Date range change handler for metrics
+  // Date range change handler
   const handleDateRangeChange = (field, date) => {
     setDateRange(prev => ({
       ...prev,
       [field]: date
     }));
-  };
-
-  // Tab change handler for metrics modal
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
   };
 
   // Validate form
@@ -272,75 +441,6 @@ const TrafficChannelTable = () => {
     setSelectedChannel(channel.aliasChannel);
     setEditMode(true);
     setOpenSecondModal(true);
-  };
-
-  // View metrics modal
-  const handleViewMetrics = async (channel) => {
-    setSelectedRow(channel);
-    setOpenMetricsModal(true);
-    
-    try {
-      setLoading(prev => ({ ...prev, metrics: true }));
-      
-      // Format date range for API
-      const formattedStartDate = dateRange.startDate.toISOString().split('T')[0];
-      const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
-      
-      // Get metrics from API
-      const [aggregatedResponse, timeSeriesResponse] = await Promise.all([
-        axios.get(`${API_URL}/api/trafficChannels/${channel.id}/metrics`, {
-          params: {
-            start_date: formattedStartDate,
-            end_date: formattedEndDate
-          }
-        }),
-        axios.get(`${API_URL}/api/trafficChannels/${channel.id}/metrics`, {
-          params: {
-            start_date: formattedStartDate,
-            end_date: formattedEndDate,
-            dimension: 'day'
-          }
-        })
-      ]);
-      
-      setMetricsData({
-        aggregated: aggregatedResponse.data,
-        timeSeries: timeSeriesResponse.data
-      });
-    } catch (error) {
-      console.error("Error fetching metrics:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to load metrics data",
-        severity: "error"
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, metrics: false }));
-    }
-  };
-
-  // View macros modal
-  const handleViewMacros = async (channel) => {
-    setSelectedRow(channel);
-    setOpenMacrosModal(true);
-    
-    try {
-      setLoading(prev => ({ ...prev, macros: true }));
-      
-      // Get macros documentation from API
-      const response = await axios.get(`${API_URL}/api/trafficChannels/${channel.id}/macros`);
-      
-      setMacrosData(response.data);
-    } catch (error) {
-      console.error("Error fetching macros:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to load macros data",
-        severity: "error"
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, macros: false }));
-    }
   };
 
   // Delete channel
@@ -469,20 +569,15 @@ const TrafficChannelTable = () => {
     setOpenSecondModal(false);
     resetForm();
   };
-  
-  const handleCloseMetricsModal = () => {
-    setOpenMetricsModal(false);
-    setActiveTab(0);
-  };
-  
-  const handleCloseMacrosModal = () => {
-    setOpenMacrosModal(false);
-    setMacrosData(null);
-  };
 
   // Close snackbar
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Handle row click to navigate to detailed view
+  const handleRowClick = (params) => {
+    navigate(`/traffic-channels/${params.id}/details`);
   };
 
   return (
@@ -602,7 +697,7 @@ const TrafficChannelTable = () => {
               pageSize={10}
               rowsPerPageOptions={[10, 20, 50]}
               disableSelectionOnClick
-              onRowClick={(params) => handleViewMetrics(params.row)}
+              onRowClick={handleRowClick}
               getRowId={(row) => row.id}
               sx={{
                 '& .MuiDataGrid-columnHeaders': { backgroundColor: "#f0f0f0", fontWeight: "bold" },
@@ -1388,632 +1483,6 @@ const TrafficChannelTable = () => {
           </Box>
         </Modal>
 
-        {/* Metrics Modal */}
-        <Modal open={openMetricsModal} onClose={handleCloseMetricsModal}>
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              bgcolor: "white",
-              borderRadius: 2,
-              boxShadow: 3,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              width: "90%",
-              maxWidth: "1200px"
-            }}
-          >
-            {/* Modal Header */}
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                p: 2,
-                boxShadow: 2,
-                zIndex: 10,
-                backgroundColor: "white",
-                borderTopLeftRadius: 2,
-                borderTopRightRadius: 2,
-              }}
-            >
-              <Typography variant="h6">
-                {selectedRow?.channelName} Metrics
-                <Chip 
-                  label={`${dateRange.startDate.toLocaleDateString()} - ${dateRange.endDate.toLocaleDateString()}`}
-                  size="small" 
-                  color="primary" 
-                  sx={{ ml: 1 }}
-                  icon={<DateRangeIcon />}
-                />
-              </Typography>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                <Button variant="outlined" onClick={handleCloseMetricsModal}>
-                  Close
-                </Button>
-              </Box>
-            </Box>
-
-            {/* Tabs */}
-            <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
-              <Tabs value={activeTab} onChange={handleTabChange} centered>
-                <Tab label="Overview" />
-                <Tab label="Daily Metrics" />
-                <Tab label="Trends" />
-              </Tabs>
-            </Box>
-
-            {/* Main Content */}
-            <Box sx={{ p: 2 }}>
-              {loading.metrics ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <>
-                  {/* Overview Tab */}
-                  {activeTab === 0 && (
-                    <Box>
-                      <Grid container spacing={2}>
-                        {/* Metrics Summary Cards */}
-                        <Grid item xs={12} md={3}>
-                          <Card sx={{ p: 2, boxShadow: 1 }}>
-                            <Typography variant="subtitle2" color="textSecondary">Impressions</Typography>
-                            <Typography variant="h4" sx={{ mt: 1 }}>
-                              {formatNumber(metricsData.aggregated?.impressions || 0, 0)}
-                            </Typography>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          <Card sx={{ p: 2, boxShadow: 1 }}>
-                            <Typography variant="subtitle2" color="textSecondary">Clicks</Typography>
-                            <Typography variant="h4" sx={{ mt: 1 }}>
-                              {formatNumber(metricsData.aggregated?.clicks || 0, 0)}
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              CTR: {formatPercent(metricsData.aggregated?.ctr || 0)}
-                            </Typography>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          <Card sx={{ p: 2, boxShadow: 1 }}>
-                            <Typography variant="subtitle2" color="textSecondary">Conversions</Typography>
-                            <Typography variant="h4" sx={{ mt: 1 }}>
-                              {formatNumber(metricsData.aggregated?.conversions || 0, 0)}
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              CR: {formatPercent(metricsData.aggregated?.cr || 0)}
-                            </Typography>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          <Card sx={{ p: 2, boxShadow: 1 }}>
-                            <Typography variant="subtitle2" color="textSecondary">Profit</Typography>
-                            <Typography 
-                              variant="h4" 
-                              sx={{ 
-                                mt: 1,
-                                color: (metricsData.aggregated?.profit || 0) >= 0 ? 'green' : 'red'
-                              }}
-                            >
-                              ${formatNumber(metricsData.aggregated?.profit || 0)}
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              ROI: {formatPercent(metricsData.aggregated?.roi || 0)}
-                            </Typography>
-                          </Card>
-                        </Grid>
-                        
-                        {/* Detailed Metrics Table */}
-                        <Grid item xs={12}>
-                          <Card sx={{ mt: 2, overflow: 'auto' }}>
-                            <TableContainer>
-                              <Table size="small">
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell>EPC</TableCell>
-                                    <TableCell align="right">${formatNumber(metricsData.aggregated?.epc || 0)}</TableCell>
-                                    <TableCell>LP EPC</TableCell>
-                                    <TableCell align="right">${formatNumber(metricsData.aggregated?.lpepc || 0)}</TableCell>
-                                    <TableCell>ROI</TableCell>
-                                    <TableCell align="right">{formatPercent(metricsData.aggregated?.roi || 0)}</TableCell>
-                                  </TableRow>
-                                </TableHead>
-                              </Table>
-                            </TableContainer>
-                          </Card>
-                        </Grid>
-                        
-                        {/* Chart Preview */}
-                        <Grid item xs={12}>
-                          <Card sx={{ mt: 2, p: 2 }}>
-                            <Typography variant="h6" gutterBottom>Profit Trend</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <LineChart
-                                data={metricsData.timeSeries}
-                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="dimension" />
-                                <YAxis />
-                                <RechartsTooltip formatter={(value) => `${value.toFixed(2)}`} />
-                                <Legend />
-                                <Line type="monotone" dataKey="revenue" stroke="#8884d8" name="Revenue" />
-                                <Line type="monotone" dataKey="cost" stroke="#82ca9d" name="Cost" />
-                                <Line type="monotone" dataKey="profit" stroke="#ff7300" name="Profit" />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </Card>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  )}
-                  
-                  {/* Daily Metrics Tab */}
-                  {activeTab === 1 && (
-                    <Box>
-                      <TableContainer component={Paper}>
-                        <Table sx={{ minWidth: 650 }} size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Date</TableCell>
-                              <TableCell align="right">Impressions</TableCell>
-                              <TableCell align="right">Clicks</TableCell>
-                              <TableCell align="right">CTR</TableCell>
-                              <TableCell align="right">Conversions</TableCell>
-                              <TableCell align="right">CR</TableCell>
-                              <TableCell align="right">Revenue</TableCell>
-                              <TableCell align="right">Cost</TableCell>
-                              <TableCell align="right">Profit</TableCell>
-                              <TableCell align="right">ROI</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {metricsData.timeSeries.map((row) => (
-                              <TableRow
-                                key={row.dimension}
-                                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                              >
-                                <TableCell component="th" scope="row">
-                                  {row.dimension}
-                                </TableCell>
-                                <TableCell align="right">{formatNumber(row.impressions, 0)}</TableCell>
-                                <TableCell align="right">{formatNumber(row.clicks, 0)}</TableCell>
-                                <TableCell align="right">{formatPercent(row.ctr)}</TableCell>
-                                <TableCell align="right">{formatNumber(row.conversions, 0)}</TableCell>
-                                <TableCell align="right">{formatPercent(row.cr)}</TableCell>
-                                <TableCell align="right">${formatNumber(row.revenue)}</TableCell>
-                                <TableCell align="right">${formatNumber(row.cost)}</TableCell>
-                                <TableCell 
-                                  align="right"
-                                  sx={{ color: row.profit >= 0 ? 'green' : 'red' }}
-                                >
-                                  ${formatNumber(row.profit)}
-                                </TableCell>
-                                <TableCell 
-                                  align="right"
-                                  sx={{ color: row.roi >= 0 ? 'green' : 'red' }}
-                                >
-                                  {formatPercent(row.roi)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Box>
-                  )}
-                  
-                  {/* Trends Tab */}
-                  {activeTab === 2 && (
-                    <Box>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <Card sx={{ p: 2 }}>
-                            <Typography variant="h6" gutterBottom>Clicks & Conversions</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <LineChart
-                                data={metricsData.timeSeries}
-                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="dimension" />
-                                <YAxis yAxisId="left" />
-                                <YAxis yAxisId="right" orientation="right" />
-                                <RechartsTooltip />
-                                <Legend />
-                                <Line 
-                                  yAxisId="left"
-                                  type="monotone" 
-                                  dataKey="clicks" 
-                                  stroke="#8884d8" 
-                                  name="Clicks" 
-                                />
-                                <Line 
-                                  yAxisId="right"
-                                  type="monotone" 
-                                  dataKey="conversions" 
-                                  stroke="#82ca9d" 
-                                  name="Conversions" 
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Card sx={{ p: 2 }}>
-                            <Typography variant="h6" gutterBottom>Revenue & Cost</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <LineChart
-                                data={metricsData.timeSeries}
-                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="dimension" />
-                                <YAxis />
-                                <RechartsTooltip formatter={(value) => `${value.toFixed(2)}`} />
-                                <Legend />
-                                <Line type="monotone" dataKey="revenue" stroke="#8884d8" name="Revenue" />
-                                <Line type="monotone" dataKey="cost" stroke="#82ca9d" name="Cost" />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Card sx={{ p: 2 }}>
-                            <Typography variant="h6" gutterBottom>Conversion Rates</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <LineChart
-                                data={metricsData.timeSeries}
-                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="dimension" />
-                                <YAxis />
-                                <RechartsTooltip formatter={(value) => `${value.toFixed(2)}%`} />
-                                <Legend />
-                                <Line type="monotone" dataKey="ctr" stroke="#8884d8" name="CTR" />
-                                <Line type="monotone" dataKey="cr" stroke="#82ca9d" name="CR" />
-                                <Line type="monotone" dataKey="offer_cr" stroke="#ff7300" name="Offer CR" />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Card sx={{ p: 2 }}>
-                            <Typography variant="h6" gutterBottom>Profit & ROI</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <LineChart
-                                data={metricsData.timeSeries}
-                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="dimension" />
-                                <YAxis yAxisId="left" />
-                                <YAxis yAxisId="right" orientation="right" />
-                                <RechartsTooltip 
-                                  formatter={(value, name) => {
-                                    if (name === 'Profit') return `${value.toFixed(2)}`;
-                                    return `${value.toFixed(2)}%`;
-                                  }} 
-                                />
-                                <Legend />
-                                <Line 
-                                  yAxisId="left"
-                                  type="monotone" 
-                                  dataKey="profit" 
-                                  stroke="#8884d8" 
-                                  name="Profit" 
-                                />
-                                <Line 
-                                  yAxisId="right"
-                                  type="monotone" 
-                                  dataKey="roi" 
-                                  stroke="#82ca9d" 
-                                  name="ROI" 
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </Card>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  )}
-                </>
-              )}
-            </Box>
-          </Box>
-        </Modal>
-
-        {/* Macros Modal */}
-        <Modal open={openMacrosModal} onClose={handleCloseMacrosModal}>
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              bgcolor: "white",
-              borderRadius: 2,
-              boxShadow: 3,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              width: "90%",
-              maxWidth: "1000px"
-            }}
-          >
-            {/* Modal Header */}
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                p: 2,
-                boxShadow: 2,
-                zIndex: 10,
-                backgroundColor: "white",
-                borderTopLeftRadius: 2,
-                borderTopRightRadius: 2,
-              }}
-            >
-              <Typography variant="h6">
-                {selectedRow?.channelName} Macro Documentation
-                <Chip 
-                  label={selectedRow?.aliasChannel || "Channel"}
-                  size="small" 
-                  color="secondary" 
-                  sx={{ ml: 1 }}
-                  icon={<MacroIcon />}
-                />
-              </Typography>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                <Button variant="outlined" onClick={handleCloseMacrosModal}>
-                  Close
-                </Button>
-              </Box>
-            </Box>
-
-            {/* Main Content */}
-            <Box sx={{ p: 2 }}>
-              {loading.macros ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <>
-                  {/* Postback URL Section */}
-                  <Card sx={{ mb: 3, p: 2 }}>
-                    <Typography variant="h6" gutterBottom>Postback URL</Typography>
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      value={macrosData?.postbackUrl || ""}
-                      InputProps={{
-                        readOnly: true,
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LinkIcon />
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Tooltip title="Copy to clipboard">
-                              <IconButton
-                                edge="end"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(macrosData?.postbackUrl || "");
-                                  setSnackbar({
-                                    open: true,
-                                    message: "Postback URL copied to clipboard",
-                                    severity: "success"
-                                  });
-                                }}
-                              >
-                                <ContentCopyIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </InputAdornment>
-                        )
-                      }}
-                    />
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                      This is your postback URL for this traffic source. Use macros from the tables below to pass data.
-                    </Typography>
-                  </Card>
-                  
-                  {/* System Macros Table */}
-                  <Typography variant="h6" gutterBottom>System Macros</Typography>
-                  <TableContainer component={Paper} sx={{ mb: 3 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Token</TableCell>
-                          <TableCell>Description</TableCell>
-                          <TableCell align="center">Detected</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {macrosData?.systemMacros?.map((macro) => (
-                          <TableRow key={macro.name}>
-                            <TableCell><strong>{macro.name}</strong></TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <code>{macro.token}</code>
-                                <Tooltip title="Copy to clipboard">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(macro.token);
-                                      setSnackbar({
-                                        open: true,
-                                        message: `Macro ${macro.token} copied to clipboard`,
-                                        severity: "success"
-                                      });
-                                    }}
-                                  >
-                                    <ContentCopyIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            </TableCell>
-                            <TableCell>{macro.description}</TableCell>
-                            <TableCell align="center">
-                              {macro.detected ? (
-                                <CheckIcon color="success" />
-                              ) : (
-                                <WarningIcon color="disabled" />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  
-                  {/* Custom Subparameter Macros */}
-                  <Typography variant="h6" gutterBottom>Custom Sub Macros</Typography>
-                  <TableContainer component={Paper}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Token</TableCell>
-                          <TableCell>Description</TableCell>
-                          <TableCell>Sample Values</TableCell>
-                          <TableCell align="center">Detected</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {macrosData?.subMacros?.map((macro) => (
-                          <TableRow key={macro.name}>
-                            <TableCell><strong>{macro.name}</strong></TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <code>{macro.token}</code>
-                                <Tooltip title="Copy to clipboard">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(macro.token);
-                                      setSnackbar({
-                                        open: true,
-                                        message: `Macro ${macro.token} copied to clipboard`,
-                                        severity: "success"
-                                      });
-                                    }}
-                                  >
-                                    <ContentCopyIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            </TableCell>
-                            <TableCell>{macro.description}</TableCell>
-                            <TableCell>
-                              {macro.samples && macro.samples.length > 0 ? (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                  {macro.samples.map((sample, idx) => (
-                                    <Chip 
-                                      key={idx} 
-                                      label={sample} 
-                                      size="small" 
-                                      variant="outlined" 
-                                    />
-                                  ))}
-                                </Box>
-                              ) : (
-                                <Typography variant="body2" color="textSecondary">No samples yet</Typography>
-                              )}
-                            </TableCell>
-                            <TableCell align="center">
-                              {macro.detected ? (
-                                <CheckIcon color="success" />
-                              ) : (
-                                <WarningIcon color="disabled" />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  
-                  {/* Examples Section */}
-                  <Card sx={{ mt: 3, p: 2 }}>
-                    <Typography variant="h6" gutterBottom>Example URLs</Typography>
-                    <Typography variant="subtitle1">Basic Postback:</Typography>
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      value={macrosData?.examples?.basic || ""}
-                      InputProps={{
-                        readOnly: true,
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Tooltip title="Copy to clipboard">
-                              <IconButton
-                                edge="end"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(macrosData?.examples?.basic || "");
-                                  setSnackbar({
-                                    open: true,
-                                    message: "Example URL copied to clipboard",
-                                    severity: "success"
-                                  });
-                                }}
-                              >
-                                <ContentCopyIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </InputAdornment>
-                        )
-                      }}
-                      sx={{ mb: 2 }}
-                    />
-                    
-                    <Typography variant="subtitle1">With Sub Parameters:</Typography>
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      value={macrosData?.examples?.withSubs || ""}
-                      InputProps={{
-                        readOnly: true,
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Tooltip title="Copy to clipboard">
-                              <IconButton
-                                edge="end"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(macrosData?.examples?.withSubs || "");
-                                  setSnackbar({
-                                    open: true,
-                                    message: "Example URL copied to clipboard",
-                                    severity: "success"
-                                  });
-                                }}
-                              >
-                                <ContentCopyIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </InputAdornment>
-                        )
-                      }}
-                    />
-                  </Card>
-                </>
-              )}
-            </Box>
-          </Box>
-        </Modal>
-
         {/* Global Snackbar for messages */}
         <Snackbar
           open={snackbar.open}
@@ -2034,4 +1503,4 @@ const TrafficChannelTable = () => {
   );
 };
 
-export default TrafficChannelTable;
+export default TrafficChannels;
