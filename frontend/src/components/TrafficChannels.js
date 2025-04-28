@@ -55,7 +55,11 @@ const ChannelTable = () => {
     parameter: "",
     macroToken: "",
     nameDescription: "",
-    selectRole: ""
+    selectRole: "",
+    conversionType: "",
+    conversionName: "",
+    conversionCategory: "",
+    includeInConversions: ""
   });
   const [error, setError] = useState("");
 
@@ -87,7 +91,7 @@ const ChannelTable = () => {
   }, [navigate]);
 
   // Generate columns from first data item's metrics if available
-  const metricFields = data[0]?.Metrics
+  const metricFields = data.length > 0 && data[0]?.Metrics
     ? Object.keys(data[0].Metrics).map((key) => ({
         field: key,
         headerName: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -210,7 +214,11 @@ const ChannelTable = () => {
         parameter: "",
         macroToken: "",
         nameDescription: "",
-        selectRole: ""
+        selectRole: "",
+        conversionType: "",
+        conversionName: "",
+        conversionCategory: "",
+        includeInConversions: ""
       });
       
       // Alert success
