@@ -10,8 +10,8 @@ import DomainsPage from "./components/Domains";
 import LandingPage from "./components/Landers";
 import CampaignsPage from "./components/Campaigns";
 import AdminPanelPage from "./components/AdminPanelPage";
-import ClickLogs from "./components/click-log";
-import ConversionLogs from "./components/conversion-log";
+import ClickLogs from "./components/logs/click-log";
+import ConversionLogs from "./components/logs/conversion-log";
 
 const App = () => {
   return (
@@ -22,8 +22,8 @@ const App = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/traffic-channels" element={< TrafficChannels />} />
-        <Route path="/click-log" element={<ClickLogs/>} />
-        <Route path="/conversion-log" element={<ConversionLogs/>} />
+        <Route path="logs/click-log" element={<ClickLogs/>} />
+        <Route path="logs/conversion-log" element={<ConversionLogs/>} />
         <Route path="/offers" element={<Offers />} />
         <Route path="/offer-source" element={<OfferSource />} />
         <Route path="/domains" element={<DomainsPage />} />
