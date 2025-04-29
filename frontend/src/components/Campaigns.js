@@ -664,8 +664,8 @@ const columns = [
     width: 150,
     valueGetter: (params) => {
       // Check multiple possible paths to get traffic channel name with proper null checks
-      if (params.row?.traffic_channel_name?.channelName) {
-        return params.row.traffic_channel_name.channelName;
+      if (params.row?.traffic_channel_id.channelName) {
+        return params.row.traffic_channel_id.channelName;
       } else if (params.row?.traffic_channel_name) {
         return params.row.traffic_channel_name;
       } else {
