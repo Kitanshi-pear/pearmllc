@@ -1,322 +1,530 @@
-// This is an example of how you might implement the server-side
-// postback API endpoints in a Node.js/Express application
-
+// routes/postback.js
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
-const db = require('../models'); // Your database models
+const axios = require('axios');
+const crypto = require('crypto');
+const { Click, Conversion, TrafficSource, Campaign, Offer } = require('../models');
 
-/**
- * Endpoint for receiving postback notifications from traffic sources
- * This would be the endpoint you provide as your postback URL
- */
-router.get('/conversions/postback', async (req, res) => {
+// Simple logging utility that doesn't require winston
+const logger = {
+  error: (message, ...args) => console.error(`❌ ERROR: ${message}`, ...args),
+  warn: (message, ...args) => console.warn(`⚠️ WARN: ${message}`, ...args),
+  info: (message, ...args) => console.info(`✅ INFO: ${message}`, ...args),
+  debug: (message, ...args) => console.debug(`📝 DEBUG: ${message}`, ...args)
+};
+
+// Utils for handling macros
+const macroUtil = {
+  // Extract macros from a URL string (format: {macro_name})
+  extractMacros: (url) => {
+    const macroRegex = /\{([a-zA-Z0-9_]+)\}/g;
+    const matches = url.match(macroRegex) || [];
+    return matches.map(match => match.replace('{', '').replace('}', ''));
+  },
+
+  // Get macro values for a click
+  getMacroValues: async (clickId) => {
+    try {
+      // Get click with all related data
+      const click = await Click.findByPk(clickId, {
+        include: [
+          { model: Campaign, attributes: ['id', 'name', 'offer_id'] },
+          { model: TrafficSource, attributes: ['id', 'name', 'type'] },
+          { model: Offer, attributes: ['id', 'name', 'payout'] }
+        ]
+      });
+
+      if (!click) return {};
+
+      // Basic click macros
+      const macros = {
+        click_id: clickId,
+        campaign_id: click.campaign_id || '',
+        traffic_source_id: click.traffic_source_id || '',
+        ip: click.ip || '',
+        user_agent: click.user_agent || '',
+        country: click.country || '',
+        city: click.city || '',
+        region: click.region || '',
+        device: click.device || '',
+        os: click.os || '',
+        browser: click.browser || '',
+        timestamp: click.createdAt ? click.createdAt.toISOString() : '',
+        date: click.createdAt ? click.createdAt.toISOString().split('T')[0] : '',
+        time: click.createdAt ? click.createdAt.toISOString().split('T')[1].split('.')[0] : ''
+      };
+
+      // Campaign macros
+      if (click.Campaign) {
+        macros.campaign_name = click.Campaign.name || '';
+      }
+
+      // Traffic source macros
+      if (click.TrafficSource) {
+        macros.traffic_source = click.TrafficSource.name || '';
+        macros.traffic_source_type = click.TrafficSource.type || '';
+      }
+
+      // Offer macros
+      if (click.Offer) {
+        macros.offer_id = click.Offer.id || '';
+        macros.offer_name = click.Offer.name || '';
+        macros.payout = click.Offer.payout || '';
+      }
+
+      // Sub ID macros (from click data)
+      const clickData = click.toJSON();
+      for (let i = 1; i <= 23; i++) {
+        const subKey = `sub${i}`;
+        if (clickData[subKey]) {
+          macros[subKey] = clickData[subKey];
+        }
+      }
+
+      return macros;
+    } catch (error) {
+      logger.error(`Error getting macro values for click ${clickId}:`, error);
+      return {};
+    }
+  },
+
+  // Hash data for sending to ad platforms (SHA256)
+  hashData: (data) => {
+    if (!data) return '';
+    return crypto.createHash('sha256').update(String(data).toLowerCase().trim()).digest('hex');
+  }
+};
+
+// Facebook Conversion API Service
+const facebookConversionService = {
+  sendConversion: async (params) => {
+    try {
+      const {
+        pixelId,
+        accessToken,
+        eventName = 'Purchase',
+        clickData,
+        conversionData,
+        macroValues
+      } = params;
+
+      // Validate required parameters
+      if (!pixelId || !accessToken) {
+        throw new Error('Missing required Facebook parameters: pixelId or accessToken');
+      }
+
+      // Extract user data
+      const userData = {
+        client_ip_address: clickData.ip || '',
+        client_user_agent: clickData.user_agent || '',
+        fbc: macroValues.fbc || '',
+        fbp: macroValues.fbp || '',
+      };
+
+      // Add country if available
+      if (clickData.country) {
+        userData.country = clickData.country;
+      }
+
+      // Add city if available
+      if (clickData.city) {
+        userData.city = clickData.city;
+      }
+
+      // Add state if available
+      if (clickData.region) {
+        userData.state = clickData.region;
+      }
+
+      // Add external ID if available (usually sub1)
+      if (macroValues.sub1) {
+        userData.external_id = macroUtil.hashData(macroValues.sub1);
+      }
+
+      // Add em (email) if available (usually in sub params)
+      if (macroValues.email || macroValues.sub2) {
+        userData.em = macroUtil.hashData(macroValues.email || macroValues.sub2);
+      }
+
+      // Add phone if available (usually in sub params)
+      if (macroValues.phone || macroValues.sub3) {
+        userData.ph = macroUtil.hashData(macroValues.phone || macroValues.sub3);
+      }
+
+      // Event data
+      const eventData = {
+        value: parseFloat(conversionData.revenue) || 0,
+        currency: macroValues.currency || 'USD',
+        content_name: macroValues.offer_name || '',
+        content_ids: [macroValues.offer_id || '']
+      };
+
+      // Add campaign info
+      if (macroValues.campaign_id) {
+        eventData.campaign_id = macroValues.campaign_id;
+      }
+
+      if (macroValues.campaign_name) {
+        eventData.campaign_name = macroValues.campaign_name;
+      }
+
+      // Add order ID if available
+      if (macroValues.order_id || macroValues.sub4) {
+        eventData.order_id = macroValues.order_id || macroValues.sub4;
+      }
+
+      // Current timestamp in seconds
+      const eventTime = Math.floor(Date.now() / 1000);
+
+      // Prepare the event payload
+      const eventPayload = {
+        data: [
+          {
+            event_name: eventName,
+            event_time: eventTime,
+            event_source_url: macroValues.source_url || '',
+            action_source: 'website',
+            user_data: userData,
+            custom_data: eventData
+          }
+        ],
+        test_event_code: process.env.NODE_ENV === 'production' ? undefined : 'TEST12345'
+      };
+
+      logger.debug('Facebook event payload:', JSON.stringify(eventPayload));
+
+      // Send to Facebook Conversions API
+      const response = await axios.post(
+        `https://graph.facebook.com/v17.0/${pixelId}/events`,
+        eventPayload,
+        {
+          params: {
+            access_token: accessToken
+          },
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      logger.info(`Facebook Conversion sent successfully for click_id: ${clickData.id}`);
+      return response.data;
+
+    } catch (error) {
+      logger.error('Facebook Conversion API Error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+};
+
+// Google Conversion API Service
+const googleConversionService = {
+  sendConversion: async (params) => {
+    try {
+      const {
+        accountId,
+        conversionId,
+        conversionLabel,
+        clickData,
+        conversionData,
+        macroValues
+      } = params;
+
+      // Validate required parameters
+      if (!accountId || !conversionId || !conversionLabel) {
+        throw new Error('Missing required Google parameters: accountId, conversionId, or conversionLabel');
+      }
+
+      // Extract Google Click ID (gclid) if available
+      const gclid = macroValues.gclid || macroValues.sub1 || '';
+
+      // Prepare payload for HTTP conversion tracking
+      const payload = {
+        conversion_id: conversionId,
+        conversion_label: conversionLabel,
+        conversion_value: parseFloat(conversionData.revenue) || 0,
+        conversion_currency: macroValues.currency || 'USD',
+        gclid: gclid,
+        remarketing_only: false,
+        // Add enhanced conversion parameters if available
+        email: macroUtil.hashData(macroValues.email || macroValues.sub2 || ''),
+        phone_number: macroUtil.hashData(macroValues.phone || macroValues.sub3 || '')
+      };
+
+      // Add user agent and IP if available
+      if (clickData.user_agent) {
+        payload.user_agent = clickData.user_agent;
+      }
+
+      if (clickData.ip) {
+        payload.ip_address = clickData.ip;
+      }
+
+      // Google conversion tracking endpoint
+      const url = 'https://www.googleadservices.com/pagead/conversion/';
+
+      // Send the conversion to Google HTTP endpoint
+      const response = await axios.post(`${url}${conversionId}/?cv=${conversionLabel}`, payload, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      logger.info(`Google HTTP Conversion sent for click_id: ${clickData.id}`);
+      return {
+        id: conversionData.id,
+        status: 'sent',
+        details: response.data
+      };
+    } catch (error) {
+      logger.error('Google HTTP Conversion Error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+};
+
+// Main postback endpoint that receives conversion data
+router.get('/conversion', async (req, res) => {
   try {
-    const {
-      clickid,      // The unique ID of the click
-      payout,       // The payout/revenue amount
-      offerid,      // Your offer ID
-      status,       // Conversion status (1 = approved, 0 = pending)
-      campaignid,   // Campaign ID if applicable
-      source,       // Traffic source
-      ...otherParams // Any other custom parameters
-    } = req.query;
+    console.log('📣 Postback received:', req.query);
     
-    // Log the raw postback for debugging
-    console.log('Received postback:', req.query);
-    
-    // 1. Required parameter validation
-    if (!clickid) {
-      console.error('Missing clickid in postback');
-      // Return 200 OK even on error to prevent retries from traffic source
-      return res.status(200).send('ERROR: Missing clickid');
+    // Get the click_id from the request query parameters
+    const clickId = req.query.click_id;
+    if (!clickId) {
+      console.error('❌ No click_id provided in postback');
+      return res.status(400).json({ error: 'Missing click_id parameter' });
     }
     
-    // 2. Find the click record in your database
-    const click = await db.Clicks.findOne({ 
-      where: { external_id: clickid } 
+    // Look up the click in the database
+    const click = await Click.findByPk(clickId, {
+      include: [
+        { model: Campaign, attributes: ['id', 'name', 'offer_id'] },
+        { model: TrafficSource, attributes: ['id', 'name', 'type', 'external_id', 'api_key', 'pixel_id', 'default_event_name', 'google_ads_id', 'conversion_id', 'conversion_label'] }
+      ]
     });
     
     if (!click) {
-      console.error(`Click not found for clickid: ${clickid}`);
-      return res.status(200).send('ERROR: Click not found');
+      console.error(`❌ Click with ID ${clickId} not found`);
+      return res.status(404).json({ error: 'Click not found' });
     }
     
-    // 3. Get the offer from the database
-    let offerId = offerid || click.offer_id;
-    
-    const offer = await db.Offers.findOne({
-      where: { id: offerId }
-    });
-    
-    if (!offer) {
-      console.error(`Offer not found: ${offerId}`);
-      return res.status(200).send('ERROR: Offer not found');
-    }
-    
-    // 4. Check if this conversion has already been processed (prevent duplicates)
-    const existingConversion = await db.Conversions.findOne({
-      where: { click_id: click.id }
-    });
-    
-    if (existingConversion) {
-      console.log(`Duplicate conversion for clickid: ${clickid}`);
-      return res.status(200).send('Duplicate conversion');
-    }
-    
-    // 5. Create the conversion record
-    const conversion = await db.Conversions.create({
-      id: uuidv4(),
-      click_id: click.id,
-      offer_id: offer.id,
-      status: status === '1' ? 'approved' : 'pending',
-      payout: parseFloat(payout) || offer.revenue,
-      source: source || click.source,
-      campaign_id: campaignid || click.campaign_id,
-      ip_address: click.ip_address,
-      country: click.country,
-      metadata: JSON.stringify(otherParams),
-      created_at: new Date()
-    });
-    
-    // 6. Update offer metrics
-    await db.Offers.update(
-      { 
-        conversion: db.sequelize.literal('conversion + 1'),
-        total_revenue: db.sequelize.literal(`total_revenue + ${conversion.payout}`)
-      },
-      { where: { id: offer.id } }
-    );
-    
-    // 7. Log the postback success
-    await db.PostbackLogs.create({
-      id: uuidv4(),
-      conversion_id: conversion.id,
-      click_id: click.id,
-      offer_id: offer.id,
-      status: 'success',
-      request_data: JSON.stringify(req.query),
-      created_at: new Date()
-    });
-    
-    // 8. Return appropriate response based on the request
-    if (req.headers.accept && req.headers.accept.includes('image')) {
-      // If requesting an image, return a tracking pixel
-      res.setHeader('Content-Type', 'image/gif');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      // 1x1 transparent GIF
-      const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-      return res.end(pixel);
-    }
-    
-    // Return JSON response for S2S tracking
-    return res.json({ 
-      success: true, 
-      message: 'Conversion recorded', 
-      id: conversion.id 
-    });
-  } catch (error) {
-    console.error('Postback processing error:', error);
-    
-    // Log the error
-    try {
-      await db.PostbackLogs.create({
-        id: uuidv4(),
-        status: 'error',
-        request_data: JSON.stringify(req.query),
-        error_message: error.message,
-        created_at: new Date()
+    // Get the offer details if available
+    let offer = null;
+    if (click.Campaign && click.Campaign.offer_id) {
+      offer = await Offer.findByPk(click.Campaign.offer_id, {
+        attributes: ['id', 'name', 'payout']
       });
-    } catch (logError) {
-      console.error('Failed to log postback error:', logError);
     }
-    
-    // Return 200 OK even on error to prevent retries
-    return res.status(200).send('ERROR: ' + error.message);
-  }
-});
 
-/**
- * Endpoint for manually sending postbacks
- * Can be used from admin panel to resend postbacks
- */
-router.post('/postbacks/send', async (req, res) => {
-  try {
-    const { conversionId, clickId, customParams } = req.body;
+    // Extract conversion parameters from the request
+    const payout = parseFloat(req.query.payout) || (offer ? offer.payout : 0);
+    const revenue = parseFloat(req.query.revenue) || payout;
+    const eventName = req.query.event_name || (click.TrafficSource ? click.TrafficSource.default_event_name : 'conversion');
     
-    // Find the conversion
-    let conversion;
-    if (conversionId) {
-      conversion = await db.Conversions.findOne({
-        where: { id: conversionId },
-        include: [
-          { model: db.Clicks, as: 'click' },
-          { model: db.Offers, as: 'offer' }
-        ]
-      });
-    } else if (clickId) {
-      conversion = await db.Conversions.findOne({
-        where: { click_id: clickId },
-        include: [
-          { model: db.Clicks, as: 'click' },
-          { model: db.Offers, as: 'offer' }
-        ]
-      });
-    }
-    
-    if (!conversion) {
-      return res.status(404).json({ error: 'Conversion not found' });
-    }
-    
-    // Get the offer's postback URL template
-    const postbackUrlTemplate = conversion.offer.postbackUrl;
-    
-    if (!postbackUrlTemplate) {
-      return res.status(400).json({ error: 'No postback URL configured for this offer' });
-    }
-    
-    // Prepare data for the postback
-    const postbackData = {
-      clickid: conversion.click.external_id,
-      payout: conversion.payout.toString(),
-      offerid: conversion.offer.id.toString(),
-      status: conversion.status === 'approved' ? '1' : '0',
-      campaignid: conversion.campaign_id,
-      ...customParams
-    };
-    
-    // Generate the actual postback URL by replacing macros
-    let postbackUrl = postbackUrlTemplate;
-    
-    // Replace all macros with actual values
-    Object.entries(postbackData).forEach(([key, value]) => {
-      postbackUrl = postbackUrl.replace(new RegExp(`{${key}}`, 'g'), encodeURIComponent(value));
+    // Create a conversion record
+    const conversion = await Conversion.create({
+      click_id: clickId,
+      campaign_id: click.campaign_id,
+      traffic_source_id: click.traffic_source_id,
+      offer_id: offer ? offer.id : null,
+      payout,
+      revenue,
+      profit: revenue - (click.cost || 0),
+      status: 'completed',
+      event_name: eventName,
+      metadata: JSON.stringify(req.query)
     });
     
-    // Make the postback request
-    const fetch = require('node-fetch');
-    const postbackResponse = await fetch(postbackUrl, {
-      method: 'GET',
-      timeout: 10000
-    });
+    console.log(`✅ Conversion recorded with ID: ${conversion.id}`);
     
-    // Log the postback attempt
-    await db.PostbackLogs.create({
-      id: uuidv4(),
-      conversion_id: conversion.id,
-      click_id: conversion.click_id,
-      offer_id: conversion.offer_id,
-      status: postbackResponse.ok ? 'success' : 'error',
-      request_data: JSON.stringify(postbackData),
-      response_data: await postbackResponse.text(),
-      response_code: postbackResponse.status,
-      created_at: new Date()
-    });
+    // Send conversion data to appropriate platforms based on traffic source
+    if (click.TrafficSource) {
+      const trafficSource = click.TrafficSource;
+      const sourceType = trafficSource.type ? trafficSource.type.toLowerCase() : '';
+      
+      // Extract macro values for this click
+      const macroValues = await macroUtil.getMacroValues(clickId);
+      
+      // Add conversion-specific macros
+      macroValues.payout = payout.toString();
+      macroValues.revenue = revenue.toString();
+      macroValues.profit = (revenue - (click.cost || 0)).toString();
+      macroValues.event_name = eventName;
+      
+      if (sourceType === 'facebook') {
+        // Send to Facebook Conversions API
+        if (trafficSource.api_key && trafficSource.pixel_id) {
+          try {
+            const fbResult = await facebookConversionService.sendConversion({
+              pixelId: trafficSource.pixel_id,
+              accessToken: trafficSource.api_key,
+              eventName,
+              clickData: click,
+              conversionData: conversion,
+              macroValues
+            });
+            
+            console.log(`✅ Facebook conversion sent: ${fbResult.id || 'success'}`);
+          } catch (fbError) {
+            console.error('❌ Facebook conversion error:', fbError);
+            // Continue processing even if Facebook fails
+          }
+        } else {
+          console.warn('⚠️ Facebook source missing api_key or pixel_id');
+        }
+      } else if (sourceType === 'google') {
+        // Send to Google Ads Conversion Tracking
+        if (trafficSource.google_ads_id) {
+          try {
+            const googleResult = await googleConversionService.sendConversion({
+              accountId: trafficSource.google_ads_id,
+              conversionId: trafficSource.conversion_id || req.query.google_conversion_id || 'default',
+              conversionLabel: trafficSource.conversion_label || req.query.google_conversion_label || 'default',
+              clickData: click,
+              conversionData: conversion,
+              macroValues
+            });
+            
+            console.log(`✅ Google conversion sent: ${googleResult.id || 'success'}`);
+          } catch (googleError) {
+            console.error('❌ Google conversion error:', googleError);
+            // Continue processing even if Google fails
+          }
+        } else {
+          console.warn('⚠️ Google source missing google_ads_id');
+        }
+      }
+    }
     
-    return res.json({
+    // Always return a 200 response to the postback requester
+    // This prevents retries and duplicates from the postback source
+    res.status(200).json({
       success: true,
-      message: 'Postback sent successfully',
-      url: postbackUrl,
-      statusCode: postbackResponse.status
+      conversion_id: conversion.id
     });
+    
   } catch (error) {
-    console.error('Error sending postback:', error);
-    return res.status(500).json({
+    console.error('❌ Postback error:', error);
+    
+    // Always return success to postback source even if there's an error
+    // Internal error handling should be done through monitoring/alerts
+    res.status(200).json({
       success: false,
-      error: error.message
+      error: 'Internal processing error'
     });
   }
 });
 
-/**
- * Endpoint to get postback logs for a specific conversion or offer
- */
-router.get('/postback-logs', async (req, res) => {
+// Dedicated Facebook postback endpoint (alternative to the main one)
+router.get('/facebook', (req, res) => {
+  // Add Facebook-specific parameters to the request and forward to the main endpoint
+  req.query.platform = 'facebook';
+  
+  // Forward to the main conversion endpoint
+  req.url = '/conversion?' + new URLSearchParams(req.query).toString();
+  router.handle(req, res);
+});
+
+// Dedicated Google postback endpoint (alternative to the main one)
+router.get('/google', (req, res) => {
+  // Add Google-specific parameters to the request and forward to the main endpoint
+  req.query.platform = 'google';
+  
+  // Forward to the main conversion endpoint
+  req.url = '/conversion?' + new URLSearchParams(req.query).toString();
+  router.handle(req, res);
+});
+
+// Endpoint to generate a postback URL for a specific click
+router.get('/generate/:clickId', async (req, res) => {
   try {
-    const { conversion_id, offer_id, limit = 100 } = req.query;
+    const { clickId } = req.params;
     
-    const where = {};
-    if (conversion_id) where.conversion_id = conversion_id;
-    if (offer_id) where.offer_id = offer_id;
+    // Verify the click exists
+    const click = await Click.findByPk(clickId);
+    if (!click) {
+      return res.status(404).json({ error: 'Click not found' });
+    }
     
-    const logs = await db.PostbackLogs.findAll({
-      where,
-      limit: parseInt(limit),
-      order: [['created_at', 'DESC']]
+    // Base URL of your application
+    const baseUrl = process.env.BACKEND_URL || 'https://pearmllc.onrender.com';
+    
+    // Generate a postback URL with the click_id
+    const postbackUrl = `${baseUrl}/api/postback/conversion?click_id=${clickId}`;
+    
+    // Allow additional parameters to be added
+    const additionalParams = req.query;
+    let finalUrl = postbackUrl;
+    
+    for (const [key, value] of Object.entries(additionalParams)) {
+      finalUrl += `&${key}=${encodeURIComponent(value)}`;
+    }
+    
+    res.json({
+      click_id: clickId,
+      postback_url: finalUrl,
+      example_usage: `${finalUrl}&payout=10.00&event_name=purchase`
     });
     
-    return res.json(logs);
   } catch (error) {
-    console.error('Error fetching postback logs:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    console.error('❌ Error generating postback URL:', error);
+    res.status(500).json({ error: 'Failed to generate postback URL' });
   }
 });
 
-/**
- * Endpoint to generate a tracking pixel HTML for client-side postbacks
- */
-router.get('/tracking-pixel', (req, res) => {
-  const { clickid, offerid } = req.query;
-  
-  if (!clickid || !offerid) {
-    return res.status(400).json({
-      error: 'Missing required parameters: clickid, offerid'
+// Retrieve conversion status for a click
+router.get('/status/:clickId', async (req, res) => {
+  try {
+    const { clickId } = req.params;
+    
+    // Find all conversions for this click
+    const conversions = await Conversion.findAll({
+      where: { click_id: clickId },
+      order: [['createdAt', 'DESC']]
     });
+    
+    if (conversions.length === 0) {
+      return res.json({
+        click_id: clickId,
+        has_conversion: false,
+        conversions: []
+      });
+    }
+    
+    res.json({
+      click_id: clickId,
+      has_conversion: true,
+      conversions: conversions.map(conv => ({
+        id: conv.id,
+        status: conv.status,
+        event_name: conv.event_name,
+        payout: conv.payout,
+        revenue: conv.revenue,
+        created_at: conv.createdAt
+      }))
+    });
+    
+  } catch (error) {
+    console.error('❌ Error checking conversion status:', error);
+    res.status(500).json({ error: 'Failed to check conversion status' });
   }
-  
-  // Generate the pixel HTML
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const pixelUrl = `${baseUrl}/api/conversions/postback?clickid=${clickid}&offerid=${offerid}&status=1`;
-  
-  const pixelHtml = `<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`;
-  
-  res.json({
-    html: pixelHtml,
-    url: pixelUrl
-  });
 });
 
-/**
- * Database models required for this implementation:
- *
- * - Clicks: Stores click data
- *   - id: Primary key
- *   - external_id: ID passed to traffic source
- *   - offer_id: Associated offer
- *   - campaign_id: Campaign that generated the click
- *   - source: Traffic source
- *   - ip_address: User's IP
- *   - country: User's country
- *   - ... other tracking data
- *
- * - Offers: Stores offer information
- *   - id: Primary key
- *   - name: Offer name
- *   - postbackUrl: Postback URL template
- *   - revenue: Default revenue/payout
- *   - ... other offer data
- *
- * - Conversions: Stores conversion data
- *   - id: Primary key
- *   - click_id: Associated click
- *   - offer_id: Associated offer
- *   - status: 'approved' or 'pending'
- *   - payout: Conversion payout amount
- *   - ... other conversion data
- *
- * - PostbackLogs: Stores postback attempt logs
- *   - id: Primary key
- *   - conversion_id: Associated conversion
- *   - click_id: Associated click
- *   - offer_id: Associated offer
- *   - status: 'success' or 'error'
- *   - request_data: Postback request data
- *   - response_data: Response from traffic source
- *   - response_code: HTTP response code
- *   - ... other log data
- */
+// Endpoint to test the postback system without creating a real conversion
+router.get('/test', (req, res) => {
+  try {
+    console.log('📝 Postback test requested');
+    
+    // Return a success message
+    res.json({
+      success: true,
+      message: 'Postback route is working properly',
+      query_params: req.query
+    });
+  } catch (error) {
+    console.error('❌ Postback test error:', error);
+    res.status(500).json({ error: 'Postback test failed' });
+  }
+});
 
 module.exports = router;

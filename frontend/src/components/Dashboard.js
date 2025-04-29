@@ -1,39 +1,566 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, ArrowUp, ArrowDown, DollarSign, TrendingUp, RefreshCw } from "lucide-react";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement } from "chart.js";
+import {
+  Box,
+  Grid,
+  Typography,
+  Button,
+  ButtonGroup,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  useTheme,
+  ThemeProvider,
+  createTheme,
+  Card,
+  CardContent,
+  IconButton,
+  CircularProgress,
+  Tooltip
+} from "@mui/material";
+
+// Import MUI icons
+import RefreshIcon from "@mui/icons-material/Refresh";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import PercentIcon from "@mui/icons-material/Percent";
+import CircleIcon from "@mui/icons-material/Circle";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import LinkIcon from "@mui/icons-material/Link";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import TrafficIcon from "@mui/icons-material/Traffic";
+import CampaignIcon from "@mui/icons-material/Campaign";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import Layout from "./Layout";
+
+// Import charts
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip as ChartTooltip, Legend, ArcElement } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
+import axios from "axios";
 
 // Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, ChartTooltip, Legend, ArcElement);
 
-const DashboardLayout = ({ children }) => {
+// Create a custom theme to match RedTrack's style
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: "#5569ff", // RedTrack uses a bright blue as primary
+      light: "#e8eaff",
+      dark: "#3846c6",
+    },
+    secondary: {
+      main: "#f53d57", // RedTrack uses a bright red as secondary color
+    },
+    success: {
+      main: "#47c97a",
+      light: "#e6f7ee",
+    },
+    error: {
+      main: "#f53d57",
+      light: "#ffecef",
+    },
+    warning: {
+      main: "#ffb74d",
+      light: "#fff5e6",
+    },
+    background: {
+      default: "#f5f5f9", // Light gray background
+      paper: "#ffffff",
+    },
+    text: {
+      primary: "#101127", // Dark blue/black text
+      secondary: "#5b6084", // Lighter text for less important elements
+    },
+  },
+  typography: {
+    fontFamily: "'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif",
+    h1: {
+      fontWeight: 700,
+    },
+    h2: {
+      fontWeight: 700,
+    },
+    h3: {
+      fontWeight: 600,
+    },
+    h4: {
+      fontWeight: 600,
+    },
+    h5: {
+      fontWeight: 600,
+    },
+    h6: {
+      fontWeight: 600,
+    },
+    button: {
+      textTransform: "none", // RedTrack doesn't use uppercase buttons
+      fontWeight: 500,
+    },
+  },
+  shape: {
+    borderRadius: 8, // Rounded corners
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          boxShadow: "none",
+          "&:hover": {
+            boxShadow: "none",
+          },
+        },
+        containedPrimary: {
+          "&:hover": {
+            backgroundColor: "#4356e6",
+          },
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.05)",
+          borderRadius: 10,
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.05)",
+          borderRadius: 10,
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          fontWeight: 600,
+          color: "#5b6084",
+          backgroundColor: "#f8f8fb",
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.05)",
+        },
+      },
+    },
+  },
+});
+
+// Stats card component for metrics
+const StatsCard = ({ title, value, change, icon, color, borderColor }) => {
+  const isPositiveChange = change > 0;
+  
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <span className="font-bold text-xl text-indigo-600">MarketingIQ</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button className="bg-gray-100 p-2 rounded-full">
-                <Calendar size={20} className="text-gray-600" />
-              </button>
-              <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium">
-                MK
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
+    <Card
+      sx={{
+        height: "100%",
+        borderLeft: `4px solid ${borderColor}`,
+        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        "&:hover": {
+          transform: "translateY(-4px)",
+          boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)"
+        }
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {title}
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+              {value}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+              {change ? (
+                <>
+                  {isPositiveChange ? (
+                    title === "Ad Spend" ? (
+                      <TrendingUpIcon fontSize="small" sx={{ color: "error.main", mr: 0.5 }} />
+                    ) : (
+                      <TrendingUpIcon fontSize="small" sx={{ color: "success.main", mr: 0.5 }} />
+                    )
+                  ) : title === "Ad Spend" ? (
+                    <TrendingDownIcon fontSize="small" sx={{ color: "success.main", mr: 0.5 }} />
+                  ) : (
+                    <TrendingDownIcon fontSize="small" sx={{ color: "error.main", mr: 0.5 }} />
+                  )}
+                  <Typography
+                    variant="body2"
+                    sx={{ 
+                      color: isPositiveChange 
+                        ? title === "Ad Spend" 
+                          ? "error.main" 
+                          : "success.main" 
+                        : title === "Ad Spend" 
+                          ? "success.main" 
+                          : "error.main"
+                    }}
+                  >
+                    {isPositiveChange ? "+" : "-"}
+                    {Math.abs(change).toFixed(1)}% vs yesterday
+                  </Typography>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No change
+                </Typography>
+              )}
+            </Box>
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: `${color}.light`,
+              color: `${color}.main`,
+              borderRadius: 2,
+              width: 56,
+              height: 56,
+            }}
+          >
+            {icon}
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
+
+// New component for Conversion Stats Card
+const ConversionStatsCard = ({ title, value, previousValue, icon, color }) => {
+  const change = previousValue ? ((value - previousValue) / previousValue) * 100 : 0;
+  const isPositiveChange = change > 0;
+  
+  return (
+    <Card sx={{ height: "100%" }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: `${color}.light`,
+              color: `${color}.main`,
+              borderRadius: 1.5,
+              width: 40,
+              height: 40,
+              mr: 2
+            }}
+          >
+            {icon}
+          </Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            {title}
+          </Typography>
+        </Box>
+        
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+          {value}
+        </Typography>
+        
+        {previousValue && (
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Chip 
+              icon={isPositiveChange ? <TrendingUpIcon fontSize="small" /> : <TrendingDownIcon fontSize="small" />}
+              label={`${isPositiveChange ? '+' : ''}${change.toFixed(1)}%`}
+              size="small"
+              sx={{ 
+                bgcolor: isPositiveChange ? 'success.light' : 'error.light',
+                color: isPositiveChange ? 'success.dark' : 'error.dark',
+                fontWeight: 500,
+                '& .MuiChip-icon': {
+                  color: 'inherit'
+                }
+              }}
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              vs. previous period
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// New component for Postback Status Card
+const PostbackStatusCard = ({ status, lastUpdated, sources }) => {
+  const statusColor = status === 'active' ? 'success' : status === 'issues' ? 'warning' : 'error';
+  
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Postback System Status
+          </Typography>
+          <Chip 
+            icon={status === 'active' ? <CheckIcon fontSize="small" /> : <HelpOutlineIcon fontSize="small" />}
+            label={status === 'active' ? 'Active' : status === 'issues' ? 'Issues Detected' : 'Down'}
+            size="small"
+            sx={{ 
+              bgcolor: `${statusColor}.light`,
+              color: `${statusColor}.dark`,
+              '& .MuiChip-icon': {
+                color: 'inherit'
+              }
+            }}
+          />
+        </Box>
+        
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          System monitoring active. Last updated {lastUpdated}.
+        </Typography>
+        
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+          Traffic Source Status
+        </Typography>
+        
+        <Box sx={{ mt: 1 }}>
+          {sources.map((source) => (
+            <Box 
+              key={source.name}
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                py: 1,
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: source.status === 'active' ? 'success.main' : source.status === 'issues' ? 'warning.main' : 'error.main',
+                    mr: 1.5,
+                  }}
+                />
+                <Typography variant="body2">{source.name}</Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                {source.conversions_24h} conversions (24h)
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        
+        <Button 
+          variant="outlined" 
+          color="primary" 
+          fullWidth 
+          startIcon={<VisibilityIcon />}
+          sx={{ mt: 2, borderRadius: 2 }}
+        >
+          View Postback Logs
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
+// New component for Quick Actions Card
+const QuickActionsCard = () => {
+  const actions = [
+    { 
+      name: 'Create New Campaign', 
+      icon: <CampaignIcon />, 
+      color: 'primary.main',
+      bgColor: 'primary.light'
+    },
+    { 
+      name: 'Add Traffic Source', 
+      icon: <TrafficIcon />, 
+      color: 'success.main',
+      bgColor: 'success.light'
+    },
+    { 
+      name: 'Test Postbacks', 
+      icon: <LinkIcon />, 
+      color: 'warning.main',
+      bgColor: 'warning.light'
+    },
+    { 
+      name: 'Generate Report', 
+      icon: <BarChartIcon />, 
+      color: 'error.main',
+      bgColor: 'error.light'
+    }
+  ];
+  
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+          Quick Actions
+        </Typography>
+        
+        <Grid container spacing={2}>
+          {actions.map((action) => (
+            <Grid item xs={6} key={action.name}>
+              <Card
+                sx={{
+                  height: '100%',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  boxShadow: 'none',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                    borderColor: action.color
+                  },
+                  cursor: 'pointer'
+                }}
+              >
+                <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: action.bgColor,
+                      color: action.color,
+                      borderRadius: 2,
+                      width: 48,
+                      height: 48,
+                      mx: 'auto',
+                      mb: 1.5
+                    }}
+                  >
+                    {action.icon}
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {action.name}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+};
+
+// New Component for Recent Conversions
+const RecentConversionsCard = ({ conversions, isLoading }) => {
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Recent Conversions
+          </Typography>
+          <Button 
+            size="small"
+            endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+          >
+            View All
+          </Button>
+        </Box>
+        
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : conversions.length > 0 ? (
+          <TableContainer sx={{ maxHeight: 350 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Time</TableCell>
+                  <TableCell>Source</TableCell>
+                  <TableCell>Campaign</TableCell>
+                  <TableCell align="right">Revenue</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {conversions.map((conversion) => (
+                  <TableRow key={conversion.id} hover>
+                    <TableCell>
+                      <Tooltip title={conversion.timestamp}>
+                        <Typography variant="body2">{conversion.time_ago}</Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: 'inline-block',
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: conversion.source === 'Facebook' ? '#4267B2' : 
+                                    conversion.source === 'Google' ? '#DB4437' : 'primary.main',
+                            mr: 1,
+                          }}
+                        />
+                        <Typography variant="body2">{conversion.source}</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'nowrap',
+                        maxWidth: 120 
+                      }}>
+                        {conversion.campaign}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                        {conversion.revenue}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              No recent conversions to display
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
 export default function Dashboard() {
+  // Theme instance
+  const muiTheme = useTheme();
+  
   // States for dynamic data
   const [dashboardData, setDashboardData] = useState({
     adSpend: { today: 14500, yesterday: 12800, thisMonth: 324500 },
@@ -74,13 +601,77 @@ export default function Dashboard() {
       { name: "Fri", revenue: 24300, adSpend: 9750 },
       { name: "Sat", revenue: 26700, adSpend: 10500 },
       { name: "Sun", revenue: 22900, adSpend: 9200 }
+    ],
+    conversionMetrics: {
+      total: 3452,
+      previousTotal: 3102,
+      approved: 2890,
+      previousApproved: 2620,
+      pending: 345,
+      previousPending: 325,
+      rejected: 217,
+      previousRejected: 157
+    },
+    postbackStatus: {
+      status: 'active',
+      lastUpdated: '10 minutes ago',
+      sources: [
+        { name: 'Facebook', status: 'active', conversions_24h: 145 },
+        { name: 'Google', status: 'active', conversions_24h: 98 },
+        { name: 'TikTok', status: 'issues', conversions_24h: 42 },
+        { name: 'Taboola', status: 'active', conversions_24h: 31 }
+      ]
+    },
+    recentConversions: [
+      { 
+        id: 1, 
+        source: 'Facebook', 
+        campaign: 'Summer Sale', 
+        revenue: '$45.00', 
+        time_ago: '2 min ago',
+        timestamp: '2025-04-30 14:28:35' 
+      },
+      { 
+        id: 2, 
+        source: 'Google', 
+        campaign: 'New Customer', 
+        revenue: '$120.00', 
+        time_ago: '15 min ago',
+        timestamp: '2025-04-30 14:15:22' 
+      },
+      { 
+        id: 3, 
+        source: 'TikTok', 
+        campaign: 'Product Launch', 
+        revenue: '$75.50', 
+        time_ago: '32 min ago',
+        timestamp: '2025-04-30 13:58:12' 
+      },
+      { 
+        id: 4, 
+        source: 'Facebook', 
+        campaign: 'Retargeting', 
+        revenue: '$89.99', 
+        time_ago: '1 hour ago',
+        timestamp: '2025-04-30 13:30:45' 
+      },
+      { 
+        id: 5, 
+        source: 'Google', 
+        campaign: 'Holiday Special', 
+        revenue: '$59.95', 
+        time_ago: '1 hour ago',
+        timestamp: '2025-04-30 13:27:18' 
+      }
     ]
   });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("week");
   const [timeRange, setTimeRange] = useState("week"); // day, week, month, year
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isConversionsLoading, setIsConversionsLoading] = useState(false);
 
   // Function to handle time range changes
   const handleTabChange = (tab) => {
@@ -90,16 +681,85 @@ export default function Dashboard() {
     setIsRefreshing(true);
     setTimeout(() => {
       setIsRefreshing(false);
+      // Simulate data change based on tab
+      if (tab === 'today') {
+        // Update with daily data
+        setDashboardData(prev => ({
+          ...prev,
+          adSpend: { ...prev.adSpend, thisMonth: prev.adSpend.today },
+          revenue: { ...prev.revenue, thisMonth: prev.revenue.today }
+        }));
+      } else if (tab === 'week') {
+        // Reset to original weekly data
+        setDashboardData(prev => ({
+          ...prev,
+          adSpend: { ...prev.adSpend, thisMonth: 324500 },
+          revenue: { ...prev.revenue, thisMonth: 752000 }
+        }));
+      } else if (tab === 'month') {
+        // Show monthly data (higher numbers)
+        setDashboardData(prev => ({
+          ...prev,
+          adSpend: { ...prev.adSpend, thisMonth: 645000 },
+          revenue: { ...prev.revenue, thisMonth: 1520000 }
+        }));
+      }
     }, 800);
   };
 
   // Function to refresh data
   const refreshData = () => {
     setIsRefreshing(true);
+    
+    // Simulate a real data refresh with loading states
+    setIsConversionsLoading(true);
+    
     setTimeout(() => {
+      // Mock data update with new conversions
+      const updatedConversions = [
+        { 
+          id: Math.floor(Math.random() * 10000), 
+          source: 'Facebook', 
+          campaign: 'Summer Flash Sale', 
+          revenue: '$' + (Math.floor(Math.random() * 100) + 20) + '.00', 
+          time_ago: 'Just now',
+          timestamp: '2025-04-30 14:30:00' 
+        },
+        ...dashboardData.recentConversions.slice(0, 4)
+      ];
+      
+      setDashboardData(prev => ({
+        ...prev,
+        recentConversions: updatedConversions,
+        postbackStatus: {
+          ...prev.postbackStatus,
+          lastUpdated: 'Just now'
+        }
+      }));
+      
+      setIsConversionsLoading(false);
       setIsRefreshing(false);
     }, 800);
   };
+
+  // Effect to simulate fetching postback data on mount
+  useEffect(() => {
+    // Simulate a postback system check
+    const checkPostbackSystem = async () => {
+      try {
+        // In a real app, you would fetch postback status from your API
+        // const response = await axios.get('/api/postback/status');
+        // setPostbackStatus(response.data);
+        
+        // For demo, we'll just use the mock data
+        console.log('Postback system check complete');
+      } catch (error) {
+        console.error('Error checking postback system:', error);
+      }
+    };
+    
+    checkPostbackSystem();
+  }, []);
 
   // Calculate ROAS
   function calculateRoas(revenue, adSpend) {
@@ -116,27 +776,27 @@ export default function Dashboard() {
     }).format(value);
   };
 
-  // Modern chart theme
+  // Chart theme matching RedTrack style
   const chartTheme = {
     backgroundColor: [
-      'rgba(99, 102, 241, 0.7)',
-      'rgba(16, 185, 129, 0.7)',
-      'rgba(245, 158, 11, 0.7)',
-      'rgba(239, 68, 68, 0.7)',
-      'rgba(139, 92, 246, 0.7)',
-      'rgba(20, 184, 166, 0.7)'
+      'rgba(85, 105, 255, 0.7)',  // Primary blue
+      'rgba(71, 201, 122, 0.7)',  // Success green
+      'rgba(255, 183, 77, 0.7)',  // Warning orange
+      'rgba(245, 61, 87, 0.7)',   // Error red
+      'rgba(156, 39, 176, 0.7)',  // Purple
+      'rgba(0, 188, 212, 0.7)',   // Cyan
     ],
     borderColor: [
-      'rgb(99, 102, 241)',
-      'rgb(16, 185, 129)',
-      'rgb(245, 158, 11)',
-      'rgb(239, 68, 68)',
-      'rgb(139, 92, 246)',
-      'rgb(20, 184, 166)'
+      'rgb(85, 105, 255)',     // Primary blue
+      'rgb(71, 201, 122)',     // Success green
+      'rgb(255, 183, 77)',     // Warning orange
+      'rgb(245, 61, 87)',      // Error red
+      'rgb(156, 39, 176)',     // Purple
+      'rgb(0, 188, 212)',      // Cyan
     ],
     gridColor: 'rgba(243, 244, 246, 1)',
-    textColor: 'rgba(107, 114, 128, 1)',
-    tooltipBgColor: 'rgba(17, 24, 39, 0.9)'
+    textColor: 'rgba(91, 96, 132, 1)',
+    tooltipBgColor: 'rgba(16, 17, 39, 0.95)'
   };
 
   // Chart.js options for consistent styling
@@ -239,7 +899,7 @@ export default function Dashboard() {
         label: 'Revenue',
         data: dashboardData.revenueData.map(item => item.value),
         borderColor: chartTheme.borderColor[1],
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        backgroundColor: 'rgba(71, 201, 122, 0.1)',
         tension: 0.4,
         fill: true,
         pointBackgroundColor: 'white',
@@ -252,7 +912,7 @@ export default function Dashboard() {
         label: 'Ad Spend',
         data: dashboardData.adSpendData.map(item => item.value),
         borderColor: chartTheme.borderColor[0],
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        backgroundColor: 'rgba(85, 105, 255, 0.1)',
         tension: 0.4,
         fill: true,
         pointBackgroundColor: 'white',
@@ -317,231 +977,350 @@ export default function Dashboard() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="dashboard p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="dashboard-title text-3xl font-bold text-gray-800">Marketing Dashboard</h1>
-            <p className="text-gray-500 mt-1">Performance analytics for {timeRange === "today" ? "Today" : timeRange === "week" ? "This Week" : "This Month"}</p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex items-center bg-white rounded-lg shadow-sm p-1">
-              <button 
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "today" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                onClick={() => handleTabChange("today")}
-              >
-                Today
-              </button>
-              <button 
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "week" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                onClick={() => handleTabChange("week")}
-              >
-                This Week
-              </button>
-              <button 
-                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "month" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-                onClick={() => handleTabChange("month")}
-              >
-                This Month
-              </button>
-            </div>
+    <ThemeProvider theme={theme}>
+      <Layout>
+        <Box sx={{ mb: 4 }}>
+          <Grid container spacing={2} alignItems={{ xs: "flex-start", md: "center" }} justifyContent="space-between">
+            <Grid item xs={12} md={6}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: "text.primary" }}>
+                Marketing Dashboard
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Performance analytics for {timeRange === "today" ? "Today" : timeRange === "week" ? "This Week" : "This Month"}
+              </Typography>
+            </Grid>
             
-            <button 
-              className="flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-4 py-2 rounded-lg shadow-sm transition-all"
-              onClick={refreshData}
-              disabled={isRefreshing}
-            >
-              <RefreshCw size={16} className={`${isRefreshing ? 'animate-spin' : ''}`} /> 
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-          </div>
-        </div>
+            <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, justifyContent: { md: "flex-end" } }}>
+              <ButtonGroup 
+                variant="contained" 
+                disableElevation 
+                sx={{ 
+                  bgcolor: "background.paper", 
+                  "& .MuiButton-root": { 
+                    color: "text.secondary",
+                    borderColor: "divider",
+                    "&.active": {
+                      bgcolor: "primary.main",
+                      color: "white"
+                    }
+                  } 
+                }}
+              >
+                <Button 
+                  className={activeTab === "today" ? "active" : ""}
+                  onClick={() => handleTabChange("today")}
+                >
+                  Today
+                </Button>
+                <Button 
+                  className={activeTab === "week" ? "active" : ""}
+                  onClick={() => handleTabChange("week")}
+                >
+                  This Week
+                </Button>
+                <Button 
+                  className={activeTab === "month" ? "active" : ""}
+                  onClick={() => handleTabChange("month")}
+                >
+                  This Month
+                </Button>
+              </ButtonGroup>
+              
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<RefreshIcon className={isRefreshing ? "animate-spin" : ""} />}
+                onClick={refreshData}
+                disabled={isRefreshing}
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh Data"}
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
 
         {/* Key Metrics Cards */}
-        <div className="dashboard-metrics grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="metric-box ad-spend bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-600 hover:shadow-md transition duration-300">
-            <div className="flex justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Ad Spend</p>
-                <h3 className="text-2xl font-bold text-gray-800">{formatCurrency(dashboardData.adSpend.thisMonth)}</h3>
-                <div className="flex items-center mt-2">
-                  {dashboardData.adSpend.today > dashboardData.adSpend.yesterday ? (
-                    <>
-                      <ArrowUp size={16} className="text-red-500 mr-1" />
-                      <p className="text-sm text-red-500">
-                        +{(((dashboardData.adSpend.today - dashboardData.adSpend.yesterday) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <ArrowDown size={16} className="text-green-500 mr-1" />
-                      <p className="text-sm text-green-500">
-                        -{(((dashboardData.adSpend.yesterday - dashboardData.adSpend.today) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="bg-indigo-100 p-3 rounded-lg">
-                <DollarSign size={28} className="text-indigo-600" />
-              </div>
-            </div>
-          </div>
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={4}>
+            <StatsCard
+              title="Ad Spend"
+              value={formatCurrency(dashboardData.adSpend.thisMonth)}
+              change={((dashboardData.adSpend.today - dashboardData.adSpend.yesterday) / dashboardData.adSpend.yesterday) * 100}
+              icon={<AccountBalanceWalletIcon sx={{ fontSize: 28 }} />}
+              color="primary"
+              borderColor={theme.palette.primary.main}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <StatsCard
+              title="Revenue"
+              value={formatCurrency(dashboardData.revenue.thisMonth)}
+              change={((dashboardData.revenue.today - dashboardData.revenue.yesterday) / dashboardData.revenue.yesterday) * 100}
+              icon={<AttachMoneyIcon sx={{ fontSize: 28 }} />}
+              color="success"
+              borderColor={theme.palette.success.main}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <StatsCard
+              title="ROAS"
+              value={`${calculateRoas(dashboardData.revenue.thisMonth, dashboardData.adSpend.thisMonth)}%`}
+              change={dashboardData.roas.today - dashboardData.roas.yesterday}
+              icon={<PercentIcon sx={{ fontSize: 28 }} />}
+              color="warning"
+              borderColor={theme.palette.warning.main}
+            />
+          </Grid>
+        </Grid>
 
-          <div className="metric-box revenue bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500 hover:shadow-md transition duration-300">
-            <div className="flex justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Revenue</p>
-                <h3 className="text-2xl font-bold text-gray-800">{formatCurrency(dashboardData.revenue.thisMonth)}</h3>
-                <div className="flex items-center mt-2">
-                  {dashboardData.revenue.today > dashboardData.revenue.yesterday ? (
-                    <>
-                      <ArrowUp size={16} className="text-green-500 mr-1" />
-                      <p className="text-sm text-green-500">
-                        +{(((dashboardData.revenue.today - dashboardData.revenue.yesterday) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <ArrowDown size={16} className="text-red-500 mr-1" />
-                      <p className="text-sm text-red-500">
-                        -{(((dashboardData.revenue.yesterday - dashboardData.revenue.today) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="bg-emerald-100 p-3 rounded-lg">
-                <DollarSign size={28} className="text-emerald-500" />
-              </div>
-            </div>
-          </div>
-
-          <div className="metric-box roas bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 hover:shadow-md transition duration-300">
-            <div className="flex justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">ROAS</p>
-                <h3 className="text-2xl font-bold text-gray-800">
-                  {calculateRoas(dashboardData.revenue.thisMonth, dashboardData.adSpend.thisMonth)}%
-                </h3>
-                <div className="flex items-center mt-2">
-                  {dashboardData.roas.today > dashboardData.roas.yesterday ? (
-                    <>
-                      <ArrowUp size={16} className="text-green-500 mr-1" />
-                      <p className="text-sm text-green-500">
-                        +{(dashboardData.roas.today - dashboardData.roas.yesterday).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <ArrowDown size={16} className="text-red-500 mr-1" />
-                      <p className="text-sm text-red-500">
-                        -{(dashboardData.roas.yesterday - dashboardData.roas.today).toFixed(1)}% vs yesterday
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="bg-amber-100 p-3 rounded-lg">
-                <TrendingUp size={28} className="text-amber-500" />
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Conversion Stats and Postback Status */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={8}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <ConversionStatsCard
+                  title="Total Conversions"
+                  value={dashboardData.conversionMetrics.total.toLocaleString()}
+                  previousValue={dashboardData.conversionMetrics.previousTotal}
+                  icon={<CheckCircleIcon sx={{ fontSize: 24 }} />}
+                  color="primary"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <ConversionStatsCard
+                  title="Approved Conversions"
+                  value={dashboardData.conversionMetrics.approved.toLocaleString()}
+                  previousValue={dashboardData.conversionMetrics.previousApproved}
+                  icon={<CheckIcon sx={{ fontSize: 24 }} />}
+                  color="success"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <ConversionStatsCard
+                  title="Pending Conversions"
+                  value={dashboardData.conversionMetrics.pending.toLocaleString()}
+                  previousValue={dashboardData.conversionMetrics.previousPending}
+                  icon={<HelpOutlineIcon sx={{ fontSize: 24 }} />}
+                  color="warning"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <ConversionStatsCard
+                  title="Rejected Conversions"
+                  value={dashboardData.conversionMetrics.rejected.toLocaleString()}
+                  previousValue={dashboardData.conversionMetrics.previousRejected}
+                  icon={<CloseIcon sx={{ fontSize: 24 }} />}
+                  color="error"
+                />
+              </Grid>
+            </Grid>
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <PostbackStatusCard
+              status={dashboardData.postbackStatus.status}
+              lastUpdated={dashboardData.postbackStatus.lastUpdated}
+              sources={dashboardData.postbackStatus.sources}
+            />
+          </Grid>
+        </Grid>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-            <h3 className="text-lg font-semibold text-gray-800 mb-6">Revenue vs Ad Spend</h3>
-            <div className="h-72">
-              {dashboardData.dailyData.length > 0 ? (
-                <Bar data={revenueVsAdSpendData} options={chartOptions} />
-              ) : (
-                <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">No data available</p>
-                </div>
-              )}
-            </div>
-          </div>
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: "100%" }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                  Revenue vs Ad Spend
+                </Typography>
+                <Box sx={{ height: 360 }}>
+                  {dashboardData.dailyData.length > 0 ? (
+                    <Bar data={revenueVsAdSpendData} options={chartOptions} />
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100%",
+                        bgcolor: "background.default",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography color="text.secondary">No data available</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: "100%" }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                  Campaign Performance
+                </Typography>
+                <Box sx={{ height: 360 }}>
+                  {dashboardData.campaignPerformance.length > 0 ? (
+                    <Doughnut data={campaignPerformanceData} options={doughnutOptions} />
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100%",
+                        bgcolor: "background.default",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography color="text.secondary">No data available</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-            <h3 className="text-lg font-semibold text-gray-800 mb-6">Campaign Performance</h3>
-            <div className="h-72">
-              {dashboardData.campaignPerformance.length > 0 ? (
-                <Doughnut data={campaignPerformanceData} options={doughnutOptions} />
-              ) : (
-                <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">No data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Recent Conversions and Quick Actions */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={8}>
+            <RecentConversionsCard 
+              conversions={dashboardData.recentConversions}
+              isLoading={isConversionsLoading}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <QuickActionsCard />
+          </Grid>
+        </Grid>
 
         {/* Monthly Trend */}
-        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6">Monthly Trends</h3>
-          <div className="h-80">
-            {dashboardData.revenueData.length > 0 && dashboardData.adSpendData.length > 0 ? (
-              <Line data={monthlyTrendsData} options={chartOptions} />
-            ) : (
-              <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
-                <p className="text-gray-500">No data available</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <Card sx={{ mb: 4 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+              Monthly Trends
+            </Typography>
+            <Box sx={{ height: 400 }}>
+              {dashboardData.revenueData.length > 0 && dashboardData.adSpendData.length > 0 ? (
+                <Line data={monthlyTrendsData} options={chartOptions} />
+              ) : (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100%",
+                    bgcolor: "background.default",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography color="text.secondary">No data available</Typography>
+                </Box>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
 
         {/* Campaign Table */}
-        <div className="dashboard-tables table-box bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-800">Best Performing Campaigns</h3>
-            <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{dashboardData.campaignPerformance.length} campaigns</span>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tl-lg">Campaign</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Revenue</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Conversions</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">ROAS</th>
-                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tr-lg">Status</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {dashboardData.campaignPerformance.map((campaign, index) => {
-                  // Calculate adSpend as percentage of revenue (dynamic calculation)
-                  const adSpend = campaign.value * (0.3 + Math.random() * 0.3); // Random between 30-60% for demo
-                  const roas = calculateRoas(campaign.value, adSpend);
-                  return (
-                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-4 text-sm font-medium text-gray-900 whitespace-nowrap">{campaign.name}</td>
-                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{formatCurrency(campaign.value)}</td>
-                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{campaign.conversions.toLocaleString()}</td>
-                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{roas}%</td>
-                      <td className="py-4 px-4 text-sm whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs inline-flex items-center font-medium rounded-full ${
-                          roas > 200 ? 'bg-green-100 text-green-800' : 
-                          roas > 120 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          <span className={`h-2 w-2 rounded-full mr-2 ${
-                            roas > 200 ? 'bg-green-600' : 
-                            roas > 120 ? 'bg-amber-600' : 'bg-red-600'
-                          }`}></span>
-                          {roas > 200 ? 'Excellent' : roas > 120 ? 'Good' : 'Needs Improvement'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </DashboardLayout>
+        <Card>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Best Performing Campaigns
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Chip 
+                  label={`${dashboardData.campaignPerformance.length} campaigns`} 
+                  size="small" 
+                  sx={{ bgcolor: "background.default", color: "text.secondary" }}
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  sx={{ borderRadius: 2 }}
+                >
+                  New Campaign
+                </Button>
+              </Box>
+            </Box>
+            
+            <TableContainer>
+              <Table sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Campaign</TableCell>
+                    <TableCell>Revenue</TableCell>
+                    <TableCell>Conversions</TableCell>
+                    <TableCell>ROAS</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {dashboardData.campaignPerformance.map((campaign, index) => {
+                    // Calculate adSpend as percentage of revenue (dynamic calculation)
+                    const adSpend = campaign.value * (0.3 + Math.random() * 0.3); // Random between 30-60% for demo
+                    const roas = calculateRoas(campaign.value, adSpend);
+                    return (
+                      <TableRow key={index} hover>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 500, color: "text.primary" }}>{campaign.name}</Typography>
+                        </TableCell>
+                        <TableCell>{formatCurrency(campaign.value)}</TableCell>
+                        <TableCell>{campaign.conversions.toLocaleString()}</TableCell>
+                        <TableCell>{roas}%</TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={<CircleIcon sx={{ fontSize: 8 }} />}
+                            label={roas > 200 ? "Excellent" : roas > 120 ? "Good" : "Needs Improvement"}
+                            size="small"
+                            sx={{
+                              bgcolor: roas > 200 
+                                ? "success.light" 
+                                : roas > 120 
+                                ? "warning.light" 
+                                : "error.light",
+                              color: roas > 200 
+                                ? "success.dark" 
+                                : roas > 120 
+                                ? "warning.dark" 
+                                : "error.dark",
+                              "& .MuiChip-icon": {
+                                color: roas > 200 
+                                  ? "success.main" 
+                                  : roas > 120 
+                                  ? "warning.main" 
+                                  : "error.main",
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton size="small" sx={{ color: "text.secondary" }}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" sx={{ color: "text.secondary" }}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      </Layout>
+    </ThemeProvider>
   );
 }

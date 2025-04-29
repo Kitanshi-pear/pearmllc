@@ -9,28 +9,45 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Layout from "./Layout";
+import axios from 'axios';
 
 // Define postback macros globally
 const POSTBACK_MACROS = {
-    CLICKID: '{clickid}',
+    CLICKID: '{click_id}',
     PAYOUT: '{payout}',
     REVENUE: '{revenue}',
-    CONVERSION_ID: '{conversionid}',
-    OFFER_ID: '{offerid}',
-    OFFER_NAME: '{offername}',
-    CAMPAIGN_ID: '{campaignid}',
+    CONVERSION_ID: '{conversion_id}',
+    OFFER_ID: '{offer_id}',
+    OFFER_NAME: '{offer_name}',
+    CAMPAIGN_ID: '{campaign_id}',
+    CAMPAIGN_NAME: '{campaign_name}',
     SOURCE: '{source}',
     IP: '{ip}',
     COUNTRY: '{country}',
     DEVICE: '{device}',
     BROWSER: '{browser}',
     OS: '{os}',
-    STATUS: '{status}'
+    STATUS: '{status}',
+    EVENT_NAME: '{event_name}',
+    GCLID: '{gclid}',
+    SUB1: '{sub1}',
+    SUB2: '{sub2}',
+    SUB3: '{sub3}',
+    SUB4: '{sub4}',
+    SUB5: '{sub5}'
 };
 
-// Generate a default postback URL template
-const generatePostbackTemplate = (baseUrl = 'https://your-domain.com/') => {
-    return `${baseUrl}?clickid=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}&offer=${POSTBACK_MACROS.OFFER_ID}&status=1`;
+// Generate postback URL format based on traffic source
+const generatePostbackTemplate = (baseUrl = window.location.origin, trafficSource = '') => {
+    const apiPostbackUrl = `${baseUrl}/api/postback/conversion?click_id=${POSTBACK_MACROS.CLICKID}`;
+    
+    if (trafficSource.toLowerCase() === 'facebook') {
+        return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}&sub2=${POSTBACK_MACROS.SUB2}`;
+    } else if (trafficSource.toLowerCase() === 'google') {
+        return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.GCLID}`;
+    } else {
+        return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&status=1`;
+    }
 };
 
 // Parse a postback URL by replacing macros with actual values
@@ -43,7 +60,7 @@ const parsePostbackUrl = (template, data) => {
     Object.entries(POSTBACK_MACROS).forEach(([key, macro]) => {
         const valueKey = key.toLowerCase();
         const value = data[valueKey] || '';
-        url = url.replace(new RegExp(macro, 'g'), encodeURIComponent(value));
+        url = url.replace(new RegExp(macro.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), encodeURIComponent(value));
     });
     
     return url;
@@ -61,17 +78,27 @@ const OffersPage = () => {
     
     // Postback testing state
     const [testPostbackData, setTestPostbackData] = useState({
-        clickid: 'test_' + Math.random().toString(36).substring(2, 10),
+        click_id: 'test_' + Math.random().toString(36).substring(2, 10),
         payout: '10.00',
         revenue: '10.00',
-        conversionid: 'conv_' + Date.now(),
-        offerid: '',
-        offername: '',
-        campaignid: 'camp_1',
+        conversion_id: 'conv_' + Date.now(),
+        offer_id: '',
+        offer_name: '',
+        campaign_id: 'camp_1',
+        campaign_name: 'Test Campaign',
         source: '',
         ip: '192.168.0.1',
         country: 'US',
         device: 'desktop',
+        browser: 'Chrome',
+        os: 'Windows',
+        event_name: 'purchase',
+        gclid: 'gclid_123456',
+        sub1: 'custom_value_1',
+        sub2: 'user@example.com', // email for Facebook
+        sub3: '15555555555', // phone for Facebook
+        sub4: 'order_'+Date.now(),
+        sub5: 'additional_data',
         status: '1'
     });
     const [processedUrl, setProcessedUrl] = useState('');
@@ -122,7 +149,8 @@ const OffersPage = () => {
         setNewOffer(prev => ({
             ...prev,
             source: selectedSourceName,
-            postbackUrl: sourceDetails ? sourceDetails.postback_url : ''
+            // Generate postback URL based on source type
+            postbackUrl: generatePostbackTemplate(window.location.origin, selectedSourceName)
         }));
     };
     
@@ -144,7 +172,7 @@ const OffersPage = () => {
     const handleGeneratePostbackTemplate = () => {
         setNewOffer(prev => ({
             ...prev,
-            postbackUrl: generatePostbackTemplate()
+            postbackUrl: generatePostbackTemplate(window.location.origin, prev.source)
         }));
     };
 
@@ -169,8 +197,8 @@ const OffersPage = () => {
         
         const url = parsePostbackUrl(selectedOffer.postbackUrl, {
             ...testPostbackData,
-            offerid: selectedOffer.id,
-            offername: selectedOffer.offers_name
+            offer_id: selectedOffer.id,
+            offer_name: selectedOffer.offers_name
         });
         
         setProcessedUrl(url);
@@ -184,21 +212,21 @@ const OffersPage = () => {
         try {
             const url = handleGenerateTestUrl();
             
-            // This is just a simulation since we can't actually make the request due to CORS
-            // In a real app, you might use a proxy or server-side code to test the actual URL
-            setTimeout(() => {
-                setTestResult({
-                    success: true,
-                    message: 'Postback test completed! In production, this would notify your traffic source about the conversion.'
-                });
-                setIsTesting(false);
-            }, 1500);
+            // Actually send the test postback request
+            const response = await axios.get(url);
+            
+            setTestResult({
+                success: true,
+                message: 'Postback test completed successfully! Response: ' + JSON.stringify(response.data),
+                data: response.data
+            });
             
         } catch (error) {
             setTestResult({
                 success: false,
-                message: `Error: ${error.message}`
+                message: `Error: ${error.response?.data?.error || error.message}`
             });
+        } finally {
             setIsTesting(false);
         }
     };
@@ -207,8 +235,8 @@ const OffersPage = () => {
         setSelectedOffer(offer);
         setTestPostbackData(prev => ({
             ...prev,
-            offerid: offer.id,
-            offername: offer.offers_name,
+            offer_id: offer.id,
+            offer_name: offer.offers_name,
             source: offer.source || ''
         }));
         setPostbackTestDialogOpen(true);
@@ -276,7 +304,10 @@ const OffersPage = () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(newOffer)
+                body: JSON.stringify({
+                    ...newOffer,
+                    postbackUrl: newOffer.postbackUrl // Save the postback URL with the offer
+                })
             });
     
             if (!response.ok) {
@@ -556,13 +587,13 @@ const OffersPage = () => {
                                 fullWidth
                                 disabled
                                 value={parsePostbackUrl(newOffer.postbackUrl, {
-                                    clickid: 'abc123',
+                                    click_id: 'abc123',
                                     payout: '10.00',
                                     revenue: newOffer.revenue.toString(),
-                                    conversionid: '123456',
-                                    offerid: '789',
-                                    offername: newOffer.name,
-                                    campaignid: 'camp_1',
+                                    conversion_id: '123456',
+                                    offer_id: '789',
+                                    offer_name: newOffer.name,
+                                    campaign_id: 'camp_1',
                                     source: newOffer.source,
                                     status: '1'
                                 })}
@@ -572,8 +603,22 @@ const OffersPage = () => {
                             <Card variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5' }}>
                                 <Typography variant="body2" color="text.secondary">
                                     <strong>How it works:</strong> When a conversion occurs, the system will replace the 
-                                    placeholders (like {'{clickid}'}) with actual values and ping this URL automatically.
+                                    placeholders with actual values and ping this URL automatically.
                                     This notifies your traffic source about successful conversions.
+                                    
+                                    {newOffer.source && newOffer.source.toLowerCase() === 'facebook' && (
+                                        <Box mt={1}>
+                                            <strong>Facebook-specific:</strong> Use {'{sub1}'} for user_id, {'{sub2}'} for email, and {'{sub3}'} for phone.
+                                            These will be automatically hashed for privacy as required by Facebook.
+                                        </Box>
+                                    )}
+                                    
+                                    {newOffer.source && newOffer.source.toLowerCase() === 'google' && (
+                                        <Box mt={1}>
+                                            <strong>Google-specific:</strong> Use {'{gclid}'} or {'{sub1}'} for Google Click ID for conversion tracking.
+                                            You can also use {'{sub2}'} for email and {'{sub3}'} for phone for enhanced conversions.
+                                        </Box>
+                                    )}
                                 </Typography>
                             </Card>
                         </Box>
@@ -596,7 +641,7 @@ const OffersPage = () => {
                     Test Postback URL
                     {selectedOffer && (
                         <Typography variant="subtitle2" color="text.secondary">
-                            {selectedOffer.offers_name}
+                            {selectedOffer.offers_name} - {selectedOffer.source}
                         </Typography>
                     )}
                 </DialogTitle>
@@ -622,8 +667,8 @@ const OffersPage = () => {
                                     <TextField
                                         fullWidth
                                         label="Click ID"
-                                        name="clickid"
-                                        value={testPostbackData.clickid}
+                                        name="click_id"
+                                        value={testPostbackData.click_id}
                                         onChange={handleTestDataChange}
                                     />
                                 </Grid>
@@ -649,8 +694,17 @@ const OffersPage = () => {
                                     <TextField
                                         fullWidth
                                         label="Conversion ID"
-                                        name="conversionid"
-                                        value={testPostbackData.conversionid}
+                                        name="conversion_id"
+                                        value={testPostbackData.conversion_id}
+                                        onChange={handleTestDataChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={4}>
+                                    <TextField
+                                        fullWidth
+                                        label="Event Name"
+                                        name="event_name"
+                                        value={testPostbackData.event_name}
                                         onChange={handleTestDataChange}
                                     />
                                 </Grid>
@@ -658,20 +712,77 @@ const OffersPage = () => {
                                     <TextField
                                         fullWidth
                                         label="Campaign ID"
-                                        name="campaignid"
-                                        value={testPostbackData.campaignid}
+                                        name="campaign_id"
+                                        value={testPostbackData.campaign_id}
                                         onChange={handleTestDataChange}
                                     />
                                 </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Status"
-                                        name="status"
-                                        value={testPostbackData.status}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
+                                
+                                {/* Show Facebook-specific fields if the source is Facebook */}
+                                {selectedOffer.source && selectedOffer.source.toLowerCase() === 'facebook' && (
+                                    <>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="User ID (sub1)"
+                                                name="sub1"
+                                                value={testPostbackData.sub1}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Email (sub2)"
+                                                name="sub2"
+                                                value={testPostbackData.sub2}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Phone (sub3)"
+                                                name="sub3"
+                                                value={testPostbackData.sub3}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
+                                
+                                {/* Show Google-specific fields if the source is Google */}
+                                {selectedOffer.source && selectedOffer.source.toLowerCase() === 'google' && (
+                                    <>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="GCLID"
+                                                name="gclid"
+                                                value={testPostbackData.gclid}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Email (sub2)"
+                                                name="sub2"
+                                                value={testPostbackData.sub2}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Phone (sub3)"
+                                                name="sub3"
+                                                value={testPostbackData.sub3}
+                                                onChange={handleTestDataChange}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
                             </Grid>
                             
                             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -700,6 +811,8 @@ const OffersPage = () => {
                                     <TextField
                                         fullWidth
                                         value={processedUrl}
+                                        multiline
+                                        rows={2}
                                         InputProps={{
                                             readOnly: true,
                                         }}
@@ -718,6 +831,15 @@ const OffersPage = () => {
                                     <Typography>
                                         {testResult.message}
                                     </Typography>
+                                    
+                                    {testResult.success && testResult.data && (
+                                        <Box mt={2}>
+                                            <Typography variant="subtitle2">Response Data:</Typography>
+                                            <pre style={{ whiteSpace: 'pre-wrap' }}>
+                                                {JSON.stringify(testResult.data, null, 2)}
+                                            </pre>
+                                        </Box>
+                                    )}
                                 </Paper>
                             )}
                         </>

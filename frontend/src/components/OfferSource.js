@@ -22,6 +22,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -34,12 +35,15 @@ import {
 
 // Postback Macros
 const POSTBACK_MACROS = {
-  CLICKID: '{clickid}',
+  CLICKID: '{click_id}',
   PAYOUT: '{payout}',
   REVENUE: '{revenue}',
-  CONVERSION_ID: '{conversionid}',
-  OFFER_ID: '{offerid}',
-  CAMPAIGN_ID: '{campaignid}',
+  CONVERSION_ID: '{conversion_id}',
+  OFFER_ID: '{offer_id}',
+  OFFER_NAME: '{offer_name}',
+  CAMPAIGN_ID: '{campaign_id}',
+  CAMPAIGN_NAME: '{campaign_name}',
+  SOURCE: '{source}',
   IP: '{ip}',
   COUNTRY: '{country}',
   DEVICE: '{device}',
@@ -47,16 +51,31 @@ const POSTBACK_MACROS = {
   OS: '{os}',
   DATE: '{date}',
   TIME: '{time}',
-  AFFILIATE_ID: '{affiliateid}',
+  AFFILIATE_ID: '{affiliate_id}',
   STATUS: '{status}',
+  EVENT_NAME: '{event_name}',
+  GCLID: '{gclid}',
+  SUB1: '{sub1}',
+  SUB2: '{sub2}',
+  SUB3: '{sub3}',
+  SUB4: '{sub4}',
+  SUB5: '{sub5}',
   CUSTOM1: '{custom1}',
   CUSTOM2: '{custom2}',
   CUSTOM3: '{custom3}',
 };
 
-// Generate sample postback URL
-const generatePostbackTemplate = (baseUrl = 'https://yourdomain.com/postback') => {
-  return `${baseUrl}?clickid=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}&status=1`;
+// Generate postback URL format based on traffic source
+const generatePostbackTemplate = (baseUrl = window.location.origin, sourceType = '') => {
+  const apiPostbackUrl = `${baseUrl}/api/postback/conversion?click_id=${POSTBACK_MACROS.CLICKID}`;
+  
+  if (sourceType.toLowerCase() === 'facebook') {
+    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}&sub2=${POSTBACK_MACROS.SUB2}`;
+  } else if (sourceType.toLowerCase() === 'google') {
+    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.GCLID}`;
+  } else {
+    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&status=1`;
+  }
 };
 
 // Parse a postback URL template and replace macros with test values
@@ -69,7 +88,7 @@ const parsePostbackUrl = (template, data) => {
   Object.entries(POSTBACK_MACROS).forEach(([key, macro]) => {
     const valueKey = key.toLowerCase();
     const value = data[valueKey] || '';
-    url = url.replace(new RegExp(macro, 'g'), encodeURIComponent(value));
+    url = url.replace(new RegExp(macro.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), encodeURIComponent(value));
   });
   
   return url;
@@ -84,18 +103,33 @@ const OfferSourcePage = () => {
   const [date, setDate] = useState("");
   const [titleText, setTitle] = useState("");
   const [tabValue, setTabValue] = useState(0);
+  const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
+  const [selectedSource, setSelectedSource] = useState(null);
   
   // Postback testing state
   const [testPostbackData, setTestPostbackData] = useState({
-    clickid: 'test_' + Math.random().toString(36).substring(2, 10),
+    click_id: 'test_' + Math.random().toString(36).substring(2, 10),
     payout: '10.00',
     revenue: '10.00',
-    conversionid: 'conv_' + Date.now(),
-    offerid: '12345',
-    campaignid: 'camp_1',
+    conversion_id: 'conv_' + Date.now(),
+    offer_id: '12345',
+    offer_name: 'Test Offer',
+    campaign_id: 'camp_1',
+    campaign_name: 'Test Campaign',
     ip: '192.168.0.1',
     country: 'US',
     device: 'desktop',
+    browser: 'Chrome',
+    os: 'Windows',
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toISOString().split('T')[1].split('.')[0],
+    event_name: 'purchase',
+    gclid: 'gclid_123456',
+    sub1: 'custom_value_1',
+    sub2: 'user@example.com', // email for Facebook
+    sub3: '15555555555', // phone for Facebook
+    sub4: 'order_'+Date.now(),
+    sub5: 'additional_data',
     status: '1'
   });
   const [processedUrl, setProcessedUrl] = useState('');
@@ -120,11 +154,21 @@ const OfferSourcePage = () => {
     "Consent Personalization",
     "None",
   ];
+  
+  const source_types = [
+    "Facebook",
+    "Google",
+    "TikTok",
+    "Taboola",
+    "Outbrain",
+    "Other"
+  ];
 
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     alias: "",
     postbackUrl: "",
+    sourceType: "",
     currency: "USD",
     offerUrl: "",
     clickid: "",
@@ -133,6 +177,13 @@ const OfferSourcePage = () => {
     token: "",
     description: "",
     role: "",
+    // API connection parameters
+    pixel_id: "",    // Facebook pixel ID
+    api_key: "",     // Facebook API token
+    google_ads_id: "", // Google Ads account ID
+    conversion_id: "", // Google conversion ID
+    conversion_label: "", // Google conversion label
+    default_event_name: "purchase" // Default event name
   });
 
   const handleDateChange = (e) => {
@@ -154,8 +205,15 @@ const OfferSourcePage = () => {
         id: item.id,
         serial_no: index + 1,
         source_name: item.name,
+        source_type: item.sourceType || "Other",
         Timestamp: item.createdAt,
         postback: item.postback_url,
+        pixel_id: item.pixel_id || "",
+        api_key: item.api_key || "",
+        google_ads_id: item.google_ads_id || "",
+        conversion_id: item.conversion_id || "",
+        conversion_label: item.conversion_label || "",
+        default_event_name: item.default_event_name || "purchase",
         currency: item.currency,
         offer_url: item.offer_url,
         clickid: item.clickid,
@@ -193,6 +251,7 @@ const OfferSourcePage = () => {
       name: row.source_name,
       alias: row.source_name.toLowerCase().replace(/\s+/g, "-"),
       postbackUrl: row.postback || "",
+      sourceType: row.source_type || "Other",
       currency: row.currency || "USD",
       offerUrl: row.offer_url || "",
       clickid: row.clickid || "",
@@ -201,6 +260,12 @@ const OfferSourcePage = () => {
       token: row.token || "",
       description: row.description || "",
       role: row.role || "",
+      pixel_id: row.pixel_id || "",
+      api_key: row.api_key || "",
+      google_ads_id: row.google_ads_id || "",
+      conversion_id: row.conversion_id || "",
+      conversion_label: row.conversion_label || "",
+      default_event_name: row.default_event_name || "purchase"
     });
     setOpenTemplateModal(true);
   };
@@ -210,6 +275,7 @@ const OfferSourcePage = () => {
       const payload = {
         name: newTemplate.name,
         alias: newTemplate.alias,
+        sourceType: newTemplate.sourceType,
         postback_url: newTemplate.postbackUrl,
         currency: newTemplate.currency,
         offer_url: newTemplate.offerUrl,
@@ -219,6 +285,13 @@ const OfferSourcePage = () => {
         token: newTemplate.token,
         description: newTemplate.description,
         role: newTemplate.role,
+        // API connection parameters
+        pixel_id: newTemplate.pixel_id,
+        api_key: newTemplate.api_key,
+        google_ads_id: newTemplate.google_ads_id,
+        conversion_id: newTemplate.conversion_id,
+        conversion_label: newTemplate.conversion_label,
+        default_event_name: newTemplate.default_event_name
       };
 
       if (editMode && selectedRowId) {
@@ -243,6 +316,7 @@ const OfferSourcePage = () => {
         name: "",
         alias: "",
         postbackUrl: "",
+        sourceType: "",
         currency: "USD",
         offerUrl: "",
         clickid: "",
@@ -251,19 +325,35 @@ const OfferSourcePage = () => {
         token: "",
         description: "",
         role: "",
+        pixel_id: "",
+        api_key: "",
+        google_ads_id: "",
+        conversion_id: "",
+        conversion_label: "",
+        default_event_name: "purchase"
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
     }
   };
 
+  const handleSourceTypeChange = (e) => {
+    const sourceType = e.target.value;
+    setNewTemplate({
+      ...newTemplate,
+      sourceType,
+      postbackUrl: generatePostbackTemplate(window.location.origin, sourceType)
+    });
+  };
+
   const handleCopyPostback = () => {
     navigator.clipboard.writeText(newTemplate.postbackUrl);
-    // Could add a snackbar notification here
+    // You could add a snackbar notification here
+    alert("Postback URL copied to clipboard!");
   };
 
   const handleGeneratePostbackTemplate = () => {
-    const template = generatePostbackTemplate();
+    const template = generatePostbackTemplate(window.location.origin, newTemplate.sourceType);
     setNewTemplate({
       ...newTemplate,
       postbackUrl: template
@@ -277,6 +367,21 @@ const OfferSourcePage = () => {
     });
   };
 
+  const handleOpenPostbackTest = (source) => {
+    setSelectedSource(source);
+    setTestPostbackData(prev => ({
+      ...prev,
+      source: source.source_name || ''
+    }));
+    setPostbackTestDialogOpen(true);
+  };
+
+  const handleClosePostbackTest = () => {
+    setPostbackTestDialogOpen(false);
+    setProcessedUrl('');
+    setTestResult(null);
+  };
+
   // Postback testing functions
   const handleTestDataChange = (e) => {
     const { name, value } = e.target;
@@ -287,7 +392,9 @@ const OfferSourcePage = () => {
   };
 
   const handleGenerateTestUrl = () => {
-    const url = parsePostbackUrl(newTemplate.postbackUrl, testPostbackData);
+    if (!selectedSource) return '';
+    
+    const url = parsePostbackUrl(selectedSource.postback, testPostbackData);
     setProcessedUrl(url);
     return url;
   };
@@ -299,21 +406,21 @@ const OfferSourcePage = () => {
     try {
       const url = handleGenerateTestUrl();
       
-      // This is just a simulation since we can't actually make the request due to CORS
-      // In a real app, you might use a proxy or server-side code to test the actual URL
-      setTimeout(() => {
-        setTestResult({
-          success: true,
-          message: 'Postback test completed! Note: This is a simulation. In production, the actual request would be sent.'
-        });
-        setIsTesting(false);
-      }, 1500);
+      // Actually send the test postback request
+      const response = await axios.get(url);
+      
+      setTestResult({
+        success: true,
+        message: 'Postback test completed successfully! Response: ' + JSON.stringify(response.data),
+        data: response.data
+      });
       
     } catch (error) {
       setTestResult({
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.response?.data?.error || error.message}`
       });
+    } finally {
       setIsTesting(false);
     }
   };
@@ -337,6 +444,7 @@ const OfferSourcePage = () => {
         </Box>
       ),
     },
+    { field: "source_type", headerName: "Type", width: 120 },
     {
       field: "Timestamp",
       headerName: "Timestamp",
@@ -349,15 +457,30 @@ const OfferSourcePage = () => {
       headerName: "Postback", 
       width: 180,
       renderCell: (params) => (
-        <Tooltip title={params.value || "No postback URL"}>
-          <Typography sx={{ 
-            overflow: "hidden", 
-            textOverflow: "ellipsis", 
-            whiteSpace: "nowrap" 
-          }}>
-            {params.value || "—"}
-          </Typography>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Tooltip title={params.value || "No postback URL"}>
+            <Typography sx={{ 
+              overflow: "hidden", 
+              textOverflow: "ellipsis", 
+              whiteSpace: "nowrap",
+              flexGrow: 1 
+            }}>
+              {params.value || "—"}
+            </Typography>
+          </Tooltip>
+          {params.value && (
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenPostbackTest(params.row);
+              }}
+              title="Test Postback"
+            >
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
       )
     },
     { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
@@ -474,6 +597,7 @@ const OfferSourcePage = () => {
                 name: "",
                 alias: "",
                 postbackUrl: "",
+                sourceType: "",
                 currency: "USD",
                 offerUrl: "",
                 clickid: "",
@@ -482,10 +606,16 @@ const OfferSourcePage = () => {
                 token: "",
                 description: "",
                 role: "",
+                pixel_id: "",
+                api_key: "",
+                google_ads_id: "",
+                conversion_id: "",
+                conversion_label: "",
+                default_event_name: "purchase"
               });
             }}
           >
-            Add New Template
+            Add New Source
           </Button>
         </Box>
 
@@ -561,14 +691,14 @@ const OfferSourcePage = () => {
             }}
           >
             <Typography variant="h6" gutterBottom>
-              {editMode ? "Edit Offer Source" : "Add New Template"}
+              {editMode ? "Edit Offer Source" : "Add New Source"}
             </Typography>
 
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
               <Tabs value={tabValue} onChange={handleTabChange}>
                 <Tab label="Basic Details" />
                 <Tab label="Postback URL" />
-                <Tab label="Test Postback" />
+                <Tab label="API Configuration" />
               </Tabs>
             </Box>
 
@@ -578,10 +708,10 @@ const OfferSourcePage = () => {
                 <Card sx={{ mb: 2 }}>
                   <CardContent>
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={12} sm={12}>
+                      <Grid item xs={12}>
                         <TextField
                           fullWidth
-                          label="Name *"
+                          label="Source Name *"
                           value={newTemplate.name}
                           onChange={(e) => {
                             const value = e.target.value;
@@ -593,13 +723,29 @@ const OfferSourcePage = () => {
                           }}
                         />
                       </Grid>
-                      <Grid item md={4} or lg={3}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
-                          label="Alias Offer Source"
+                          label="Alias"
                           value={newTemplate.alias}
                           disabled
                         />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Select
+                          fullWidth
+                          value={newTemplate.sourceType}
+                          onChange={handleSourceTypeChange}
+                          displayEmpty
+                          label="Source Type"
+                        >
+                          <MenuItem value="" disabled>Select Source Type</MenuItem>
+                          {source_types.map((type) => (
+                            <MenuItem key={type} value={type}>
+                              {type}
+                            </MenuItem>
+                          ))}
+                        </Select>
                       </Grid>
                     </Grid>
                     
@@ -665,7 +811,7 @@ const OfferSourcePage = () => {
                 {/* Additional Parameters */}
                 <Card>
                   <CardContent>
-                    <Typography variant="subtitle1">Additional Parameters</Typography>
+                  <Typography variant="subtitle1">Additional Parameters</Typography>
                     <Grid container spacing={2} sx={{ mt: 1 }}>
                       <Grid item xs={3}>
                         <TextField
@@ -728,7 +874,7 @@ const OfferSourcePage = () => {
                     Postback URL Configuration
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Create a postback URL template with dynamic parameters. Traffic sources will use this URL to notify you about conversions.
+                    Create a postback URL template with dynamic parameters. Traffic sources will use this URL to notify your system about conversions.
                   </Typography>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -777,154 +923,156 @@ const OfferSourcePage = () => {
                     fullWidth
                     disabled
                     value={parsePostbackUrl(newTemplate.postbackUrl, {
-                      clickid: 'abc123',
+                      click_id: 'abc123',
                       payout: '10.00',
                       revenue: '10.00',
-                      conversionid: '123456',
-                      offerid: '789',
-                      campaignid: 'camp_1',
+                      conversion_id: '123456',
+                      offer_id: '789',
+                      campaign_id: 'camp_1',
                       status: '1'
                     })}
                   />
                   
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    This URL will be used to receive conversion data from your traffic sources. Replace placeholders with macros from your traffic source.
+                    This URL will be used to receive conversion data from your traffic sources. The system will also automatically forward this data to the respective advertising platform (like Facebook or Google) based on your API configuration.
+                    
+                    {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'facebook' && (
+                      <Box mt={1}>
+                        <strong>Facebook-specific:</strong> Use {'{sub1}'} for user_id, {'{sub2}'} for email, and {'{sub3}'} for phone.
+                        These values will be automatically hashed for privacy as required by Facebook.
+                      </Box>
+                    )}
+                    
+                    {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'google' && (
+                      <Box mt={1}>
+                        <strong>Google-specific:</strong> Use {'{gclid}'} or {'{sub1}'} for Google Click ID for conversion tracking.
+                        For enhanced conversions, you can also use {'{sub2}'} for email and {'{sub3}'} for phone number.
+                      </Box>
+                    )}
                   </Typography>
                 </CardContent>
               </Card>
             )}
             
-            {/* Tab 3: Test Postback */}
+            {/* Tab 3: API Configuration */}
             {tabValue === 2 && (
               <Card sx={{ mb: 2 }}>
                 <CardContent>
                   <Typography variant="subtitle1" gutterBottom>
-                    Test Your Postback URL
+                    API Configuration
                   </Typography>
-                  
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Test your postback URL with sample data to ensure it works correctly.
+                    Configure API settings to automatically send conversion data to traffic sources.
                   </Typography>
-                  
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Current postback URL template:
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      disabled
-                      value={newTemplate.postbackUrl || 'No postback URL configured'}
-                      sx={{ mb: 2 }}
-                    />
-                  </Box>
                   
                   <Typography variant="subtitle2" gutterBottom>
-                    Test Parameters:
+                    Conversion Settings
                   </Typography>
                   
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Click ID"
-                        name="clickid"
-                        value={testPostbackData.clickid}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Payout"
-                        name="payout"
-                        value={testPostbackData.payout}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Revenue"
-                        name="revenue"
-                        value={testPostbackData.revenue}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Conversion ID"
-                        name="conversionid"
-                        value={testPostbackData.conversionid}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Offer ID"
-                        name="offerid"
-                        value={testPostbackData.offerid}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <TextField
-                        fullWidth
-                        label="Campaign ID"
-                        name="campaignid"
-                        value={testPostbackData.campaignid}
-                        onChange={handleTestDataChange}
-                      />
-                    </Grid>
-                  </Grid>
+                  <TextField
+                    fullWidth
+                    label="Default Event Name"
+                    value={newTemplate.default_event_name}
+                    onChange={(e) => setNewTemplate({ ...newTemplate, default_event_name: e.target.value })}
+                    sx={{ mb: 2 }}
+                    helperText="Default event name for conversions (e.g., purchase, lead, complete_registration)"
+                  />
                   
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <Button
-                      variant="outlined"
-                      onClick={handleGenerateTestUrl}
-                      disabled={!newTemplate.postbackUrl}
-                    >
-                      Generate Test URL
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleTestPostback}
-                      disabled={!newTemplate.postbackUrl || isTesting}
-                    >
-                      {isTesting ? 'Testing...' : 'Send Test Postback'}
-                    </Button>
+                  {/* Show Facebook-specific fields if the source type is Facebook */}
+                  {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'facebook' && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 3 }}>
+                        Facebook API Configuration
+                      </Typography>
+                      
+                      <TextField
+                        fullWidth
+                        label="Facebook Pixel ID"
+                        value={newTemplate.pixel_id}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, pixel_id: e.target.value })}
+                        sx={{ mb: 2 }}
+                        helperText="Your Facebook Pixel ID (required for Facebook Conversions API)"
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        label="Facebook API Access Token"
+                        value={newTemplate.api_key}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, api_key: e.target.value })}
+                        type="password"
+                        helperText="Your Facebook API Access Token (required for Facebook Conversions API)"
+                      />
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        These credentials will be used to send conversion data to Facebook Conversions API. 
+                        When a conversion occurs, the system will automatically hash personal data and send it to Facebook
+                        following their data privacy requirements.
+                      </Typography>
+                    </>
+                  )}
+                  
+                  {/* Show Google-specific fields if the source type is Google */}
+                  {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'google' && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 3 }}>
+                        Google Ads Configuration
+                      </Typography>
+                      
+                      <TextField
+                        fullWidth
+                        label="Google Ads Account ID"
+                        value={newTemplate.google_ads_id}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, google_ads_id: e.target.value })}
+                        sx={{ mb: 2 }}
+                        helperText="Your Google Ads Account ID without dashes (required for Google Ads conversion tracking)"
+                      />
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="Conversion ID"
+                            value={newTemplate.conversion_id}
+                            onChange={(e) => setNewTemplate({ ...newTemplate, conversion_id: e.target.value })}
+                            helperText="Google Ads Conversion ID"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="Conversion Label"
+                            value={newTemplate.conversion_label}
+                            onChange={(e) => setNewTemplate({ ...newTemplate, conversion_label: e.target.value })}
+                            helperText="Google Ads Conversion Label"
+                          />
+                        </Grid>
+                      </Grid>
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        These credentials will be used to send conversion data to Google Ads. 
+                        When a conversion occurs, the system will attempt to use the GCLID (Google Click ID) for tracking,
+                        or use enhanced conversions with hashed email and phone if available.
+                      </Typography>
+                    </>
+                  )}
+                  
+                  <Box sx={{ mt: 4, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" color="primary">
+                      How the Postback System Works
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      1. A user clicks on your ad and is redirected to your landing page with tracking parameters.
+                    </Typography>
+                    <Typography variant="body2">
+                      2. When a conversion occurs, the postback URL is pinged with conversion data.
+                    </Typography>
+                    <Typography variant="body2">
+                      3. Our system records the conversion and automatically forwards it to the respective traffic source (Facebook/Google).
+                    </Typography>
+                    <Typography variant="body2">
+                      4. No additional code or pixels needed - everything is handled server-side!
+                    </Typography>
                   </Box>
-                  
-                  {processedUrl && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Generated URL:
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        value={processedUrl}
-                        InputProps={{
-                          readOnly: true,
-                        }}
-                      />
-                    </Box>
-                  )}
-                  
-                  {testResult && (
-                    <Paper 
-                      sx={{ 
-                        p: 2, 
-                        bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
-                        borderRadius: 1
-                      }}
-                    >
-                      <Typography>
-                        {testResult.message}
-                      </Typography>
-                    </Paper>
-                  )}
                 </CardContent>
               </Card>
             )}
@@ -936,6 +1084,265 @@ const OfferSourcePage = () => {
               </Button>
               <Button variant="contained" color="primary" onClick={handleSaveTemplate}>
                 {editMode ? "Save Changes" : "Save Template"}
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+        
+        {/* Postback Testing Dialog */}
+        <Modal 
+          open={postbackTestDialogOpen} 
+          onClose={handleClosePostbackTest}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "800px",
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              overflow: "auto",
+              bgcolor: "background.paper",
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" gutterBottom>
+              Test Postback URL
+              {selectedSource && (
+                <Typography variant="subtitle2" color="text.secondary">
+                  {selectedSource.source_name} ({selectedSource.source_type})
+                </Typography>
+              )}
+            </Typography>
+            
+            {selectedSource && (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  Postback URL Template:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={selectedSource.postback || 'No postback URL configured'}
+                  InputProps={{ readOnly: true }}
+                  sx={{ mb: 3 }}
+                />
+                
+                <Typography variant="subtitle2" gutterBottom>
+                  Test Parameters:
+                </Typography>
+                
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Click ID"
+                      name="click_id"
+                      value={testPostbackData.click_id}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Payout"
+                      name="payout"
+                      value={testPostbackData.payout}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Revenue"
+                      name="revenue"
+                      value={testPostbackData.revenue}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Conversion ID"
+                      name="conversion_id"
+                      value={testPostbackData.conversion_id}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Offer ID"
+                      name="offer_id"
+                      value={testPostbackData.offer_id}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Event Name"
+                      name="event_name"
+                      value={testPostbackData.event_name}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  
+                  {/* Show Facebook-specific fields if the source is Facebook */}
+                  {selectedSource.source_type && selectedSource.source_type.toLowerCase() === 'facebook' && (
+                    <>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="User ID (sub1)"
+                          name="sub1"
+                          value={testPostbackData.sub1}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Email (sub2)"
+                          name="sub2"
+                          value={testPostbackData.sub2}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Phone (sub3)"
+                          name="sub3"
+                          value={testPostbackData.sub3}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                  
+                  {/* Show Google-specific fields if the source is Google */}
+                  {selectedSource.source_type && selectedSource.source_type.toLowerCase() === 'google' && (
+                    <>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="GCLID"
+                          name="gclid"
+                          value={testPostbackData.gclid}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Email (sub2)"
+                          name="sub2"
+                          value={testPostbackData.sub2}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Phone (sub3)"
+                          name="sub3"
+                          value={testPostbackData.sub3}
+                          onChange={handleTestDataChange}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                </Grid>
+                
+                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleGenerateTestUrl}
+                    disabled={!selectedSource.postback}
+                  >
+                    Generate Test URL
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleTestPostback}
+                    disabled={!selectedSource.postback || isTesting}
+                  >
+                    {isTesting ? 'Testing...' : 'Send Test Postback'}
+                  </Button>
+                </Box>
+                
+                {processedUrl && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Generated URL:
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={processedUrl}
+                      multiline
+                      rows={2}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                    />
+                  </Box>
+                )}
+                
+                {testResult && (
+                  <Paper 
+                    sx={{ 
+                      p: 2, 
+                      bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
+                      borderRadius: 1
+                    }}
+                  >
+                    <Typography>
+                      {testResult.message}
+                    </Typography>
+                    
+                    {testResult.success && testResult.data && (
+                      <Box mt={2}>
+                        <Typography variant="subtitle2">Response Data:</Typography>
+                        <pre style={{ whiteSpace: 'pre-wrap' }}>
+                          {JSON.stringify(testResult.data, null, 2)}
+                        </pre>
+                      </Box>
+                    )}
+                    
+                    {testResult.success && selectedSource.source_type && (
+                      <Box mt={2} p={2} bgcolor="#f5f5f5" borderRadius={1}>
+                        <Typography variant="subtitle2">
+                          {selectedSource.source_type} Conversion Details:
+                        </Typography>
+                        {selectedSource.source_type.toLowerCase() === 'facebook' && (
+                          <Typography variant="body2">
+                            This test conversion was sent to Facebook using your Pixel ID {selectedSource.pixel_id || '[Not configured]'}.
+                            {!selectedSource.pixel_id && ' Please configure your Facebook Pixel ID in the source settings.'}
+                            {!selectedSource.api_key && ' Please configure your Facebook API Key in the source settings.'}
+                          </Typography>
+                        )}
+                        {selectedSource.source_type.toLowerCase() === 'google' && (
+                          <Typography variant="body2">
+                            This test conversion was sent to Google Ads using Account ID {selectedSource.google_ads_id || '[Not configured]'}.
+                            {!selectedSource.google_ads_id && ' Please configure your Google Ads Account ID in the source settings.'}
+                            {!selectedSource.conversion_id && ' Please configure your Google Conversion ID in the source settings.'}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+                )}
+              </>
+            )}
+            
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
+              <Button onClick={handleClosePostbackTest}>
+                Close
               </Button>
             </Box>
           </Box>
