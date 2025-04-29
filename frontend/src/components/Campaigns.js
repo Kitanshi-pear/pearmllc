@@ -641,166 +641,168 @@ export default function CampaignsPage() {
   }, []);
 
   // Enhanced columns with proper data mapping
-  const columns = [
-    { field: "id", headerName: "ID", width: 70 },
-    { field: "name", headerName: "Campaign Name", flex: 1 },
-    {
-      field: "status",
-      headerName: "Status",
-      width: 120,
-      renderCell: (params) => (
-        <Chip 
-          label={params.value || "INACTIVE"} 
-          color={params.value === "ACTIVE" ? "success" : "default"} 
+ // Replace your entire columns definition with this updated version:
+
+const columns = [
+  { field: "id", headerName: "ID", width: 70 },
+  { field: "name", headerName: "Campaign Name", flex: 1 },
+  {
+    field: "status",
+    headerName: "Status",
+    width: 120,
+    renderCell: (params) => (
+      <Chip 
+        label={params.value || "INACTIVE"} 
+        color={params.value === "ACTIVE" ? "success" : "default"} 
+        size="small"
+      />
+    ),
+  },
+  {
+    field: "traffic_channel_id",
+    headerName: "Traffic Source",
+    width: 150,
+    valueGetter: (params) => {
+      // Check multiple possible paths to get traffic channel name with proper null checks
+      if (params.row?.traffic_channel_name?.channelName) {
+        return params.row.traffic_channel_name.channelName;
+      } else if (params.row?.traffic_channel_name) {
+        return params.row.traffic_channel_name;
+      } else {
+        // Try to get the traffic channel ID at minimum
+        return params.row?.traffic_channel_id ? `Source #${params.row.traffic_channel_id}` : "N/A";
+      }
+    }
+  },
+  { 
+    field: "costType", 
+    headerName: "Cost Type", 
+    width: 100,
+    valueGetter: (params) => params.row?.costType || "N/A"
+  },
+  { 
+    field: "costValue", 
+    headerName: "Cost", 
+    width: 80,
+    valueGetter: (params) => params.row?.costValue || 0,
+    valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
+  },
+  {
+    field: "clicks",
+    headerName: "Clicks",
+    width: 80,
+    valueGetter: (params) => {
+      const campaignMetrics = metrics[params.row?.id] || {};
+      return campaignMetrics.clicks || 0;
+    }
+  },
+  {
+    field: "conversions",
+    headerName: "Conversions",
+    width: 110,
+    valueGetter: (params) => {
+      const campaignMetrics = metrics[params.row?.id] || {};
+      return campaignMetrics.conversions || 0;
+    }
+  },
+  {
+    field: "cr",
+    headerName: "CR%",
+    width: 80,
+    valueGetter: (params) => {
+      const campaignMetrics = metrics[params.row?.id] || {};
+      const clicks = campaignMetrics.clicks || 0;
+      const conversions = campaignMetrics.conversions || 0;
+      return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+    },
+    valueFormatter: (params) => `${params.value}%`
+  },
+  {
+    field: "revenue",
+    headerName: "Revenue",
+    width: 100,
+    valueGetter: (params) => {
+      const campaignMetrics = metrics[params.row?.id] || {};
+      return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+    },
+    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+  },
+  {
+    field: "profit",
+    headerName: "Profit",
+    width: 100,
+    valueGetter: (params) => {
+      const campaignMetrics = metrics[params.row?.id] || {};
+      // Calculate profit if not directly available
+      if (campaignMetrics.profit !== undefined) {
+        return campaignMetrics.profit;
+      } else {
+        const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+        const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+        return revenue - cost;
+      }
+    },
+    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+  },
+  {
+    field: "offer_id",
+    headerName: "Offer",
+    width: 120,
+    valueGetter: (params) => {
+      // Find offer name from the offers list if available
+      const offerItem = offersList.find(
+        offer => offer.Serial_No === params.row?.offer_id
+      );
+      
+      if (offerItem) {
+        return offerItem.Offer_name;
+      } else {
+        return params.row?.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+      }
+    }
+  },
+  {
+    field: "actions",
+    headerName: "Actions",
+    width: 120,
+    renderCell: (params) => (
+      <Box display="flex">
+        <IconButton
           size="small"
-        />
-      ),
-    },
-    {
-      field: "traffic_channel_id",
-      headerName: "Traffic Source",
-      width: 150,
-      valueGetter: (params) => {
-        // Check multiple possible paths to get traffic channel name
-        if (params.row.traffic_channel_name?.channelName) {
-          return params.row.traffic_channel_name.channelName;
-        } else if (params.row.traffic_channel_name) {
-          return params.row.traffic_channel_name;
-        } else {
-          // Try to get the traffic channel ID at minimum
-          return `Source #${params.row.traffic_channel_id}` || "N/A";
-        }
-      }
-    },
-    { 
-      field: "costType", 
-      headerName: "Cost Type", 
-      width: 100,
-      valueGetter: (params) => params.row.costType || "N/A"
-    },
-    { 
-      field: "costValue", 
-      headerName: "Cost", 
-      width: 80,
-      valueGetter: (params) => params.row.costValue || 0,
-      valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
-    },
-    {
-      field: "clicks",
-      headerName: "Clicks",
-      width: 80,
-      valueGetter: (params) => {
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.clicks || 0;
-      }
-    },
-    {
-      field: "conversions",
-      headerName: "Conversions",
-      width: 110,
-      valueGetter: (params) => {
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.conversions || 0;
-      }
-    },
-    {
-      field: "cr",
-      headerName: "CR%",
-      width: 80,
-      valueGetter: (params) => {
-        const campaignMetrics = metrics[params.row.id] || {};
-        const clicks = campaignMetrics.clicks || 0;
-        const conversions = campaignMetrics.conversions || 0;
-        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
-      },
-      valueFormatter: (params) => `${params.value}%`
-    },
-    {
-      field: "revenue",
-      headerName: "Revenue",
-      width: 100,
-      valueGetter: (params) => {
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-      },
-      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
-    },
-    {
-      field: "profit",
-      headerName: "Profit",
-      width: 100,
-      valueGetter: (params) => {
-        const campaignMetrics = metrics[params.row.id] || {};
-        // Calculate profit if not directly available
-        if (campaignMetrics.profit !== undefined) {
-          return campaignMetrics.profit;
-        } else {
-          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
-          return revenue - cost;
-        }
-      },
-      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
-    },
-    {
-      field: "offer_id",
-      headerName: "Offer",
-      width: 120,
-      valueGetter: (params) => {
-        // Find offer name from the offers list if available
-        const offerItem = offersList.find(
-          offer => offer.Serial_No === params.row.offer_id
-        );
-        
-        if (offerItem) {
-          return offerItem.Offer_name;
-        } else {
-          return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
-        }
-      }
-    },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 120,
-      renderCell: (params) => (
-        <Box display="flex">
-          <IconButton
-            size="small"
-            onClick={() => handleEditClick(params.row)}
-            title="Edit Campaign"
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-              // Function to copy tracking URL
-              const domain = params.row.domain?.url || 
-                            (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                            "yourdomain.com";
-              const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
-              navigator.clipboard.writeText(trackingUrl);
-              setSnackbarMessage("Tracking URL copied to clipboard!");
-              setSnackbarOpen(true);
-            }}
-            title="Copy Tracking URL"
-          >
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-              window.open(`/campaigns/${params.row.id}`, '_blank');
-            }}
-            title="View Campaign Details"
-          >
-            <LaunchIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ];
+          onClick={() => handleEditClick(params.row)}
+          title="Edit Campaign"
+        >
+          <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={() => {
+            // Function to copy tracking URL
+            const domain = params.row?.domain?.url || 
+                          (params.row?.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                          "yourdomain.com";
+            const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row?.id}&tc=${params.row?.traffic_channel_id}`;
+            navigator.clipboard.writeText(trackingUrl);
+            setSnackbarMessage("Tracking URL copied to clipboard!");
+            setSnackbarOpen(true);
+          }}
+          title="Copy Tracking URL"
+        >
+          <ContentCopyIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={() => {
+            window.open(`/campaigns/${params.row?.id}`, '_blank');
+          }}
+          title="View Campaign Details"
+        >
+          <LaunchIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    ),
+  },
+];
 
   // Improved campaign fetching with better endpoint targeting
   const fetchCampaigns = () => {

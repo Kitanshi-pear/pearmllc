@@ -139,37 +139,37 @@ const TrafficChannels = () => {
       headerName: 'Clicks',
       type: 'number',
       width: 90,
-      valueFormatter: (params) => formatNumber(params.value, 0),
+      valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
     },
     {
       field: 'conversions',
       headerName: 'Conversions',
       type: 'number',
       width: 120,
-      valueFormatter: (params) => formatNumber(params.value, 0),
+      valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
     },
     {
       field: 'revenue',
       headerName: 'Revenue',
       type: 'number',
       width: 120,
-      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
     },
     {
       field: 'cost',
       headerName: 'Cost',
       type: 'number',
       width: 120,
-      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
     },
     {
       field: 'profit',
       headerName: 'Profit',
       type: 'number',
       width: 120,
-      valueFormatter: (params) => `$${formatNumber(params.value)}`,
+      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
       cellClassName: (params) => {
-        if (params.value == null) {
+        if (params.value == null || params.value === undefined) {
           return '';
         }
         return params.value >= 0 ? 'profit-positive' : 'profit-negative';
@@ -180,9 +180,9 @@ const TrafficChannels = () => {
       headerName: 'ROI',
       type: 'number',
       width: 90,
-      valueFormatter: (params) => formatPercent(params.value),
+      valueFormatter: (params) => params?.value !== undefined ? formatPercent(params.value) : "0%",
       cellClassName: (params) => {
-        if (params.value == null) {
+        if (params.value == null || params.value === undefined) {
           return '';
         }
         return params.value >= 0 ? 'profit-positive' : 'profit-negative';
@@ -303,8 +303,19 @@ const TrafficChannels = () => {
         }
       });
       
+      // Ensure that all rows have the expected properties, even if they're null
+      const processedData = response.data.map(row => ({
+        ...row,
+        clicks: row.clicks ?? 0,
+        conversions: row.conversions ?? 0,
+        revenue: row.revenue ?? 0,
+        cost: row.cost ?? 0,
+        profit: row.profit ?? 0,
+        roi: row.roi ?? 0
+      }));
+      
       // Set the rows with metrics data already included from the backend
-      setRows(response.data);
+      setRows(processedData);
       
       // Check auth status - keeping the original endpoint structure for this call
       const authResponse = await axios.get(`${API_URL}/trafficChannels/authStatus`);
