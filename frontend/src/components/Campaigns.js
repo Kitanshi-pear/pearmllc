@@ -47,7 +47,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [offersList, setOffersList] = useState([]);
-const [offerSelected, setOfferSelected] = useState("");
+  const [offerSelected, setOfferSelected] = useState(editMode ? campaignData.offer_id || "" : "");
 
   const selectedDomain = domains.find(d => d.id === trackingDomain);
 
@@ -56,7 +56,7 @@ const [offerSelected, setOfferSelected] = useState("");
       setLoading(true);
       
       // Fetch traffic channels
-      fetch(`${API_URL}/api/traffic`)
+      fetch(`${API_URL}/api/traffic/trafficChannels`)
         .then((res) => res.json())
         .then((data) => {
           // Ensure data is an array
@@ -142,133 +142,131 @@ const [offerSelected, setOfferSelected] = useState("");
     }
   }, [selectedDomain, trafficChannel, editMode, campaignData]);
 
-  // Modified handleSubmit function in CampaignModal component
-// Modified handleSubmit function in CampaignModal component to correctly save to the API
-const handleSubmit = async () => {
-  setSubmitError("");
-  
-  // Validate required fields
-  if (!campaignName || !trafficChannel || !trackingDomain) {
-    setSubmitError("Campaign name, traffic channel, and tracking domain are required");
-    return;
-  }
-
-  // If not direct linking, require a lander
-  if (!isDirectLinking && !lander) {
-    setSubmitError("Please select a landing page or enable direct linking");
-    return;
-  }
-  
-  const campaignPayload = {
-    name: campaignName,
-    traffic_channel_id: trafficChannel,
-    domain_id: trackingDomain,
-    costType,
-    costValue: parseFloat(costValue) || 0,
-    tags,
-    offer_id: offerSelected, // Use the selected offer ID from state
-    offerWeight: parseInt(offerWeight) || 100,
-    autoOptimize,
-    isDirectLinking,
-    lander_id: isDirectLinking ? null : lander,
-    status: "ACTIVE"
-  };
-
-  try {
-    console.log("Submitting campaign with payload:", campaignPayload);
+  // Modified handleSubmit function to correctly save to the API
+  const handleSubmit = async () => {
+    setSubmitError("");
     
-    let res;
-    if (editMode) {
-      // For editing a campaign
-      const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
-      console.log("Making PUT request to:", editUrl);
-      res = await axios.put(editUrl, campaignPayload);
-      console.log("Successfully updated campaign:", res.data);
-      onClose(res.data);
-    } else {
-      // For creating a new campaign - try the correct endpoint
-      const createUrl = `${API_URL}/api/campaigns`; // Most likely correct endpoint
-      console.log("Making POST request to:", createUrl);
+    // Validate required fields
+    if (!campaignName || !trafficChannel || !trackingDomain) {
+      setSubmitError("Campaign name, traffic channel, and tracking domain are required");
+      return;
+    }
+
+    // If not direct linking, require a lander
+    if (!isDirectLinking && !lander) {
+      setSubmitError("Please select a landing page or enable direct linking");
+      return;
+    }
+    
+    const campaignPayload = {
+      name: campaignName,
+      traffic_channel_id: trafficChannel,
+      domain_id: trackingDomain,
+      costType,
+      costValue: parseFloat(costValue) || 0,
+      tags,
+      offer_id: offerSelected, // Use the selected offer ID from state
+      offerWeight: parseInt(offerWeight) || 100,
+      autoOptimize,
+      isDirectLinking,
+      lander_id: isDirectLinking ? null : lander,
+      status: "ACTIVE"
+    };
+
+    try {
+      console.log("Submitting campaign with payload:", campaignPayload);
       
-      try {
-        res = await axios.post(createUrl, campaignPayload);
-        console.log("Successfully created campaign:", res.data);
-        onCreate(res.data);
-        onClose();
-      } catch (createError) {
-        console.error("Error with first endpoint attempt:", createError);
+      let res;
+      if (editMode) {
+        // For editing a campaign
+        const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+        console.log("Making PUT request to:", editUrl);
+        res = await axios.put(editUrl, campaignPayload);
+        console.log("Successfully updated campaign:", res.data);
+        onClose(res.data);
+      } else {
+        // For creating a new campaign - try the correct endpoint
+        const createUrl = `${API_URL}/api/campaigns`; // Most likely correct endpoint
+        console.log("Making POST request to:", createUrl);
         
-        // Try another endpoint pattern
         try {
-          const altUrl = `${API_URL}/api/campaigns/create`;
-          console.log("Trying alternate endpoint:", altUrl);
-          res = await axios.post(altUrl, campaignPayload);
-          console.log("Successfully created campaign with alternate endpoint:", res.data);
+          res = await axios.post(createUrl, campaignPayload);
+          console.log("Successfully created campaign:", res.data);
           onCreate(res.data);
           onClose();
-        } catch (altError) {
-          console.error("Error with second endpoint attempt:", altError);
+        } catch (createError) {
+          console.error("Error with first endpoint attempt:", createError);
           
-          // Try one more endpoint pattern
+          // Try another endpoint pattern
           try {
-            const lastUrl = `${API_URL}/api/campaign`;
-            console.log("Trying final endpoint:", lastUrl);
-            res = await axios.post(lastUrl, campaignPayload);
-            console.log("Successfully created campaign with final endpoint:", res.data);
+            const altUrl = `${API_URL}/api/campaigns/create`;
+            console.log("Trying alternate endpoint:", altUrl);
+            res = await axios.post(altUrl, campaignPayload);
+            console.log("Successfully created campaign with alternate endpoint:", res.data);
             onCreate(res.data);
             onClose();
-          } catch (finalError) {
-            console.error("All campaign creation attempts failed:", finalError);
-            throw new Error("Failed to create campaign after trying multiple endpoints");
+          } catch (altError) {
+            console.error("Error with second endpoint attempt:", altError);
+            
+            // Try one more endpoint pattern
+            try {
+              const lastUrl = `${API_URL}/api/campaign`;
+              console.log("Trying final endpoint:", lastUrl);
+              res = await axios.post(lastUrl, campaignPayload);
+              console.log("Successfully created campaign with final endpoint:", res.data);
+              onCreate(res.data);
+              onClose();
+            } catch (finalError) {
+              console.error("All campaign creation attempts failed:", finalError);
+              throw new Error("Failed to create campaign after trying multiple endpoints");
+            }
           }
         }
       }
-    }
 
-    // Reset form after submission
-    if (!editMode) {
-      setCampaignName("");
-      setTrafficChannel("");
-      setTrackingDomain("");
-      setCostType("CPC");
-      setCostValue("0");
-      setTags([]);
-      setTagInput("");
-      setOffer("");
-      setOfferWeight("100");
-      setAutoOptimize(false);
-      setIsDirectLinking(false);
-      setLander("");
-      setOfferSelected("");
-    }
-  } catch (error) {
-    console.error("Error saving campaign:", error);
-    
-    // Enhanced error logging
-    if (error.response) {
-      console.error("Response data:", error.response.data);
-      console.error("Response status:", error.response.status);
-      
-      // Provide more helpful error messages based on status codes
-      if (error.response.status === 400) {
-        setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
-      } else if (error.response.status === 401 || error.response.status === 403) {
-        setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
-      } else if (error.response.status === 404) {
-        setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
-      } else {
-        setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+      // Reset form after submission
+      if (!editMode) {
+        setCampaignName("");
+        setTrafficChannel("");
+        setTrackingDomain("");
+        setCostType("CPC");
+        setCostValue("0");
+        setTags([]);
+        setTagInput("");
+        setOffer("");
+        setOfferWeight("100");
+        setAutoOptimize(false);
+        setIsDirectLinking(false);
+        setLander("");
+        setOfferSelected("");
       }
-    } else if (error.request) {
-      console.error("Request made but no response received:", error.request);
-      setSubmitError("No response received from server. Please check your network connection.");
-    } else {
-      console.error("Error setting up request:", error.message);
-      setSubmitError(`Request error: ${error.message}`);
+    } catch (error) {
+      console.error("Error saving campaign:", error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        
+        // Provide more helpful error messages based on status codes
+        if (error.response.status === 400) {
+          setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
+        } else if (error.response.status === 401 || error.response.status === 403) {
+          setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
+        } else if (error.response.status === 404) {
+          setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
+        } else {
+          setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+        }
+      } else if (error.request) {
+        console.error("Request made but no response received:", error.request);
+        setSubmitError("No response received from server. Please check your network connection.");
+      } else {
+        console.error("Error setting up request:", error.message);
+        setSubmitError(`Request error: ${error.message}`);
+      }
     }
-  }
-};
-
+  };
 
   const handleAddTag = () => {
     if (tagInput && !tags.includes(tagInput)) {
@@ -584,247 +582,286 @@ export default function CampaignsPage() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [domains, setDomains] = useState([]);
+  const [offersList, setOffersList] = useState([]); // Added offersList state
+
+  // Fetch offers when component mounts
+  useEffect(() => {
+    // Fetch offers
+    fetch(`${API_URL}/api/offers`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setOffersList(data);
+        } else {
+          console.error("Offers data is not an array:", data);
+          setOffersList([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching offers:', err);
+        setOffersList([]);
+      });
+      
+    // Fetch domains for tracking URL generation
+    fetch(`${API_URL}/api/domains`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const cleaned = data.map(domain => ({
+            id: domain.id,
+            url: domain.url.replace(/^https?:\/\//, '')
+          }));
+          setDomains(cleaned);
+        } else {
+          console.error("Domains data is not an array:", data);
+          setDomains([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching domains:', err);
+        setDomains([]);
+      });
+  }, []);
 
   // Enhanced columns with proper data mapping
-  // Enhanced columns with proper data mapping
-const columns = [
-  { field: "id", headerName: "ID", width: 70 },
-  { field: "name", headerName: "Campaign Name", flex: 1 },
-  {
-    field: "status",
-    headerName: "Status",
-    width: 120,
-    renderCell: (params) => (
-      <Chip 
-        label={params.value || "INACTIVE"} 
-        color={params.value === "ACTIVE" ? "success" : "default"} 
-        size="small"
-      />
-    ),
-  },
-  {
-    field: "traffic_channel_id",
-    headerName: "Traffic Source",
-    width: 150,
-    valueGetter: (params) => {
-      // Check multiple possible paths to get traffic channel name
-      if (params.row.traffic_channel?.channelName) {
-        return params.row.traffic_channel.channelName;
-      } else if (params.row.traffic_channel_name) {
-        return params.row.traffic_channel_name;
-      } else {
-        // Try to get the traffic channel ID at minimum
-        return `Source #${params.row.traffic_channel_id}` || "N/A";
-      }
-    }
-  },
-  { 
-    field: "costType", 
-    headerName: "Cost Type", 
-    width: 100,
-    valueGetter: (params) => params.row.costType || "N/A"
-  },
-  { 
-    field: "costValue", 
-    headerName: "Cost", 
-    width: 80,
-    valueGetter: (params) => params.row.costValue || 0,
-    valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
-  },
-  {
-    field: "clicks",
-    headerName: "Clicks",
-    width: 80,
-    valueGetter: (params) => {
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.clicks || 0;
-    }
-  },
-  {
-    field: "conversions",
-    headerName: "Conversions",
-    width: 110,
-    valueGetter: (params) => {
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.conversions || 0;
-    }
-  },
-  {
-    field: "cr",
-    headerName: "CR%",
-    width: 80,
-    valueGetter: (params) => {
-      const campaignMetrics = metrics[params.row.id] || {};
-      const clicks = campaignMetrics.clicks || 0;
-      const conversions = campaignMetrics.conversions || 0;
-      return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+  const columns = [
+    { field: "id", headerName: "ID", width: 70 },
+    { field: "name", headerName: "Campaign Name", flex: 1 },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 120,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || "INACTIVE"} 
+          color={params.value === "ACTIVE" ? "success" : "default"} 
+          size="small"
+        />
+      ),
     },
-    valueFormatter: (params) => `${params.value}%`
-  },
-  {
-    field: "revenue",
-    headerName: "Revenue",
-    width: 100,
-    valueGetter: (params) => {
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-    },
-    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
-  },
-  {
-    field: "profit",
-    headerName: "Profit",
-    width: 100,
-    valueGetter: (params) => {
-      const campaignMetrics = metrics[params.row.id] || {};
-      // Calculate profit if not directly available
-      if (campaignMetrics.profit !== undefined) {
-        return campaignMetrics.profit;
-      } else {
-        const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-        const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
-        return revenue - cost;
+    {
+      field: "traffic_channel_id",
+      headerName: "Traffic Source",
+      width: 150,
+      valueGetter: (params) => {
+        // Check multiple possible paths to get traffic channel name
+        if (params.row.traffic_channel?.channelName) {
+          return params.row.traffic_channel.channelName;
+        } else if (params.row.traffic_channel_name) {
+          return params.row.traffic_channel_name;
+        } else {
+          // Try to get the traffic channel ID at minimum
+          return `Source #${params.row.traffic_channel_id}` || "N/A";
+        }
       }
     },
-    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
-  },
-  {
-    field: "offer_id",
-    headerName: "Offer",
-    width: 120,
-    valueGetter: (params) => {
-      // Find offer name from the offers list if available
-      const offerItem = offersList.find(
-        offer => offer.Serial_No === params.row.offer_id
-      );
-      
-      if (offerItem) {
-        return offerItem.Offer_name;
-      } else {
-        return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+    { 
+      field: "costType", 
+      headerName: "Cost Type", 
+      width: 100,
+      valueGetter: (params) => params.row.costType || "N/A"
+    },
+    { 
+      field: "costValue", 
+      headerName: "Cost", 
+      width: 80,
+      valueGetter: (params) => params.row.costValue || 0,
+      valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
+    },
+    {
+      field: "clicks",
+      headerName: "Clicks",
+      width: 80,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.clicks || 0;
       }
-    }
-  },
-  {
-    field: "actions",
-    headerName: "Actions",
-    width: 120,
-    renderCell: (params) => (
-      <Box display="flex">
-        <IconButton
-          size="small"
-          onClick={() => handleEditClick(params.row)}
-          title="Edit Campaign"
-        >
-          <EditIcon fontSize="small" />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={() => {
-            // Function to copy tracking URL
-            const domain = params.row.domain?.url || 
-                           (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                           "yourdomain.com";
-            const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
-            navigator.clipboard.writeText(trackingUrl);
-            setSnackbarMessage("Tracking URL copied to clipboard!");
-            setSnackbarOpen(true);
-          }}
-          title="Copy Tracking URL"
-        >
-          <ContentCopyIcon fontSize="small" />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={() => {
-            window.open(`/campaigns/${params.row.id}`, '_blank');
-          }}
-          title="View Campaign Details"
-        >
-          <LaunchIcon fontSize="small" />
-        </IconButton>
-      </Box>
-    ),
-  },
-];
-  // Improved campaign fetching with better error handling
+    },
+    {
+      field: "conversions",
+      headerName: "Conversions",
+      width: 110,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.conversions || 0;
+      }
+    },
+    {
+      field: "cr",
+      headerName: "CR%",
+      width: 80,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        const clicks = campaignMetrics.clicks || 0;
+        const conversions = campaignMetrics.conversions || 0;
+        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+      },
+      valueFormatter: (params) => `${params.value}%`
+    },
+    {
+      field: "revenue",
+      headerName: "Revenue",
+      width: 100,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+      },
+      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    },
+    {
+      field: "profit",
+      headerName: "Profit",
+      width: 100,
+      valueGetter: (params) => {
+        const campaignMetrics = metrics[params.row.id] || {};
+        // Calculate profit if not directly available
+        if (campaignMetrics.profit !== undefined) {
+          return campaignMetrics.profit;
+        } else {
+          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+          return revenue - cost;
+        }
+      },
+      valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    },
+    {
+      field: "offer_id",
+      headerName: "Offer",
+      width: 120,
+      valueGetter: (params) => {
+        // Find offer name from the offers list if available
+        const offerItem = offersList.find(
+          offer => offer.Serial_No === params.row.offer_id
+        );
+        
+        if (offerItem) {
+          return offerItem.Offer_name;
+        } else {
+          return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+        }
+      }
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      renderCell: (params) => (
+        <Box display="flex">
+          <IconButton
+            size="small"
+            onClick={() => handleEditClick(params.row)}
+            title="Edit Campaign"
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              // Function to copy tracking URL
+              const domain = params.row.domain?.url || 
+                            (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                            "yourdomain.com";
+              const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
+              navigator.clipboard.writeText(trackingUrl);
+              setSnackbarMessage("Tracking URL copied to clipboard!");
+              setSnackbarOpen(true);
+            }}
+            title="Copy Tracking URL"
+          >
+            <ContentCopyIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              window.open(`/campaigns/${params.row.id}`, '_blank');
+            }}
+            title="View Campaign Details"
+          >
+            <LaunchIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ),
+    },
+  ];
+
   // Improved campaign fetching with better endpoint targeting
-const fetchCampaigns = () => {
-  setLoading(true);
-  
-  // Use the proper API endpoint for campaigns
-  console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
-  
-  axios.get(`${API_URL}/api/campaigns`)
-    .then((res) => {
-      console.log("Campaign data received:", res.data);
-      
-      // Check if res.data is an array, if not, try to convert it
-      let campaignsData = res.data;
-      if (!Array.isArray(campaignsData)) {
-        // If it's an object with a data property that's an array
-        if (res.data && Array.isArray(res.data.data)) {
-          campaignsData = res.data.data;
-        } 
-        // If it's an object with a campaigns property that's an array
-        else if (res.data && Array.isArray(res.data.campaigns)) {
-          campaignsData = res.data.campaigns;
+  const fetchCampaigns = () => {
+    setLoading(true);
+    
+    // Use the proper API endpoint for campaigns
+    console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
+    
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => {
+        console.log("Campaign data received:", res.data);
+        
+        // Check if res.data is an array, if not, try to convert it
+        let campaignsData = res.data;
+        if (!Array.isArray(campaignsData)) {
+          // If it's an object with a data property that's an array
+          if (res.data && Array.isArray(res.data.data)) {
+            campaignsData = res.data.data;
+          } 
+          // If it's an object with a campaigns property that's an array
+          else if (res.data && Array.isArray(res.data.campaigns)) {
+            campaignsData = res.data.campaigns;
+          }
+          // If it's just a single object
+          else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+            campaignsData = [res.data];
+          } 
+          // Last resort, create an empty array
+          else {
+            campaignsData = [];
+            console.warn("Received unexpected data structure:", res.data);
+          }
         }
-        // If it's just a single object
-        else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-          campaignsData = [res.data];
-        } 
-        // Last resort, create an empty array
-        else {
-          campaignsData = [];
-          console.warn("Received unexpected data structure:", res.data);
-        }
-      }
-      
-      const campaignsWithIds = campaignsData.map((campaign) => ({
-        ...campaign,
-        id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
-      }));
-      
-      setCampaigns(campaignsWithIds);
-      
-      // Fetch metrics for these campaigns
-      if (campaignsWithIds.length > 0) {
-        console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
-        fetchMetrics(campaignsWithIds.map(c => c.id));
-      } else {
-        setLoading(false);
-      }
-    })
-    .catch((err) => {
-      console.error("Error fetching campaigns:", err);
-      
-      // Try alternative endpoints
-      tryAlternativeEndpoints();
-    });
-};
-
-// Function to try alternative API endpoints
-const tryAlternativeEndpoints = () => {
-  console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
-  
-  axios.get(`${API_URL}/api/campaign`)
-    .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
-    .catch((err) => {
-      console.log("Trying another alternative endpoint:", `${API_URL}/api/campaigns/list`);
-      
-      axios.get(`${API_URL}/api/campaigns/list`)
-        .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
-        .catch((altErr) => {
-          console.error("All campaign fetching attempts failed");
+        
+        const campaignsWithIds = campaignsData.map((campaign) => ({
+          ...campaign,
+          id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+        }));
+        
+        setCampaigns(campaignsWithIds);
+        
+        // Fetch metrics for these campaigns
+        if (campaignsWithIds.length > 0) {
+          console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
+          fetchMetrics(campaignsWithIds.map(c => c.id));
+        } else {
           setLoading(false);
-          setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
-          setSnackbarSeverity("error");
-          setSnackbarOpen(true);
-        });
-    });
-};
-  
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching campaigns:", err);
+        
+        // Try alternative endpoints
+        tryAlternativeEndpoints();
+      });
+  };
+
+  // Function to try alternative API endpoints
+  const tryAlternativeEndpoints = () => {
+    console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
+    
+    axios.get(`${API_URL}/api/campaign`)
+      .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
+      .catch((err) => {
+        console.log("Trying another alternative endpoint:", `${API_URL}/api/campaigns/list`);
+        
+        axios.get(`${API_URL}/api/campaigns/list`)
+          .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
+          .catch((altErr) => {
+            console.error("All campaign fetching attempts failed");
+            setLoading(false);
+            setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
+            setSnackbarSeverity("error");
+            setSnackbarOpen(true);
+          });
+      });
+  };
+    
   // Handle successful API response
   const handleSuccessfulResponse = (res, logMessage) => {
     console.log(logMessage, res.data);
