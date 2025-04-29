@@ -148,10 +148,23 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Get all traffic channels with metrics
+// Get all traffic channels with metrics - CORRECTED VERSION
 router.get("/", async (req, res) => {
     try {
         console.log("Fetching traffic channels...");
+        console.log(`Current environment: ${process.env.NODE_ENV}`);
+
+        // First verify DB connectivity with a simple query
+        try {
+            const channelCount = await TrafficChannel.count();
+            console.log(`Database connection verified. Total channels: ${channelCount}`);
+        } catch (dbError) {
+            console.error("❌ Database connection error:", dbError);
+            return res.status(500).json({ 
+                error: "Database connection failed", 
+                details: dbError.message 
+            });
+        }
 
         // Fetch all traffic channels
         const channels = await TrafficChannel.findAll({
@@ -162,6 +175,13 @@ router.get("/", async (req, res) => {
             ],
             order: [['id', 'ASC']],
         });
+        
+        console.log(`Successfully fetched ${channels.length} channels`);
+
+        // Return early if no channels found
+        if (channels.length === 0) {
+            return res.json([]);
+        }
 
         // Get date range for metrics (default to last 30 days)
         const endDate = new Date();
@@ -172,29 +192,65 @@ router.get("/", async (req, res) => {
         const formattedStartDate = startDate.toISOString().split('T')[0];
         const formattedEndDate = endDate.toISOString().split('T')[0];
 
-        // Get metrics for each channel
-        const metricsPromises = channels.map(channel => 
-            MetricsService.getAggregatedMetrics(
-                'traffic_channel', 
-                channel.id, 
-                formattedStartDate, 
-                formattedEndDate
-            )
-        );
-        
-        // Wait for all metrics to be fetched
-        const metrics = await Promise.all(metricsPromises);
+        // Get metrics for each channel - with error handling
+        let metrics = [];
+        try {
+            console.log("Fetching metrics for channels...");
+            
+            const metricsPromises = channels.map(channel => {
+                try {
+                    return MetricsService.getAggregatedMetrics(
+                        'traffic_channel', 
+                        channel.id, 
+                        formattedStartDate, 
+                        formattedEndDate
+                    ).catch(metricError => {
+                        console.error(`Error fetching metrics for channel ${channel.id}:`, metricError);
+                        // Return empty metrics instead of failing
+                        return {};
+                    });
+                } catch (promiseError) {
+                    console.error(`Error creating metric promise for channel ${channel.id}:`, promiseError);
+                    return Promise.resolve({});
+                }
+            });
+            
+            // Wait for all metrics to be fetched
+            metrics = await Promise.all(metricsPromises);
+            console.log("Successfully fetched metrics for all channels");
+        } catch (metricsError) {
+            console.error("❌ Error in metrics fetching process:", metricsError);
+            // Continue with empty metrics rather than failing
+            metrics = channels.map(() => ({}));
+        }
 
-        // Map channels with their metrics
-        const channelsWithMetrics = channels.map((channel, index) => ({
-            ...channel.toJSON(),
-            metrics: metrics[index]
-        }));
+        // Map channels with their metrics - with error handling
+        const channelsWithMetrics = channels.map((channel, index) => {
+            try {
+                return {
+                    ...channel.toJSON(),
+                    metrics: metrics[index] || {}
+                };
+            } catch (mappingError) {
+                console.error(`Error mapping channel at index ${index}:`, mappingError);
+                // Return a basic object if mapping fails
+                return {
+                    id: channel.id || 'unknown',
+                    channelName: channel.channelName || 'Error processing channel',
+                    metrics: {}
+                };
+            }
+        });
 
         res.json(channelsWithMetrics);
     } catch (error) {
         console.error("❌ Error fetching channels:", error);
-        res.status(500).json({ error: "Failed to fetch traffic channels" });
+        console.error("Error details:", error.message);
+        console.error("Stack trace:", error.stack);
+        res.status(500).json({ 
+            error: "Failed to fetch traffic channels",
+            details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+        });
     }
 });
 
@@ -222,102 +278,127 @@ router.get("/:id", async (req, res) => {
         const formattedStartDate = startDate.toISOString().split('T')[0];
         const formattedEndDate = endDate.toISOString().split('T')[0];
 
-        // Get channel metrics
-        let metrics;
-        if (dimension) {
-            // Get metrics breakdown by dimension
-            metrics = await MetricsService.getMetricsByDimension(
-                'traffic_channel',
-                channel.id,
-                dimension,
-                formattedStartDate,
-                formattedEndDate
-            );
-        } else {
-            // Get aggregated metrics
-            metrics = await MetricsService.getAggregatedMetrics(
-                'traffic_channel',
-                channel.id,
-                formattedStartDate,
-                formattedEndDate
-            );
+        // Get channel metrics - with error handling
+        let metrics = {};
+        try {
+            if (dimension) {
+                // Get metrics breakdown by dimension
+                metrics = await MetricsService.getMetricsByDimension(
+                    'traffic_channel',
+                    channel.id,
+                    dimension,
+                    formattedStartDate,
+                    formattedEndDate
+                );
+            } else {
+                // Get aggregated metrics
+                metrics = await MetricsService.getAggregatedMetrics(
+                    'traffic_channel',
+                    channel.id,
+                    formattedStartDate,
+                    formattedEndDate
+                );
+            }
+        } catch (metricsError) {
+            console.error(`Error fetching metrics for channel ${channel.id}:`, metricsError);
+            metrics = {}; // Continue with empty metrics
         }
 
         // Get campaigns associated with this traffic channel if requested
         let campaigns = [];
         if (include_campaigns === 'true') {
-            // Get campaigns that have clicks from this traffic channel
-            const campaignIds = await Click.findAll({
-                attributes: ['campaign_id'],
-                where: { traffic_channel_id: channel.id },
-                group: ['campaign_id'],
-                raw: true
-            });
-            
-            if (campaignIds.length > 0) {
-                // Get campaign details
-                campaigns = await Campaign.findAll({
-                    where: {
-                        id: campaignIds.map(c => c.campaign_id)
-                    },
-                    attributes: ['id', 'name', 'status']
+            try {
+                // Get campaigns that have clicks from this traffic channel
+                const campaignIds = await Click.findAll({
+                    attributes: ['campaign_id'],
+                    where: { traffic_channel_id: channel.id },
+                    group: ['campaign_id'],
+                    raw: true
                 });
                 
-                // Get metrics for each campaign
-                const campaignMetricsPromises = campaigns.map(campaign => 
-                    MetricsService.getAggregatedMetrics(
-                        'campaign',
-                        campaign.id,
-                        formattedStartDate,
-                        formattedEndDate
-                    )
-                );
-                
-                const campaignMetrics = await Promise.all(campaignMetricsPromises);
-                
-                // Map campaigns with their metrics
-                campaigns = campaigns.map((campaign, index) => ({
-                    ...campaign.toJSON(),
-                    metrics: campaignMetrics[index]
-                }));
+                if (campaignIds.length > 0) {
+                    // Get campaign details
+                    campaigns = await Campaign.findAll({
+                        where: {
+                            id: campaignIds.map(c => c.campaign_id)
+                        },
+                        attributes: ['id', 'name', 'status']
+                    });
+                    
+                    // Get metrics for each campaign - with error handling
+                    const campaignMetricsPromises = campaigns.map(campaign => 
+                        MetricsService.getAggregatedMetrics(
+                            'campaign',
+                            campaign.id,
+                            formattedStartDate,
+                            formattedEndDate
+                        ).catch(error => {
+                            console.error(`Error fetching metrics for campaign ${campaign.id}:`, error);
+                            return {};
+                        })
+                    );
+                    
+                    const campaignMetrics = await Promise.all(campaignMetricsPromises);
+                    
+                    // Map campaigns with their metrics
+                    campaigns = campaigns.map((campaign, index) => ({
+                        ...campaign.toJSON(),
+                        metrics: campaignMetrics[index] || {}
+                    }));
+                }
+            } catch (campaignsError) {
+                console.error(`Error fetching campaigns for channel ${channel.id}:`, campaignsError);
+                campaigns = []; // Continue with empty campaigns
             }
         }
 
         // Get macros associated with this traffic channel if requested
         let macros = [];
         if (include_macros === 'true') {
-            // Get a sample of the macros detected for this traffic channel
-            const sampleClicks = await Click.findAll({
-                where: { traffic_channel_id: channel.id },
-                limit: 10,
-                order: [['createdAt', 'DESC']],
-                attributes: ['id']
-            });
-            
-            if (sampleClicks.length > 0) {
-                const macroSamples = await Promise.all(
-                    sampleClicks.map(click => MacroService.getMacroValues(click.id))
-                );
-                
-                // Flatten and deduplicate sub parameters
-                const subParams = {};
-                macroSamples.forEach(sample => {
-                    for (let i = 1; i <= 23; i++) {
-                        const subKey = `sub${i}`;
-                        if (sample[subKey] && sample[subKey].length > 0) {
-                            if (!subParams[subKey]) {
-                                subParams[subKey] = new Set();
-                            }
-                            subParams[subKey].add(sample[subKey]);
-                        }
-                    }
+            try {
+                // Get a sample of the macros detected for this traffic channel
+                const sampleClicks = await Click.findAll({
+                    where: { traffic_channel_id: channel.id },
+                    limit: 10,
+                    order: [['createdAt', 'DESC']],
+                    attributes: ['id']
                 });
                 
-                // Convert to array format
-                macros = Object.entries(subParams).map(([key, values]) => ({
-                    name: key,
-                    samples: Array.from(values).slice(0, 5) // Show up to 5 samples
-                }));
+                if (sampleClicks.length > 0) {
+                    const macroSamplesPromises = sampleClicks.map(click => 
+                        MacroService.getMacroValues(click.id).catch(error => {
+                            console.error(`Error fetching macro values for click ${click.id}:`, error);
+                            return {};
+                        })
+                    );
+                    
+                    const macroSamples = await Promise.all(macroSamplesPromises);
+                    
+                    // Flatten and deduplicate sub parameters
+                    const subParams = {};
+                    macroSamples.forEach(sample => {
+                        if (!sample) return; // Skip if sample is undefined
+                        
+                        for (let i = 1; i <= 23; i++) {
+                            const subKey = `sub${i}`;
+                            if (sample[subKey] && sample[subKey].length > 0) {
+                                if (!subParams[subKey]) {
+                                    subParams[subKey] = new Set();
+                                }
+                                subParams[subKey].add(sample[subKey]);
+                            }
+                        }
+                    });
+                    
+                    // Convert to array format
+                    macros = Object.entries(subParams).map(([key, values]) => ({
+                        name: key,
+                        samples: Array.from(values).slice(0, 5) // Show up to 5 samples
+                    }));
+                }
+            } catch (macrosError) {
+                console.error(`Error fetching macros for channel ${channel.id}:`, macrosError);
+                macros = []; // Continue with empty macros
             }
         }
 
@@ -426,31 +507,42 @@ router.get('/:id/metrics', async (req, res) => {
         const formattedStartDate = startDate.toISOString().split('T')[0];
         const formattedEndDate = endDate.toISOString().split('T')[0];
         
-        // Get metrics by dimension
-        const metrics = await MetricsService.getMetricsByDimension(
-            'traffic_channel',
-            channel.id,
-            dimension,
-            formattedStartDate,
-            formattedEndDate
-        );
-        
-        // Filter by campaign if provided
-        let filteredMetrics = metrics;
-        if (campaign_id) {
-            // Get metrics for specific campaign + traffic channel combination
-            filteredMetrics = await MetricsService.getMetricsByDimension(
-                'campaign',
-                campaign_id,
+        // Get metrics by dimension - with error handling
+        let metrics = [];
+        try {
+            metrics = await MetricsService.getMetricsByDimension(
+                'traffic_channel',
+                channel.id,
                 dimension,
                 formattedStartDate,
                 formattedEndDate
             );
-            
-            // Filter to include only records that match this traffic channel
-            filteredMetrics = filteredMetrics.filter(metric => 
-                metric.traffic_channel_id === parseInt(channel.id)
-            );
+        } catch (metricsError) {
+            console.error(`Error fetching metrics for channel ${id}:`, metricsError);
+            metrics = []; // Continue with empty metrics
+        }
+        
+        // Filter by campaign if provided
+        let filteredMetrics = metrics;
+        if (campaign_id) {
+            try {
+                // Get metrics for specific campaign + traffic channel combination
+                filteredMetrics = await MetricsService.getMetricsByDimension(
+                    'campaign',
+                    campaign_id,
+                    dimension,
+                    formattedStartDate,
+                    formattedEndDate
+                );
+                
+                // Filter to include only records that match this traffic channel
+                filteredMetrics = filteredMetrics.filter(metric => 
+                    metric.traffic_channel_id === parseInt(channel.id)
+                );
+            } catch (campaignMetricsError) {
+                console.error(`Error fetching campaign metrics for campaign ${campaign_id}:`, campaignMetricsError);
+                filteredMetrics = []; // Continue with empty metrics
+            }
         }
         
         res.json(filteredMetrics);
@@ -562,7 +654,7 @@ router.get('/:id/macros', async (req, res) => {
             detectedMacros.push(...extractedMacros);
         }
         
-        // Get sub parameter samples
+        // Get sub parameter samples - with error handling
         let subSamples = {};
         if (recentClicks.length > 0) {
             for (const click of recentClicks) {
@@ -581,6 +673,7 @@ router.get('/:id/macros', async (req, res) => {
                     }
                 } catch (err) {
                     // Skip if macro values can't be retrieved for a click
+                    console.error(`Error retrieving macro values for click ${click.id}:`, err);
                     continue;
                 }
             }
