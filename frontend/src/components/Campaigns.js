@@ -56,7 +56,7 @@ const [offerSelected, setOfferSelected] = useState("");
       setLoading(true);
       
       // Fetch traffic channels
-      fetch(`${API_URL}/api/traffic/facebook`)
+      fetch(`${API_URL}/api/traffic`)
         .then((res) => res.json())
         .then((data) => {
           // Ensure data is an array
@@ -178,14 +178,14 @@ const handleSubmit = async () => {
     
     let res;
     if (editMode) {
-      const editUrl = `${API_URL}/${campaignData.id}`;
+      const editUrl = `${API_URL}/api/campaigns${campaignData.id}`;
       console.log("Making PUT request to:", editUrl);
       res = await axios.put(editUrl, campaignPayload);
       console.log("Successfully updated campaign:", res.data);
       onClose(res.data);
     } else {
       // Try the correct endpoint based on API structure
-      const createUrl = `${API_URL}`; // Use a create endpoint
+      const createUrl = `${API_URL}/api/campaigns`; // Use a create endpoint
       console.log("Making POST request to:", createUrl);
       
       try {
@@ -199,7 +199,7 @@ const handleSubmit = async () => {
         // Try another common endpoint pattern
         try {
           console.log("Trying alternate endpoint: /");
-          res = await axios.post(`${API_URL}/`, campaignPayload);
+          res = await axios.post(`${API_URL}/api/campaigns`, campaignPayload);
           console.log("Successfully created campaign with /:", res.data);
           onCreate(res.data);
           onClose();
@@ -207,7 +207,7 @@ const handleSubmit = async () => {
           // Try one more potential endpoint structure
           try {
             console.log("Trying second alternate endpoint: /");
-            res = await axios.post(`${API_URL}/`, campaignPayload);
+            res = await axios.post(`${API_URL}/api/campaigns`, campaignPayload);
             console.log("Successfully created campaign with /:", res.data);
             onCreate(res.data);
             onClose();
@@ -726,9 +726,9 @@ export default function CampaignsPage() {
   const fetchCampaigns = () => {
     setLoading(true);
     
-    console.log("Fetching campaigns from:", `${API_URL}/`);
+    console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
     
-    axios.get(`${API_URL}/`)
+    axios.get(`${API_URL}/api/campaigns`)
       .then((res) => {
         console.log("Campaign data received:", res.data);
         

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import Layout from "./Layout";
 import { Calendar, ArrowUp, ArrowDown, DollarSign, TrendingUp, RefreshCw } from "lucide-react";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
@@ -7,56 +6,99 @@ import { Bar, Line, Doughnut } from "react-chartjs-2";
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
-const Dashboard = () => {
+const DashboardLayout = ({ children }) => {
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <span className="font-bold text-xl text-indigo-600">MarketingIQ</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="bg-gray-100 p-2 rounded-full">
+                <Calendar size={20} className="text-gray-600" />
+              </button>
+              <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium">
+                MK
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {children}
+      </main>
+    </div>
+  );
+};
+
+export default function Dashboard() {
   // States for dynamic data
   const [dashboardData, setDashboardData] = useState({
-    adSpend: { today: 0, yesterday: 0, thisMonth: 0 },
-    revenue: { today: 0, yesterday: 0, thisMonth: 0 },
-    roas: { today: 0, yesterday: 0 },
-    campaignPerformance: [],
-    revenueData: [],
-    adSpendData: [],
-    dailyData: []
+    adSpend: { today: 14500, yesterday: 12800, thisMonth: 324500 },
+    revenue: { today: 31200, yesterday: 28900, thisMonth: 752000 },
+    roas: { today: 215.2, yesterday: 225.8 },
+    campaignPerformance: [
+      { name: "Summer Sale", value: 128000, conversions: 1250 },
+      { name: "New Customer", value: 95000, conversions: 820 },
+      { name: "Holiday Special", value: 74500, conversions: 650 },
+      { name: "Retargeting", value: 55200, conversions: 410 },
+      { name: "Product Launch", value: 47800, conversions: 320 }
+    ],
+    revenueData: [
+      { name: "Jan", value: 65000 },
+      { name: "Feb", value: 72000 },
+      { name: "Mar", value: 68000 },
+      { name: "Apr", value: 92000 },
+      { name: "May", value: 110000 },
+      { name: "Jun", value: 125000 },
+      { name: "Jul", value: 148000 },
+      { name: "Aug", value: 152000 }
+    ],
+    adSpendData: [
+      { name: "Jan", value: 32500 },
+      { name: "Feb", value: 36000 },
+      { name: "Mar", value: 34000 },
+      { name: "Apr", value: 41000 },
+      { name: "May", value: 47000 },
+      { name: "Jun", value: 54000 },
+      { name: "Jul", value: 62000 },
+      { name: "Aug", value: 64000 }
+    ],
+    dailyData: [
+      { name: "Mon", revenue: 18500, adSpend: 7400 },
+      { name: "Tue", revenue: 16200, adSpend: 6800 },
+      { name: "Wed", revenue: 17800, adSpend: 7200 },
+      { name: "Thu", revenue: 21500, adSpend: 8600 },
+      { name: "Fri", revenue: 24300, adSpend: 9750 },
+      { name: "Sat", revenue: 26700, adSpend: 10500 },
+      { name: "Sun", revenue: 22900, adSpend: 9200 }
+    ]
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("week");
   const [timeRange, setTimeRange] = useState("week"); // day, week, month, year
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch dashboard data based on the selected time range
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch data from your API endpoint
-        const response = await fetch(`/api/dashboard?timeRange=${timeRange}`);
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        setDashboardData(data);
-        setError(null);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, [timeRange, isRefreshing]);
-
   // Function to handle time range changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setTimeRange(tab);
+    // In a real application, this would trigger a new data fetch
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 800);
   };
 
   // Function to refresh data
   const refreshData = () => {
     setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 800);
   };
 
   // Calculate ROAS
@@ -69,7 +111,8 @@ const Dashboard = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
@@ -175,7 +218,7 @@ const Dashboard = () => {
         backgroundColor: chartTheme.backgroundColor[1],
         borderColor: chartTheme.borderColor[1],
         borderWidth: 1,
-        borderRadius: 4
+        borderRadius: 6
       },
       {
         label: 'Ad Spend',
@@ -183,7 +226,7 @@ const Dashboard = () => {
         backgroundColor: chartTheme.backgroundColor[0],
         borderColor: chartTheme.borderColor[0],
         borderWidth: 1,
-        borderRadius: 4
+        borderRadius: 6
       }
     ]
   };
@@ -235,7 +278,7 @@ const Dashboard = () => {
     ]
   };
 
-  // Doughnut chart options (for Campaign Performance)
+  // Doughnut chart options
   const doughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -273,44 +316,31 @@ const Dashboard = () => {
     }
   };
 
-  if (isLoading && !dashboardData.dailyData.length) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-screen">
-          <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
-            <p className="mt-4 text-gray-600">Loading dashboard data...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
-    <Layout>
-      <div className="bg-gray-50 min-h-screen p-4 lg:p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <DashboardLayout>
+      <div className="dashboard p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">Marketing Dashboard</h1>
-            <p className="text-gray-500 mt-1">Analytics and performance metrics</p>
+            <h1 className="dashboard-title text-3xl font-bold text-gray-800">Marketing Dashboard</h1>
+            <p className="text-gray-500 mt-1">Performance analytics for {timeRange === "today" ? "Today" : timeRange === "week" ? "This Week" : "This Month"}</p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex items-center bg-white rounded-lg shadow-sm p-1">
               <button 
-                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "today" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "today" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
                 onClick={() => handleTabChange("today")}
               >
                 Today
               </button>
               <button 
-                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "week" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "week" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
                 onClick={() => handleTabChange("week")}
               >
                 This Week
               </button>
               <button 
-                className={`px-3 py-2 text-sm rounded-md transition-all ${activeTab === "month" ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === "month" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
                 onClick={() => handleTabChange("month")}
               >
                 This Month
@@ -328,26 +358,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  Error loading data: {error}. Showing cached or sample data.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-500 hover:shadow-md transition duration-300">
+        <div className="dashboard-metrics grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="metric-box ad-spend bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-600 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Ad Spend</p>
@@ -357,26 +370,26 @@ const Dashboard = () => {
                     <>
                       <ArrowUp size={16} className="text-red-500 mr-1" />
                       <p className="text-sm text-red-500">
-                        {(((dashboardData.adSpend.today - dashboardData.adSpend.yesterday) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
+                        +{(((dashboardData.adSpend.today - dashboardData.adSpend.yesterday) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   ) : (
                     <>
                       <ArrowDown size={16} className="text-green-500 mr-1" />
                       <p className="text-sm text-green-500">
-                        {(((dashboardData.adSpend.yesterday - dashboardData.adSpend.today) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
+                        -{(((dashboardData.adSpend.yesterday - dashboardData.adSpend.today) / dashboardData.adSpend.yesterday) * 100).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   )}
                 </div>
               </div>
               <div className="bg-indigo-100 p-3 rounded-lg">
-                <DollarSign size={24} className="text-indigo-500" />
+                <DollarSign size={28} className="text-indigo-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500 hover:shadow-md transition duration-300">
+          <div className="metric-box revenue bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Revenue</p>
@@ -386,26 +399,26 @@ const Dashboard = () => {
                     <>
                       <ArrowUp size={16} className="text-green-500 mr-1" />
                       <p className="text-sm text-green-500">
-                        {(((dashboardData.revenue.today - dashboardData.revenue.yesterday) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
+                        +{(((dashboardData.revenue.today - dashboardData.revenue.yesterday) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   ) : (
                     <>
                       <ArrowDown size={16} className="text-red-500 mr-1" />
                       <p className="text-sm text-red-500">
-                        {(((dashboardData.revenue.yesterday - dashboardData.revenue.today) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
+                        -{(((dashboardData.revenue.yesterday - dashboardData.revenue.today) / dashboardData.revenue.yesterday) * 100).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   )}
                 </div>
               </div>
               <div className="bg-emerald-100 p-3 rounded-lg">
-                <DollarSign size={24} className="text-emerald-500" />
+                <DollarSign size={28} className="text-emerald-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 hover:shadow-md transition duration-300">
+          <div className="metric-box roas bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 hover:shadow-md transition duration-300">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">ROAS</p>
@@ -417,35 +430,35 @@ const Dashboard = () => {
                     <>
                       <ArrowUp size={16} className="text-green-500 mr-1" />
                       <p className="text-sm text-green-500">
-                        {(dashboardData.roas.today - dashboardData.roas.yesterday).toFixed(1)}% vs yesterday
+                        +{(dashboardData.roas.today - dashboardData.roas.yesterday).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   ) : (
                     <>
                       <ArrowDown size={16} className="text-red-500 mr-1" />
                       <p className="text-sm text-red-500">
-                        {(dashboardData.roas.yesterday - dashboardData.roas.today).toFixed(1)}% vs yesterday
+                        -{(dashboardData.roas.yesterday - dashboardData.roas.today).toFixed(1)}% vs yesterday
                       </p>
                     </>
                   )}
                 </div>
               </div>
               <div className="bg-amber-100 p-3 rounded-lg">
-                <TrendingUp size={24} className="text-amber-500" />
+                <TrendingUp size={28} className="text-amber-500" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Charts Section - Using Chart.js */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Revenue vs Ad Spend</h3>
-            <div className="h-64">
+            <h3 className="text-lg font-semibold text-gray-800 mb-6">Revenue vs Ad Spend</h3>
+            <div className="h-72">
               {dashboardData.dailyData.length > 0 ? (
                 <Bar data={revenueVsAdSpendData} options={chartOptions} />
               ) : (
-                <div className="flex justify-center items-center h-full">
+                <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
                   <p className="text-gray-500">No data available</p>
                 </div>
               )}
@@ -453,12 +466,12 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Campaign Performance</h3>
-            <div className="h-64">
+            <h3 className="text-lg font-semibold text-gray-800 mb-6">Campaign Performance</h3>
+            <div className="h-72">
               {dashboardData.campaignPerformance.length > 0 ? (
                 <Doughnut data={campaignPerformanceData} options={doughnutOptions} />
               ) : (
-                <div className="flex justify-center items-center h-full">
+                <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
                   <p className="text-gray-500">No data available</p>
                 </div>
               )}
@@ -467,13 +480,13 @@ const Dashboard = () => {
         </div>
 
         {/* Monthly Trend */}
-        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Trends</h3>
-          <div className="h-64">
+        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all mb-8">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6">Monthly Trends</h3>
+          <div className="h-80">
             {dashboardData.revenueData.length > 0 && dashboardData.adSpendData.length > 0 ? (
               <Line data={monthlyTrendsData} options={chartOptions} />
             ) : (
-              <div className="flex justify-center items-center h-full">
+              <div className="flex justify-center items-center h-full bg-gray-50 rounded-lg">
                 <p className="text-gray-500">No data available</p>
               </div>
             )}
@@ -481,62 +494,54 @@ const Dashboard = () => {
         </div>
 
         {/* Campaign Table */}
-        <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
-          <div className="flex justify-between items-center mb-4">
+        <div className="dashboard-tables table-box bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
+          <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-gray-800">Best Performing Campaigns</h3>
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">{dashboardData.campaignPerformance.length} campaigns</span>
+            <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{dashboardData.campaignPerformance.length} campaigns</span>
           </div>
           
-          {dashboardData.campaignPerformance.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tl-lg">Campaign</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Revenue</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Conversions</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">ROAS</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tr-lg">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {dashboardData.campaignPerformance.map((campaign, index) => {
-                    // Calculate adSpend as percentage of revenue (dynamic calculation)
-                    const adSpend = campaign.value * (0.3 + Math.random() * 0.3); // Random between 30-60% for demonstration
-                    const roas = calculateRoas(campaign.value, adSpend);
-                    return (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4 text-sm font-medium text-gray-900 whitespace-nowrap">{campaign.name}</td>
-                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{formatCurrency(campaign.value)}</td>
-                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{campaign.conversions.toLocaleString()}</td>
-                        <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{roas}%</td>
-                        <td className="py-4 px-4 text-sm whitespace-nowrap">
-                          <span className={`px-3 py-1 text-xs inline-flex items-center font-medium rounded-full ${
-                            roas > 200 ? 'bg-green-100 text-green-800' : 
-                            roas > 120 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
-                              roas > 200 ? 'bg-green-600' : 
-                              roas > 120 ? 'bg-amber-600' : 'bg-red-600'
-                            }`}></span>
-                            {roas > 200 ? 'Excellent' : roas > 120 ? 'Good' : 'Needs Improvement'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-32 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No campaign data available</p>
-            </div>
-          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tl-lg">Campaign</th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Revenue</th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Conversions</th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">ROAS</th>
+                  <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-tr-lg">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dashboardData.campaignPerformance.map((campaign, index) => {
+                  // Calculate adSpend as percentage of revenue (dynamic calculation)
+                  const adSpend = campaign.value * (0.3 + Math.random() * 0.3); // Random between 30-60% for demo
+                  const roas = calculateRoas(campaign.value, adSpend);
+                  return (
+                    <tr key={index} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-4 text-sm font-medium text-gray-900 whitespace-nowrap">{campaign.name}</td>
+                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{formatCurrency(campaign.value)}</td>
+                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{campaign.conversions.toLocaleString()}</td>
+                      <td className="py-4 px-4 text-sm text-gray-700 whitespace-nowrap">{roas}%</td>
+                      <td className="py-4 px-4 text-sm whitespace-nowrap">
+                        <span className={`px-3 py-1 text-xs inline-flex items-center font-medium rounded-full ${
+                          roas > 200 ? 'bg-green-100 text-green-800' : 
+                          roas > 120 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          <span className={`h-2 w-2 rounded-full mr-2 ${
+                            roas > 200 ? 'bg-green-600' : 
+                            roas > 120 ? 'bg-amber-600' : 'bg-red-600'
+                          }`}></span>
+                          {roas > 200 ? 'Excellent' : roas > 120 ? 'Good' : 'Needs Improvement'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </Layout>
+    </DashboardLayout>
   );
-};
-
-export default Dashboard;
+}
