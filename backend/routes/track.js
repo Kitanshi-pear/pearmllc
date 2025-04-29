@@ -372,6 +372,7 @@ router.get('/conversion', async (req, res) => {
 
 // API endpoint to get metrics
 // API endpoint to get metrics - completely revised for compatibility
+// Modify the metrics query in track.js
 router.get('/metrics', async (req, res) => {
   try {
     // Handle both unique_id and campaign_id (for backwards compatibility)
@@ -388,14 +389,41 @@ router.get('/metrics', async (req, res) => {
       include_hourly = false
     } = req.query;
     
-    // Build query conditions - use either unique_id or campaign_id
+    // Build query conditions - use campaign_id instead of unique_id
     const where = {};
     
-    if (unique_id) {
-      where.unique_id = unique_id;
-    } else if (campaign_id) {
-      // If frontend is using campaign_id instead of unique_id
-      where.unique_id = campaign_id;
+    if (unique_id || campaign_id) {
+      // Find the campaign first to get its ID
+      const campaignId = campaign_id || unique_id;
+      const campaign = await Campaigns.findOne({
+        where: { unique_id: campaignId }
+      });
+      
+      if (campaign) {
+        // Use campaign_id instead of unique_id for the Metrics table
+        where.campaign_id = campaign.id;
+      } else {
+        console.log(`Campaign not found for unique_id/campaign_id: ${campaignId}`);
+        // Return empty metrics data with zeros for all values if no campaign found
+        return res.json({
+          impressions: 0,
+          clicks: 0,
+          lpviews: 0,
+          lpclicks: 0,
+          conversions: 0,
+          total_revenue: 0,
+          total_cost: 0,
+          profit: 0,
+          ctr: 0,
+          cr: 0,
+          offer_cr: 0,
+          cpc: 0,
+          cpm: 0,
+          epc: 0,
+          lpepc: 0,
+          roi: 0
+        });
+      }
     }
     
     // Log the query parameters to help with debugging
@@ -467,7 +495,7 @@ router.get('/metrics', async (req, res) => {
     // Always include these default attributes
     const defaultAttributes = [
       'id',
-      'unique_id',
+      'campaign_id',
       'traffic_channel_id', 
       'date',
       'impressions',
@@ -503,7 +531,7 @@ router.get('/metrics', async (req, res) => {
     } else if (group_by === 'date') {
       queryOptions.attributes = [
         'date', 
-        'unique_id',
+        'campaign_id',
         'impressions',
         'clicks',
         'lpviews',
@@ -523,7 +551,7 @@ router.get('/metrics', async (req, res) => {
         'roi',
         'ctc'
       ];
-      queryOptions.group = ['date', 'unique_id'];
+      queryOptions.group = ['date', 'campaign_id'];
       queryOptions.order = [['date', 'ASC']];
     } else if (dimension === 'hour' && include_hourly) {
       queryOptions.attributes = [
@@ -736,16 +764,29 @@ router.get('/metrics', async (req, res) => {
 /**
  * Update metrics for various tracking events
  */
+/**
+ * Update metrics for various tracking events
+ */
 async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 0) {
   try {
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
     const hour = new Date().getHours();
     
-    // Find or create metrics record for campaign
+    // First, find the campaign to get its ID
+    const campaign = await Campaigns.findOne({
+      where: { unique_id: campaignId }
+    });
+    
+    if (!campaign) {
+      console.error(`❌ Campaign not found for unique_id: ${campaignId}`);
+      return;
+    }
+    
+    // Find or create metrics record for campaign using campaign_id
     let [campaignMetrics] = await Metrics.findOrCreate({
       where: {
-        unique_id: campaignId,
+        campaign_id: campaign.id, // Use campaign_id instead of unique_id
         date: today
       },
       defaults: {
@@ -780,7 +821,7 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
     // Find or create hourly metrics for campaign
     let [campaignHourlyMetrics] = await Metrics.findOrCreate({
       where: {
-        unique_id: campaignId,
+        campaign_id: campaign.id, // Use campaign_id instead of unique_id
         date: today,
         hour: hour
       },
@@ -888,7 +929,7 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
       // Also update combined campaign + traffic channel metrics
       let [combinedMetrics] = await Metrics.findOrCreate({
         where: {
-          unique_id: campaignId,
+          campaign_id: campaign.id, // Use campaign_id instead of unique_id
           traffic_channel_id: trafficChannelId,
           date: today
         },
@@ -928,7 +969,6 @@ async function updateMetrics(campaignId, trafficChannelId, eventType, revenue = 
     throw error;
   }
 }
-
 /**
  * Calculate derived metrics
  */
