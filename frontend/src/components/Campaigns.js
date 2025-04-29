@@ -662,8 +662,8 @@ export default function CampaignsPage() {
       width: 150,
       valueGetter: (params) => {
         // Check multiple possible paths to get traffic channel name
-        if (params.row.traffic_channel?.channelName) {
-          return params.row.traffic_channel.channelName;
+        if (params.row.traffic_channel_name?.channelName) {
+          return params.row.traffic_channel_name.channelName;
         } else if (params.row.traffic_channel_name) {
           return params.row.traffic_channel_name;
         } else {
