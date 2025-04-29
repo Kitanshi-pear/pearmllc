@@ -103,7 +103,7 @@ const routeConfig = [
   { path: 'domains', mount: '/api/domains' },
   { path: 'landers', mount: '/api/landers' },
   { path: 'lp', mount: '/api/lp' },
-  { path: 'campaignRoutes', mount: '/' },
+  { path: 'campaignRoutes', mount: '/api/campaigns' }, // Changed from '/' to '/api/campaigns'
   { path: 'track', mount: '/api/track' },
   { path: 'trafficRoutes', mount: '/api/traffic' },
   { path: 'auth', mount: '/api/auth' },
@@ -184,41 +184,62 @@ const frontendBuildPath = path.join(__dirname, "../frontend/build");
 if (fs.existsSync(frontendBuildPath)) {
   console.log(`📝 Frontend build found at ${frontendBuildPath}`);
   app.use(express.static(frontendBuildPath));
+  
+  // ✅ API Root
+  app.get("/api", (req, res) => {
+    console.log("📝 API root requested");
+    res.send("Welcome to the PearM Dashboard API Server");
+  });
+  
+  // 👇 Serve universal.js statically
+  console.log("📝 Setting up universal.js static serving...");
+  const universalJsPath = path.join(__dirname, '../frontend');
+  if (fs.existsSync(path.join(universalJsPath, 'universal.js'))) {
+    app.use(express.static(universalJsPath));
+    console.log("✅ universal.js static serving configured");
+  } else {
+    console.warn("⚠️ universal.js not found at", path.join(universalJsPath, 'universal.js'));
+  }
+  
+  // Optional: log access
+  app.get('/universal.js', (req, res) => {
+    console.log("📝 Universal.js requested");
+    const filePath = path.join(__dirname, '../frontend/universal.js');
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      console.error("❌ universal.js file not found at", filePath);
+      res.status(404).send("File not found");
+    }
+  });
+  
+  // Make sure campaign routes are correctly loaded for the /track endpoint
+  // Load campaignRoutes for /track directly without changing the original structure
+  try {
+    console.log("📝 Setting up dedicated track route handler...");
+    const campaignRoutesModule = require('./routes/campaignRoutes');
+    app.use('/', campaignRoutesModule);
+    console.log("✅ Track route handler configured");
+  } catch (err) {
+    console.error("❌ Error setting up track route:", err);
+  }
+  
+  // This catch-all route must be AFTER all API routes
   app.get("*", (req, res) => {
+    // Skip for API routes
+    if (req.path.startsWith('/api/')) {
+      console.log(`📝 API route requested: ${req.path}`);
+      return res.status(404).json({ error: "API endpoint not found" });
+    }
+    
+    console.log(`📝 Serving frontend for path: ${req.path}`);
     res.sendFile(path.join(frontendBuildPath, "index.html"));
   });
+  
   console.log("✅ Frontend static serving configured");
 } else {
   console.warn("⚠️ Frontend build not found at", frontendBuildPath);
 }
-
-// 👇 Serve universal.js statically
-console.log("📝 Setting up universal.js static serving...");
-const universalJsPath = path.join(__dirname, '../frontend');
-if (fs.existsSync(path.join(universalJsPath, 'universal.js'))) {
-  app.use(express.static(universalJsPath));
-  console.log("✅ universal.js static serving configured");
-} else {
-  console.warn("⚠️ universal.js not found at", path.join(universalJsPath, 'universal.js'));
-}
-
-// Optional: log access
-app.get('/universal.js', (req, res) => {
-  console.log("📝 Universal.js requested");
-  const filePath = path.join(__dirname, '../frontend/universal.js');
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    console.error("❌ universal.js file not found at", filePath);
-    res.status(404).send("File not found");
-  }
-});
-
-// ✅ API Root
-app.get("/api", (req, res) => {
-  console.log("📝 API root requested");
-  res.send("Welcome to the PearM Dashboard API Server");
-});
 
 // ✅ Error handler
 console.log("📝 Setting up error handler...");
