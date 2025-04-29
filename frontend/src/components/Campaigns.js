@@ -143,130 +143,147 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
   }, [selectedDomain, trafficChannel, editMode, campaignData]);
 
   // Modified handleSubmit function to correctly save to the API
-  const handleSubmit = async () => {
-    setSubmitError("");
-    
-    // Validate required fields
-    if (!campaignName || !trafficChannel || !trackingDomain) {
-      setSubmitError("Campaign name, traffic channel, and tracking domain are required");
-      return;
-    }
+  // Fix for the CampaignModal component to handle campaign creation correctly
 
-    // If not direct linking, require a lander
-    if (!isDirectLinking && !lander) {
-      setSubmitError("Please select a landing page or enable direct linking");
-      return;
-    }
-    
-    const campaignPayload = {
-      name: campaignName,
-      traffic_channel_id: trafficChannel,
-      domain_id: trackingDomain,
-      costType,
-      costValue: parseFloat(costValue) || 0,
-      tags,
-      offer_id: offerSelected, // Use the selected offer ID from state
-      offerWeight: parseInt(offerWeight) || 100,
-      autoOptimize,
-      isDirectLinking,
-      lander_id: isDirectLinking ? null : lander,
-      status: "ACTIVE"
-    };
+const handleSubmit = async () => {
+  setSubmitError("");
+  
+  // Validate required fields
+  if (!campaignName || !trafficChannel || !trackingDomain) {
+    setSubmitError("Campaign name, traffic channel, and tracking domain are required");
+    return;
+  }
 
-    try {
-      console.log("Submitting campaign with payload:", campaignPayload);
+  // If not direct linking, require a lander
+  if (!isDirectLinking && !lander) {
+    setSubmitError("Please select a landing page or enable direct linking");
+    return;
+  }
+  
+  const campaignPayload = {
+    name: campaignName,
+    traffic_channel_id: trafficChannel,
+    domain_id: trackingDomain,
+    costType,
+    costValue: parseFloat(costValue) || 0,
+    tags,
+    offer_id: offerSelected, // Use the selected offer ID from state
+    offerWeight: parseInt(offerWeight) || 100,
+    autoOptimize,
+    isDirectLinking,
+    lander_id: isDirectLinking ? null : lander,
+    status: "ACTIVE"
+  };
+
+  try {
+    console.log("Submitting campaign with payload:", campaignPayload);
+    
+    let res;
+    if (editMode) {
+      // For editing a campaign
+      const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+      console.log("Making PUT request to:", editUrl);
+      res = await axios.put(editUrl, campaignPayload);
+      console.log("Successfully updated campaign:", res.data);
+      onClose(res.data);
+    } else {
+      // For creating a new campaign - use a consistent endpoint
+      console.log("Attempting to create a new campaign");
       
-      let res;
-      if (editMode) {
-        // For editing a campaign
-        const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
-        console.log("Making PUT request to:", editUrl);
-        res = await axios.put(editUrl, campaignPayload);
-        console.log("Successfully updated campaign:", res.data);
-        onClose(res.data);
-      } else {
-        // For creating a new campaign - try the correct endpoint
-        const createUrl = `${API_URL}/api/campaigns`; // Most likely correct endpoint
-        console.log("Making POST request to:", createUrl);
+      try {
+        // Try the most likely endpoint first
+        const url = `${API_URL}/api/campaigns`;
+        console.log("Making POST request to:", url);
+        res = await axios.post(url, campaignPayload);
+        console.log("Successfully created campaign:", res.data);
+        onCreate(res.data);
+        onClose();
+      } catch (err) {
+        console.error("Error creating campaign:", err);
         
-        try {
-          res = await axios.post(createUrl, campaignPayload);
-          console.log("Successfully created campaign:", res.data);
-          onCreate(res.data);
-          onClose();
-        } catch (createError) {
-          console.error("Error with first endpoint attempt:", createError);
-          
-          // Try another endpoint pattern
+        // If we have a specific API error message, display it
+        if (err.response && err.response.data && err.response.data.error) {
+          setSubmitError(`API Error: ${err.response.data.error}`);
+        } else {
+          // Try secondary endpoint
           try {
-            const altUrl = `${API_URL}/api/campaigns/create`;
+            const altUrl = `${API_URL}/api/campaign`;
             console.log("Trying alternate endpoint:", altUrl);
             res = await axios.post(altUrl, campaignPayload);
             console.log("Successfully created campaign with alternate endpoint:", res.data);
             onCreate(res.data);
             onClose();
-          } catch (altError) {
-            console.error("Error with second endpoint attempt:", altError);
+          } catch (altErr) {
+            console.error("Error with second attempt:", altErr);
             
-            // Try one more endpoint pattern
+            // Try the campaign controller endpoint as a last resort
             try {
-              const lastUrl = `${API_URL}/api/campaign`;
-              console.log("Trying final endpoint:", lastUrl);
-              res = await axios.post(lastUrl, campaignPayload);
+              const finalUrl = `${API_URL}/api/campaigns/create`;
+              console.log("Trying final endpoint:", finalUrl);
+              res = await axios.post(finalUrl, campaignPayload);
               console.log("Successfully created campaign with final endpoint:", res.data);
               onCreate(res.data);
               onClose();
-            } catch (finalError) {
-              console.error("All campaign creation attempts failed:", finalError);
-              throw new Error("Failed to create campaign after trying multiple endpoints");
+            } catch (finalErr) {
+              console.error("All creation attempts failed:", finalErr);
+              
+              // Provide clear error feedback
+              if (finalErr.response) {
+                setSubmitError(`API Error (${finalErr.response.status}): ${finalErr.response.data?.error || 
+                  finalErr.response.data?.message || "Campaign creation failed"}`);
+              } else {
+                setSubmitError("Network error: Could not connect to the API server");
+              }
             }
           }
         }
       }
-
-      // Reset form after submission
-      if (!editMode) {
-        setCampaignName("");
-        setTrafficChannel("");
-        setTrackingDomain("");
-        setCostType("CPC");
-        setCostValue("0");
-        setTags([]);
-        setTagInput("");
-        setOffer("");
-        setOfferWeight("100");
-        setAutoOptimize(false);
-        setIsDirectLinking(false);
-        setLander("");
-        setOfferSelected("");
-      }
-    } catch (error) {
-      console.error("Error saving campaign:", error);
-      
-      // Enhanced error logging
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        
-        // Provide more helpful error messages based on status codes
-        if (error.response.status === 400) {
-          setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
-        } else if (error.response.status === 401 || error.response.status === 403) {
-          setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
-        } else if (error.response.status === 404) {
-          setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
-        } else {
-          setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
-        }
-      } else if (error.request) {
-        console.error("Request made but no response received:", error.request);
-        setSubmitError("No response received from server. Please check your network connection.");
-      } else {
-        console.error("Error setting up request:", error.message);
-        setSubmitError(`Request error: ${error.message}`);
-      }
     }
-  };
+
+    // Reset form after successful submission if not in edit mode
+    if (!editMode && res) {
+      setCampaignName("");
+      setTrafficChannel("");
+      setTrackingDomain("");
+      setCostType("CPC");
+      setCostValue("0");
+      setTags([]);
+      setTagInput("");
+      setOffer("");
+      setOfferWeight("100");
+      setAutoOptimize(false);
+      setIsDirectLinking(false);
+      setLander("");
+      setOfferSelected("");
+    }
+  } catch (error) {
+    console.error("Error in submit handling:", error);
+    
+    // Enhanced error logging
+    if (error.response) {
+      console.error("Response data:", error.response.data);
+      console.error("Response status:", error.response.status);
+      
+      // Provide more helpful error messages based on status codes
+      if (error.response.status === 400) {
+        setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
+      } else if (error.response.status === 401 || error.response.status === 403) {
+        setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
+      } else if (error.response.status === 404) {
+        setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
+      } else {
+        setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+      }
+    } else if (error.request) {
+      console.error("Request made but no response received:", error.request);
+      setSubmitError("No response received from server. Please check your network connection.");
+    } else {
+      console.error("Error setting up request:", error.message);
+      setSubmitError(`Request error: ${error.message}`);
+    }
+  }
+};
+
 
   const handleAddTag = () => {
     if (tagInput && !tags.includes(tagInput)) {

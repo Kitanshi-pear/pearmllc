@@ -371,6 +371,10 @@ router.get('/conversion', async (req, res) => {
 });
 
 // API endpoint to get metrics
+// Fix for the metrics route in track.js
+// Replace the entire metrics route with this implementation
+
+// API endpoint to get metrics
 router.get('/metrics', async (req, res) => {
   try {
     const { 
@@ -418,9 +422,24 @@ router.get('/metrics', async (req, res) => {
       };
     }
     
+    // Default attributes to ensure we always select something
+    let attributes = [
+      'id',
+      'unique_id',
+      'traffic_channel_id', 
+      'date',
+      'impressions',
+      'clicks',
+      'lpviews',
+      'lpclicks',
+      'conversions',
+      'total_revenue',
+      'total_cost',
+      'profit'
+    ];
+    
     // Determine group by and attributes
     let groupByFields = [];
-    let attributes = [];
     
     if (group_by === 'traffic_channel') {
       groupByFields = ['traffic_channel_id'];
@@ -535,12 +554,19 @@ router.get('/metrics', async (req, res) => {
     }
     
     // Get metrics data (for non-country dimensions)
-    const metrics = await Metrics.findAll({ 
+    // This line was causing the error - we need to ensure attributes is never empty
+    const queryOptions = { 
       where,
       attributes,
-      group: groupByFields.length > 0 ? groupByFields : null,
       order: group_by === 'date' ? [['date', 'ASC']] : null
-    });
+    };
+    
+    // Only add group if we have groupByFields
+    if (groupByFields.length > 0) {
+      queryOptions.group = groupByFields;
+    }
+    
+    const metrics = await Metrics.findAll(queryOptions);
     
     // If grouping by something, calculate derived metrics
     if (group_by === 'traffic_channel') {
@@ -578,10 +604,9 @@ router.get('/metrics', async (req, res) => {
     return res.json(metrics);
   } catch (error) {
     console.error('❌ Error getting metrics:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
-
 /**
  * Update metrics for various tracking events
  */
