@@ -57,6 +57,8 @@ router.post("/", async (req, res) => {
       ...campaign.toJSON(),
       promoting_url,
     });
+
+
   } catch (error) {
     console.error("❌ [Campaign] Error creating campaign:", error);
     res.status(500).json({ error: "Internal server error" });

@@ -16,6 +16,11 @@ module.exports = (sequelize, DataTypes) => {
     customConversionMatching: { type: DataTypes.BOOLEAN },
     googleAdsAccountId: { type: DataTypes.STRING },
     googleMccAccountId: { type: DataTypes.STRING },
+    status: {
+      type: DataTypes.STRING, // or BOOLEAN
+      allowNull: true
+    }
+    
   });
 
   TrafficChannel.associate = (models) => {
