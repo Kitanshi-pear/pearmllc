@@ -296,7 +296,7 @@ const TrafficChannels = () => {
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
       // Updated API endpoint to match your specified endpoint
-      const response = await axios.get(`${API_URL}/trafficChannels`, {
+      const response = await axios.get(`${API_URL}/api/traffic`, {
         params: {
           start_date: formattedStartDate,
           end_date: formattedEndDate
@@ -342,8 +342,8 @@ const TrafficChannels = () => {
     try {
       // Updated API endpoints to match your specified endpoint
       const authUrl = platform === "google" 
-        ? `${API_URL}/trafficChannels/auth/google` 
-        : `${API_URL}/trafficChannels/auth/facebook`;
+        ? `${API_URL}/api/traffic/auth/google` 
+        : `${API_URL}/api/traffic/auth/facebook`;
       
       // Open auth URL
       window.location.href = authUrl;
@@ -453,7 +453,7 @@ const TrafficChannels = () => {
       try {
         setLoading(prev => ({ ...prev, delete: true }));
         // Updated API endpoint to match your specified endpoint
-        const response = await axios.delete(`${API_URL}/trafficChannels/${channelId}`);
+        const response = await axios.delete(`${API_URL}/api/traffic/${channelId}`);
         
         if (response.data.deactivated) {
           // Channel was not deleted but marked as inactive
@@ -512,7 +512,7 @@ const TrafficChannels = () => {
       if (editMode) {
         // Update existing channel - updated API endpoint
         response = await axios.put(
-          `${API_URL}/trafficChannels/${selectedRow.id}`, 
+          `${API_URL}/api/traffic/${selectedRow.id}`, 
           formData
         );
         
@@ -530,7 +530,7 @@ const TrafficChannels = () => {
         });
       } else {
         // Create new channel - updated API endpoint
-        response = await axios.post(`${API_URL}/trafficChannels`, formData);
+        response = await axios.post(`${API_URL}/api/traffic`, formData);
         
         // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);

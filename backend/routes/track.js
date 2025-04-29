@@ -371,30 +371,44 @@ router.get('/conversion', async (req, res) => {
 });
 
 // API endpoint to get metrics
-// Fix for the metrics route in track.js
-// Replace the entire metrics route with this implementation
-
-// API endpoint to get metrics
+// API endpoint to get metrics - completely revised for compatibility
 router.get('/metrics', async (req, res) => {
   try {
+    // Handle both unique_id and campaign_id (for backwards compatibility)
     const { 
       unique_id, 
+      campaign_id, // Added to handle frontend requests
       traffic_channel_id, 
       lander_id, 
       offer_id, 
       start_date, 
       end_date,
-      dimension, // e.g., 'day', 'hour', 'country'
-      group_by,  // e.g., 'traffic_channel', 'date'
+      dimension,
+      group_by,
       include_hourly = false
     } = req.query;
     
-    // Build query conditions
+    // Build query conditions - use either unique_id or campaign_id
     const where = {};
     
     if (unique_id) {
       where.unique_id = unique_id;
+    } else if (campaign_id) {
+      // If frontend is using campaign_id instead of unique_id
+      where.unique_id = campaign_id;
     }
+    
+    // Log the query parameters to help with debugging
+    console.log('📊 Metrics request:', {
+      where,
+      traffic_channel_id,
+      lander_id,
+      offer_id,
+      start_date,
+      end_date,
+      dimension,
+      group_by
+    });
     
     if (traffic_channel_id) {
       where.traffic_channel_id = traffic_channel_id;
@@ -422,8 +436,36 @@ router.get('/metrics', async (req, res) => {
       };
     }
     
-    // Default attributes to ensure we always select something
-    let attributes = [
+    // If no data exists for the requested metrics, return empty results rather than error
+    // Check if data exists for this query
+    const metricsCount = await Metrics.count({ where });
+    
+    if (metricsCount === 0) {
+      console.log('📊 No metrics data found for query:', where);
+      
+      // Return empty metrics data with zeros for all values
+      return res.json({
+        impressions: 0,
+        clicks: 0,
+        lpviews: 0,
+        lpclicks: 0,
+        conversions: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        profit: 0,
+        ctr: 0,
+        cr: 0,
+        offer_cr: 0,
+        cpc: 0,
+        cpm: 0,
+        epc: 0,
+        lpepc: 0,
+        roi: 0
+      });
+    }
+    
+    // Always include these default attributes
+    const defaultAttributes = [
       'id',
       'unique_id',
       'traffic_channel_id', 
@@ -438,25 +480,28 @@ router.get('/metrics', async (req, res) => {
       'profit'
     ];
     
-    // Determine group by and attributes
-    let groupByFields = [];
+    // Set up the query
+    const queryOptions = {
+      where,
+      raw: true // Return plain JS objects instead of Sequelize instances for better performance
+    };
     
+    // Handle different group by scenarios
     if (group_by === 'traffic_channel') {
-      groupByFields = ['traffic_channel_id'];
-      attributes = [
+      queryOptions.attributes = [
         'traffic_channel_id',
-        [db.sequelize.fn('SUM', db.sequelize.col('impressions')), 'impressions'],
-        [db.sequelize.fn('SUM', db.sequelize.col('clicks')), 'clicks'],
-        [db.sequelize.fn('SUM', db.sequelize.col('lpviews')), 'lpviews'],
-        [db.sequelize.fn('SUM', db.sequelize.col('lpclicks')), 'lpclicks'],
-        [db.sequelize.fn('SUM', db.sequelize.col('conversions')), 'conversions'],
-        [db.sequelize.fn('SUM', db.sequelize.col('total_revenue')), 'total_revenue'],
-        [db.sequelize.fn('SUM', db.sequelize.col('total_cost')), 'total_cost'],
-        [db.sequelize.fn('SUM', db.sequelize.col('profit')), 'profit']
+        [Sequelize.fn('SUM', Sequelize.col('impressions')), 'impressions'],
+        [Sequelize.fn('SUM', Sequelize.col('clicks')), 'clicks'],
+        [Sequelize.fn('SUM', Sequelize.col('lpviews')), 'lpviews'],
+        [Sequelize.fn('SUM', Sequelize.col('lpclicks')), 'lpclicks'],
+        [Sequelize.fn('SUM', Sequelize.col('conversions')), 'conversions'],
+        [Sequelize.fn('SUM', Sequelize.col('total_revenue')), 'total_revenue'],
+        [Sequelize.fn('SUM', Sequelize.col('total_cost')), 'total_cost'],
+        [Sequelize.fn('SUM', Sequelize.col('profit')), 'profit']
       ];
+      queryOptions.group = ['traffic_channel_id'];
     } else if (group_by === 'date') {
-      groupByFields = ['date', 'unique_id'];
-      attributes = [
+      queryOptions.attributes = [
         'date', 
         'unique_id',
         'impressions',
@@ -478,9 +523,10 @@ router.get('/metrics', async (req, res) => {
         'roi',
         'ctc'
       ];
+      queryOptions.group = ['date', 'unique_id'];
+      queryOptions.order = [['date', 'ASC']];
     } else if (dimension === 'hour' && include_hourly) {
-      groupByFields = ['date', 'hour'];
-      attributes = [
+      queryOptions.attributes = [
         'date', 
         'hour',
         'impressions',
@@ -500,111 +546,191 @@ router.get('/metrics', async (req, res) => {
         'lpepc',
         'roi'
       ];
-    } else if (dimension === 'country') {
-      // For country breakdown, we need to join with the Clicks table
-      const clicks = await Clicks.findAll({
-        attributes: [
-          'country',
-          [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'clicks'],
-          [db.sequelize.fn('SUM', db.sequelize.literal('CASE WHEN lp_viewed = true THEN 1 ELSE 0 END')), 'lpviews'],
-          [db.sequelize.fn('SUM', db.sequelize.literal('CASE WHEN conversion = true THEN 1 ELSE 0 END')), 'conversions'],
-          [db.sequelize.fn('SUM', db.sequelize.col('revenue')), 'revenue'],
-          [db.sequelize.fn('SUM', db.sequelize.col('cost')), 'cost'],
-          [db.sequelize.fn('SUM', db.sequelize.col('profit')), 'profit']
-        ],
-        where,
-        group: ['country'],
-        raw: true
-      });
-      
-      // Calculate derived metrics for each country
-      const metricsData = clicks.map(country => {
-        const clicksVal = parseInt(country.clicks) || 0;
-        const lpviews = parseInt(country.lpviews) || 0;
-        const conversions = parseInt(country.conversions) || 0;
-        const revenue = parseFloat(country.revenue) || 0;
-        const cost = parseFloat(country.cost) || 0;
-        const profit = parseFloat(country.profit) || 0;
-        
-        const cr = clicksVal > 0 ? (conversions / clicksVal) * 100 : 0;
-        const offerCr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
-        const cpc = clicksVal > 0 ? cost / clicksVal : 0;
-        const epc = clicksVal > 0 ? revenue / clicksVal : 0;
-        const lpepc = lpviews > 0 ? revenue / lpviews : 0;
-        const roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
-        
-        return {
-          dimension: country.country || 'Unknown',
-          clicks: clicksVal,
-          lpviews,
-          conversions,
-          revenue,
-          cost,
-          profit,
-          cr,
-          offer_cr: offerCr,
-          cpc,
-          epc,
-          lpepc,
-          roi
-        };
-      });
-      
-      return res.json(metricsData);
+      queryOptions.group = ['date', 'hour'];
+    } else {
+      // Default case - no grouping
+      queryOptions.attributes = defaultAttributes;
     }
     
-    // Get metrics data (for non-country dimensions)
-    // This line was causing the error - we need to ensure attributes is never empty
-    const queryOptions = { 
-      where,
-      attributes,
-      order: group_by === 'date' ? [['date', 'ASC']] : null
-    };
-    
-    // Only add group if we have groupByFields
-    if (groupByFields.length > 0) {
-      queryOptions.group = groupByFields;
+    // Special handling for country dimension
+    if (dimension === 'country') {
+      // For country breakdown, we need to use Clicks model instead
+      try {
+        const clicks = await Clicks.findAll({
+          attributes: [
+            'country',
+            [Sequelize.fn('COUNT', Sequelize.col('id')), 'clicks'],
+            [Sequelize.fn('SUM', Sequelize.literal('CASE WHEN lp_viewed = true THEN 1 ELSE 0 END')), 'lpviews'],
+            [Sequelize.fn('SUM', Sequelize.literal('CASE WHEN conversion = true THEN 1 ELSE 0 END')), 'conversions'],
+            [Sequelize.fn('SUM', Sequelize.col('revenue')), 'revenue'],
+            [Sequelize.fn('SUM', Sequelize.col('cost')), 'cost'],
+            [Sequelize.fn('SUM', Sequelize.col('profit')), 'profit']
+          ],
+          where,
+          group: ['country'],
+          raw: true
+        });
+        
+        // Calculate derived metrics for each country
+        const metricsData = clicks.map(country => {
+          const clicksVal = parseInt(country.clicks) || 0;
+          const lpviews = parseInt(country.lpviews) || 0;
+          const conversions = parseInt(country.conversions) || 0;
+          const revenue = parseFloat(country.revenue) || 0;
+          const cost = parseFloat(country.cost) || 0;
+          const profit = parseFloat(country.profit) || 0;
+          
+          const cr = clicksVal > 0 ? (conversions / clicksVal) * 100 : 0;
+          const offerCr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
+          const cpc = clicksVal > 0 ? cost / clicksVal : 0;
+          const epc = clicksVal > 0 ? revenue / clicksVal : 0;
+          const lpepc = lpviews > 0 ? revenue / lpviews : 0;
+          const roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+          
+          return {
+            dimension: country.country || 'Unknown',
+            clicks: clicksVal,
+            lpviews,
+            conversions,
+            revenue,
+            cost,
+            profit,
+            cr,
+            offer_cr: offerCr,
+            cpc,
+            epc,
+            lpepc,
+            roi
+          };
+        });
+        
+        return res.json(metricsData);
+      } catch (countryError) {
+        console.error('❌ Error getting country metrics:', countryError);
+        return res.status(500).json({ 
+          error: 'Error getting country metrics',
+          details: countryError.message
+        });
+      }
     }
     
-    const metrics = await Metrics.findAll(queryOptions);
-    
-    // If grouping by something, calculate derived metrics
-    if (group_by === 'traffic_channel') {
-      const metricsData = metrics.map(metric => {
-        const data = metric.toJSON();
-        
-        // Calculate derived metrics
-        const clicks = parseInt(data.clicks) || 0;
-        const impressions = parseInt(data.impressions) || 0;
-        const lpviews = parseInt(data.lpviews) || 0;
-        const lpclicks = parseInt(data.lpclicks) || 0;
-        const conversions = parseInt(data.conversions) || 0;
-        const revenue = parseFloat(data.total_revenue) || 0;
-        const cost = parseFloat(data.total_cost) || 0;
-        const profit = parseFloat(data.profit) || 0;
-        
-        // Calculate ratios
-        data.ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-        data.lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
-        data.cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
-        data.offer_cr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
-        data.cpc = clicks > 0 ? cost / clicks : 0;
-        data.cpm = impressions > 0 ? (cost / impressions) * 1000 : 0;
-        data.epc = clicks > 0 ? revenue / clicks : 0;
-        data.lpepc = lpviews > 0 ? revenue / lpviews : 0;
-        data.roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
-        data.ctc = conversions > 0 ? cost / conversions : 0;
-        
-        return data;
-      });
+    // Execute the standard metrics query
+    try {
+      const metrics = await Metrics.findAll(queryOptions);
       
-      return res.json(metricsData);
+      // If no metrics were found despite earlier count, return zeros
+      if (metrics.length === 0) {
+        return res.json({
+          impressions: 0,
+          clicks: 0,
+          lpviews: 0,
+          lpclicks: 0,
+          conversions: 0,
+          total_revenue: 0,
+          total_cost: 0,
+          profit: 0,
+          ctr: 0,
+          cr: 0,
+          offer_cr: 0,
+          cpc: 0,
+          cpm: 0,
+          epc: 0,
+          lpepc: 0,
+          roi: 0
+        });
+      }
+      
+      // Process metrics data if needed
+      if (group_by === 'traffic_channel') {
+        const metricsData = metrics.map(metric => {
+          // Calculate derived metrics if not already present
+          const data = metric;
+          
+          const clicks = parseInt(data.clicks) || 0;
+          const impressions = parseInt(data.impressions) || 0;
+          const lpviews = parseInt(data.lpviews) || 0;
+          const lpclicks = parseInt(data.lpclicks) || 0;
+          const conversions = parseInt(data.conversions) || 0;
+          const revenue = parseFloat(data.total_revenue) || 0;
+          const cost = parseFloat(data.total_cost) || 0;
+          
+          // Add calculated metrics
+          data.ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+          data.lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
+          data.cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
+          data.offer_cr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
+          data.cpc = clicks > 0 ? cost / clicks : 0;
+          data.cpm = impressions > 0 ? (cost / impressions) * 1000 : 0;
+          data.epc = clicks > 0 ? revenue / clicks : 0;
+          data.lpepc = lpviews > 0 ? revenue / lpviews : 0;
+          data.roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+          data.ctc = conversions > 0 ? cost / conversions : 0;
+          
+          return data;
+        });
+        
+        return res.json(metricsData);
+      }
+      
+      // For a single campaign request, sum up the metrics if multiple records
+      if ((unique_id || campaign_id) && !group_by && metrics.length > 1) {
+        const summedMetrics = metrics.reduce((acc, curr) => {
+          // Sum up numeric values
+          acc.impressions = (acc.impressions || 0) + (parseInt(curr.impressions) || 0);
+          acc.clicks = (acc.clicks || 0) + (parseInt(curr.clicks) || 0);
+          acc.lpviews = (acc.lpviews || 0) + (parseInt(curr.lpviews) || 0);
+          acc.lpclicks = (acc.lpclicks || 0) + (parseInt(curr.lpclicks) || 0);
+          acc.conversions = (acc.conversions || 0) + (parseInt(curr.conversions) || 0);
+          acc.total_revenue = (acc.total_revenue || 0) + (parseFloat(curr.total_revenue) || 0);
+          acc.total_cost = (acc.total_cost || 0) + (parseFloat(curr.total_cost) || 0);
+          acc.profit = (acc.profit || 0) + (parseFloat(curr.profit) || 0);
+          return acc;
+        }, {});
+        
+        // Calculate derived metrics for the summed values
+        const clicks = summedMetrics.clicks || 0;
+        const impressions = summedMetrics.impressions || 0;
+        const lpviews = summedMetrics.lpviews || 0;
+        const lpclicks = summedMetrics.lpclicks || 0;
+        const conversions = summedMetrics.conversions || 0;
+        const revenue = summedMetrics.total_revenue || 0;
+        const cost = summedMetrics.total_cost || 0;
+        
+        summedMetrics.ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        summedMetrics.lpctr = lpviews > 0 ? (lpclicks / lpviews) * 100 : 0;
+        summedMetrics.cr = clicks > 0 ? (conversions / clicks) * 100 : 0;
+        summedMetrics.offer_cr = lpviews > 0 ? (conversions / lpviews) * 100 : 0;
+        summedMetrics.cpc = clicks > 0 ? cost / clicks : 0;
+        summedMetrics.cpm = impressions > 0 ? (cost / impressions) * 1000 : 0;
+        summedMetrics.epc = clicks > 0 ? revenue / clicks : 0;
+        summedMetrics.lpepc = lpviews > 0 ? revenue / lpviews : 0;
+        summedMetrics.roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+        summedMetrics.ctc = conversions > 0 ? cost / conversions : 0;
+        
+        return res.json(summedMetrics);
+      }
+      
+      // Just return the metrics as-is
+      return res.json(metrics);
+      
+    } catch (queryError) {
+      console.error('❌ Error executing metrics query:', queryError);
+      
+      // Provide detailed error for debugging
+      return res.status(500).json({ 
+        error: 'Error executing metrics query',
+        details: queryError.message,
+        sql: queryError.sql, // Include the SQL that caused the error if available
+        query: queryOptions
+      });
     }
-    
-    return res.json(metrics);
   } catch (error) {
     console.error('❌ Error getting metrics:', error);
-    return res.status(500).json({ error: 'Internal server error', message: error.message });
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 /**

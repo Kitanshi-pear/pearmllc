@@ -914,64 +914,95 @@ export default function CampaignsPage() {
   };
   
   // Improved metrics fetching function
-  const fetchMetrics = (campaignIds) => {
-    // Format date range for API
-    const startDate = format(dateRange[0], 'yyyy-MM-dd');
-    const endDate = format(dateRange[1], 'yyyy-MM-dd');
+  // Improved metrics fetching function for the CampaignsPage component
+const fetchMetrics = (campaignIds) => {
+  // Format date range for API
+  const startDate = format(dateRange[0], 'yyyy-MM-dd');
+  const endDate = format(dateRange[1], 'yyyy-MM-dd');
+  
+  console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
+  
+  // Create metrics object to store by campaign ID
+  const metricsData = {};
+  let completedRequests = 0;
+  
+  // Set default metrics values - prevents undefined errors in UI calculations
+  campaignIds.forEach(id => {
+    metricsData[id] = {
+      clicks: 0,
+      conversions: 0,
+      lpviews: 0,
+      lpclicks: 0,
+      impressions: 0,
+      total_revenue: 0,
+      total_cost: 0,
+      profit: 0,
+      ctr: 0,
+      cr: 0
+    };
+  });
+  
+  // If no campaign IDs, just finish early
+  if (campaignIds.length === 0) {
+    setMetrics(metricsData);
+    setLoading(false);
+    return;
+  }
+  
+  // Set loading state
+  setLoading(true);
+  
+  // Fetch metrics for each campaign
+  campaignIds.forEach(id => {
+    // Use campaign_id parameter as expected by the backend
+    const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
+    console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
     
-    console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
-    
-    // Create metrics object to store by campaign ID
-    const metricsData = {};
-    let completedRequests = 0;
-    
-    // Fetch metrics for each campaign
-    campaignIds.forEach(id => {
-      const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
-      console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
-      
-      axios.get(metricsUrl)
-        .then(res => {
-          console.log(`Metrics data for campaign ${id}:`, res.data);
+    axios.get(metricsUrl)
+      .then(res => {
+        console.log(`Metrics data for campaign ${id}:`, res.data);
+        
+        // Check if res.data is an array before reducing
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          // Sum up metrics if multiple records are returned
+          const campaignMetrics = res.data.reduce((acc, curr) => {
+            Object.keys(curr).forEach(key => {
+              if (typeof curr[key] === 'number') {
+                acc[key] = (acc[key] || 0) + curr[key];
+              }
+            });
+            return acc;
+          }, {});
           
-          // Check if res.data is an array before reducing
-          if (Array.isArray(res.data)) {
-            // Sum up metrics if multiple records are returned
-            const campaignMetrics = res.data.reduce((acc, curr) => {
-              Object.keys(curr).forEach(key => {
-                if (typeof curr[key] === 'number') {
-                  acc[key] = (acc[key] || 0) + curr[key];
-                }
-              });
-              return acc;
-            }, {});
-            
-            metricsData[id] = campaignMetrics;
-          } else if (typeof res.data === 'object') {
-            // If it's a single object, use it directly
-            metricsData[id] = res.data;
-          }
-        })
-        .catch(err => {
-          console.error(`Error fetching metrics for campaign ${id}:`, err);
-          // Set empty metrics to avoid undefined errors
-          metricsData[id] = { clicks: 0, conversions: 0, total_revenue: 0, profit: 0 };
-        })
-        .finally(() => {
-          completedRequests++;
-          if (completedRequests === campaignIds.length) {
-            console.log("All metrics fetching completed:", metricsData);
-            setMetrics(metricsData);
-            setLoading(false);
-          }
-        });
-    });
-    
-    // Handle case where no campaigns or all API calls fail
-    if (campaignIds.length === 0) {
-      setLoading(false);
-    }
-  };
+          metricsData[id] = campaignMetrics;
+        } else if (typeof res.data === 'object') {
+          // If it's a single object, use it directly
+          metricsData[id] = res.data;
+        }
+      })
+      .catch(err => {
+        console.error(`Error fetching metrics for campaign ${id}:`, err);
+        
+        // Instead of showing the error, provide a more helpful message and 
+        // use default values (already set above)
+        console.log(`Using default metrics values for campaign ${id}`);
+        
+        // Optionally show a UI notification for persistent errors
+        if (err.response && err.response.status === 500) {
+          // You could set a state to show a notification or toast
+          // setErrorNotification(`There was a problem loading metrics for some campaigns. Default values are being shown.`);
+        }
+      })
+      .finally(() => {
+        completedRequests++;
+        if (completedRequests === campaignIds.length) {
+          console.log("All metrics fetching completed:", metricsData);
+          setMetrics(metricsData);
+          setLoading(false);
+        }
+      });
+  });
+};
 
   useEffect(() => {
     fetchCampaigns();
