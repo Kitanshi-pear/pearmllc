@@ -52,7 +52,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import axios from 'axios';
-import Layout from '../../Layout';
+import Layout from '../Layout';
 
 const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
 
