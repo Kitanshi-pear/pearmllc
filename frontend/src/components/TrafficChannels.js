@@ -37,7 +37,8 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 
-const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
+// Updated API URL with your specified endpoint
+const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com/api/traffic";
 
 // Utility functions for formatting numbers and percentages
 const formatNumber = (num, decimals = 2) => {
@@ -294,8 +295,8 @@ const TrafficChannels = () => {
       const formattedStartDate = dateRange.startDate.toISOString().split('T')[0];
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
-      // Get channels with aggregated metrics data directly from MetricsService
-      const response = await axios.get(`${API_URL}/api/trafficChannels`, {
+      // Updated API endpoint to match your specified endpoint
+      const response = await axios.get(`${API_URL}/trafficChannels`, {
         params: {
           start_date: formattedStartDate,
           end_date: formattedEndDate
@@ -305,8 +306,8 @@ const TrafficChannels = () => {
       // Set the rows with metrics data already included from the backend
       setRows(response.data);
       
-      // Check auth status
-      const authResponse = await axios.get(`${API_URL}/api/trafficChannels/authStatus`);
+      // Check auth status - keeping the original endpoint structure for this call
+      const authResponse = await axios.get(`${API_URL}/trafficChannels/authStatus`);
       setAuthStatus(authResponse.data);
     } catch (error) {
       console.error("Error fetching channels:", error);
@@ -333,14 +334,16 @@ const TrafficChannels = () => {
       )
     )
   : [];
+
   // Handle authentication for platforms
   const handleAuth = async (platform) => {
     setLoading(prev => ({ ...prev, [platform]: true }));
     
     try {
+      // Updated API endpoints to match your specified endpoint
       const authUrl = platform === "google" 
-        ? `${API_URL}/api/trafficChannels/auth/google` 
-        : `${API_URL}/api/trafficChannels/auth/facebook`;
+        ? `${API_URL}/trafficChannels/auth/google` 
+        : `${API_URL}/trafficChannels/auth/facebook`;
       
       // Open auth URL
       window.location.href = authUrl;
@@ -449,7 +452,8 @@ const TrafficChannels = () => {
     if (window.confirm("Are you sure you want to delete this channel?")) {
       try {
         setLoading(prev => ({ ...prev, delete: true }));
-        const response = await axios.delete(`${API_URL}/api/trafficChannels/${channelId}`);
+        // Updated API endpoint to match your specified endpoint
+        const response = await axios.delete(`${API_URL}/trafficChannels/${channelId}`);
         
         if (response.data.deactivated) {
           // Channel was not deleted but marked as inactive
@@ -506,9 +510,9 @@ const TrafficChannels = () => {
       
       let response;
       if (editMode) {
-        // Update existing channel
+        // Update existing channel - updated API endpoint
         response = await axios.put(
-          `${API_URL}/api/trafficChannels/${selectedRow.id}`, 
+          `${API_URL}/trafficChannels/${selectedRow.id}`, 
           formData
         );
         
@@ -525,10 +529,10 @@ const TrafficChannels = () => {
           severity: "success"
         });
       } else {
-        // Create new channel
-        response = await axios.post(`${API_URL}/api/trafficChannels`, formData);
+        // Create new channel - updated API endpoint
+        response = await axios.post(`${API_URL}/trafficChannels`, formData);
         
-        // Update local state
+        // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);
         
         setSnackbar({
@@ -541,6 +545,9 @@ const TrafficChannels = () => {
       // Reset form and close modal
       resetForm();
       setOpenSecondModal(false);
+      
+      // Refresh the data to ensure we have the latest from the server
+      fetchChannels();
     } catch (error) {
       console.error("Error saving channel:", error);
       setSnackbar({
