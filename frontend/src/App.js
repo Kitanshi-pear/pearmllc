@@ -9,8 +9,8 @@ import DomainsPage from "./components/Domains";
 import LandingPage from "./components/Landers";
 import CampaignsPage from "./components/Campaigns";
 import AdminPanelPage from "./components/AdminPanelPage";
-import ClickLogs from "./components/logs/click-log";
-import ConversionLogs from "./components/logs/conversion-log";
+import ClickLogs from "./components/ClickLogs";
+import ConversionLogs from "./components/ConversionLogs";
 
 const App = () => {
   return (
