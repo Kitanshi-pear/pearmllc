@@ -594,27 +594,32 @@ const DomainsPage = () => {
             field: 'action',
             headerName: 'Actions',
             width: 160,
-            renderCell: (params) => (
-                <Box>
-                    <Tooltip title="Edit Domain">
-                        <IconButton onClick={() => handleEdit(params.row)}>
-                            <Edit />
-                        </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title={getSSLButtonTooltip(params.row)}>
-                        <span> {/* Wrapper to allow disabled Tooltip */}
-                            <IconButton 
-                                onClick={() => handleManageSSL(params.row)}
-                                disabled={!params.row.needsSSLManagement}
-                                color={params.row.needsSSLManagement ? 'primary' : 'default'}
-                            >
-                                <Refresh />
+            renderCell: (params) => {
+                if (!params || !params.row) return null;
+                
+                const domain = params.row;
+                return (
+                    <Box>
+                        <Tooltip title="Edit Domain">
+                            <IconButton onClick={() => handleEdit(domain)}>
+                                <Edit />
                             </IconButton>
-                        </span>
-                    </Tooltip>
-                </Box>
-            ),
+                        </Tooltip>
+                        
+                        <Tooltip title={getSSLButtonTooltip(domain)}>
+                            <span> {/* Wrapper to allow disabled Tooltip */}
+                                <IconButton 
+                                    onClick={() => handleManageSSL(domain)}
+                                    disabled={!domain.needsSSLManagement}
+                                    color={domain.needsSSLManagement ? 'primary' : 'default'}
+                                >
+                                    <Refresh />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    </Box>
+                );
+            },
         },
         { field: 'id', headerName: 'ID', width: 100 },
         { field: 'url', headerName: 'Domain', width: 200 },
@@ -623,9 +628,11 @@ const DomainsPage = () => {
             headerName: 'Status',
             width: 130,
             renderCell: (params) => {
+                if (!params || !params.row) return null;
+                
                 // Check if we have a more up-to-date status in our local state
-                const domainId = params.row?.id;
-                const status = domainId && domainStatuses[domainId]?.status || params.value;
+                const domainId = params.row.id;
+                const status = (domainId && domainStatuses[domainId]?.status) || params.value;
                 
                 let color = 'default';
                 let label = status;
@@ -663,9 +670,11 @@ const DomainsPage = () => {
             headerName: 'CNAME Name',
             width: 250,
             valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row?.id;
-                return domainId && domainStatuses[domainId]?.cname_acm_name || params.value;
+                const domainId = params.row.id;
+                return (domainId && domainStatuses[domainId]?.cname_acm_name) || params.value || '';
             }
         },
         {
@@ -673,9 +682,11 @@ const DomainsPage = () => {
             headerName: 'CNAME Value',
             width: 250,
             valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row?.id;
-                return domainId && domainStatuses[domainId]?.cname_acm_value || params.value;
+                const domainId = params.row.id;
+                return (domainId && domainStatuses[domainId]?.cname_acm_value) || params.value || '';
             }
         },
         {
@@ -683,7 +694,8 @@ const DomainsPage = () => {
             headerName: 'Created',
             width: 180,
             valueFormatter: (params) => {
-                const value = params?.value;
+                if (!params) return '';
+                const value = params.value;
                 if (!value) return '';
                 const date = new Date(value);
                 return isNaN(date.getTime()) ? '' : date.toLocaleString();
@@ -694,7 +706,8 @@ const DomainsPage = () => {
             headerName: 'SSL Expires',
             width: 180,
             valueFormatter: (params) => {
-                const value = params?.value;
+                if (!params) return '';
+                const value = params.value;
                 if (!value) return '';
                 const date = new Date(value);
                 return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
@@ -705,9 +718,11 @@ const DomainsPage = () => {
             headerName: 'CloudFront Domain',
             width: 250,
             valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row?.id;
-                return domainId && domainStatuses[domainId]?.cloudfront_domain || params.value;
+                const domainId = params.row.id;
+                return (domainId && domainStatuses[domainId]?.cloudfront_domain) || params.value || '';
             }
         },
     ];
