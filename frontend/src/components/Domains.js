@@ -17,7 +17,7 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
 
     useEffect(() => {
         if (domainData) {
-            setUrl(domainData.url || '');
+            setUrl(domainData.url?.replace('https://', '') || '');
             setSslEnabled(domainData.sslEnabled || false);
         } else {
             setUrl('');
@@ -75,12 +75,38 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
     );
 };
 
-// SSL Provisioning Steps Modal
+// SSL Provisioning Steps Modal with improved flow
 const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy, onAutoRoute53 }) => {
-    const [activeStep, setActiveStep] = useState(0);
+    // Determine initial step based on domain status
+    const getInitialStep = () => {
+        if (domain.status === 'active' && !domain.reissue) return 2; // Already completed
+        if (domain.status === 'verifying' || domain.status === 'verifying_dns') return 1; // DNS verification step
+        return 0; // Initial step (request certificate)
+    };
+
+    const [activeStep, setActiveStep] = useState(getInitialStep);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [response, setResponse] = useState(null);
+    const [response, setResponse] = useState({
+        cname: domain?.cname_acm_name && domain?.cname_acm_value ? {
+            name: domain.cname_acm_name,
+            value: domain.cname_acm_value
+        } : null,
+        cloudfront_domain: domain?.cloudfront_domain || null
+    });
+
+    // Update the step when domain status changes
+    useEffect(() => {
+        setActiveStep(getInitialStep());
+        // Pre-populate response data from domain
+        setResponse({
+            cname: domain?.cname_acm_name && domain?.cname_acm_value ? {
+                name: domain.cname_acm_name,
+                value: domain.cname_acm_value
+            } : null,
+            cloudfront_domain: domain?.cloudfront_domain || null
+        });
+    }, [domain]);
 
     const steps = ['Request Certificate', 'Add DNS Record', 'Deploy CloudFront'];
 
@@ -129,7 +155,7 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
         <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 3, pt: 2 }}>
                 <DialogTitle sx={{ p: 0, fontSize: "20px", fontWeight: 500 }}>
-                    SSL Provisioning for {domain?.url}
+                    SSL Provisioning for {domain?.url?.replace('https://', '')}
                 </DialogTitle>
             </Box>
 
@@ -151,14 +177,16 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
                 {activeStep === 0 && (
                     <Box>
                         <Typography variant="body1" sx={{ mb: 2 }}>
-                            Request an SSL certificate from AWS Certificate Manager for your domain.
+                            {domain.reissue 
+                                ? "Reissue SSL certificate from AWS Certificate Manager for your domain." 
+                                : "Request an SSL certificate from AWS Certificate Manager for your domain."}
                         </Typography>
                         <Button 
                             variant="contained" 
                             onClick={handleProvision} 
                             disabled={loading}
                         >
-                            {loading ? 'Requesting...' : 'Request Certificate'}
+                            {loading ? 'Requesting...' : domain.reissue ? 'Reissue Certificate' : 'Request Certificate'}
                         </Button>
                     </Box>
                 )}
@@ -268,7 +296,9 @@ const DomainsPage = () => {
                     created_at: domain.created_at || '',
                     ssl_expiry: domain.ssl_expiry || '',
                     sslEnabled: domain.status !== 'active',
-                    reissue: domain.status !== 'active',
+                    reissue: domain.reissue || false,
+                    // Always allow managing SSL if it's not active or if reissue is needed
+                    needsSSLManagement: domain.status !== 'active' || domain.reissue
                 }];
 
                 setDomains(formatted);
@@ -279,11 +309,14 @@ const DomainsPage = () => {
                 const formatted = data.map((d, idx) => ({
                     ...d,
                     serial_no: idx + 1,
+                    url: `https://${d.domain}`,
                     cname_acm_name: d.cname_acm_name || '',
                     cname_acm_value: d.cname_acm_value || '',
                     created_at: d.created_at || '',
                     ssl_expiry: d.ssl_expiry || '',
-                    reissue: d.status !== 'active',
+                    reissue: d.reissue || false,
+                    // Always allow managing SSL if it's not active or if reissue is needed
+                    needsSSLManagement: d.status !== 'active' || d.reissue
                 }));
 
                 setDomains(formatted);
@@ -341,7 +374,8 @@ const DomainsPage = () => {
                     ...d,
                     ...updated,
                     url: `https://${updated.domain}`,
-                    sslEnabled: updated.status !== 'active'
+                    sslEnabled: updated.status !== 'active',
+                    needsSSLManagement: updated.status !== 'active' || updated.reissue
                 } : d));
                 
                 showNotification('Domain updated successfully', 'success');
@@ -357,7 +391,8 @@ const DomainsPage = () => {
                     ...created,
                     serial_no: domains.length + 1,
                     url: `https://${created.domain}`,
-                    sslEnabled: created.status !== 'active'
+                    sslEnabled: created.status !== 'active',
+                    needsSSLManagement: created.status !== 'active'
                 };
                 
                 setDomains(prev => [...prev, newDomain]);
@@ -416,6 +451,19 @@ const DomainsPage = () => {
         fetchDomains();
     };
 
+    // Helper function to get appropriate tooltip text
+    const getSSLButtonTooltip = (domain) => {
+        if (domain.status === 'active' && !domain.reissue) {
+            return 'SSL Already Active';
+        }
+        
+        if (domain.status === 'verifying' || domain.status === 'verifying_dns') {
+            return 'Continue DNS Verification';
+        }
+        
+        return domain.reissue ? 'Reissue SSL Certificate' : 'Manage SSL';
+    };
+
     const columns = [
         {
             field: 'action',
@@ -429,14 +477,16 @@ const DomainsPage = () => {
                         </IconButton>
                     </Tooltip>
                     
-                    <Tooltip title="Manage SSL">
-                        <IconButton 
-                            onClick={() => handleManageSSL(params.row)}
-                            disabled={params.row.status === 'active' && !params.row.reissue}
-                            color={params.row.status !== 'active' ? 'primary' : 'default'}
-                        >
-                            <Refresh />
-                        </IconButton>
+                    <Tooltip title={getSSLButtonTooltip(params.row)}>
+                        <span> {/* Wrapper to allow disabled Tooltip */}
+                            <IconButton 
+                                onClick={() => handleManageSSL(params.row)}
+                                disabled={!params.row.needsSSLManagement}
+                                color={params.row.needsSSLManagement ? 'primary' : 'default'}
+                            >
+                                <Refresh />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                 </Box>
             ),
