@@ -643,36 +643,81 @@ export default function CampaignsPage() {
   // Enhanced columns with proper data mapping
  // Replace your entire columns definition with this updated version:
 
-// Replace your entire columns definition with this fixed version:
+// Replace your entire columns definition with this ultra-robust version:
 
 const columns = [
-  { field: "id", headerName: "ID", width: 70 },
-  { field: "name", headerName: "Campaign Name", flex: 1 },
+  { 
+    field: "id", 
+    headerName: "ID", 
+    width: 70,
+    valueGetter: (params) => {
+      try {
+        return params?.row?.id || "";
+      } catch (e) {
+        console.warn("Error getting ID value:", e);
+        return "";
+      }
+    }
+  },
+  { 
+    field: "name", 
+    headerName: "Campaign Name", 
+    flex: 1,
+    valueGetter: (params) => {
+      try {
+        return params?.row?.name || "";
+      } catch (e) {
+        console.warn("Error getting name value:", e);
+        return "";
+      }
+    }
+  },
   {
     field: "status",
     headerName: "Status",
     width: 120,
-    renderCell: (params) => (
-      <Chip 
-        label={params.value || "INACTIVE"} 
-        color={params.value === "ACTIVE" ? "success" : "default"} 
-        size="small"
-      />
-    ),
+    renderCell: (params) => {
+      try {
+        const value = params?.value || "INACTIVE";
+        return (
+          <Chip 
+            label={value} 
+            color={value === "ACTIVE" ? "success" : "default"} 
+            size="small"
+          />
+        );
+      } catch (e) {
+        console.warn("Error rendering status cell:", e);
+        return <Chip label="INACTIVE" color="default" size="small" />;
+      }
+    },
+    valueGetter: (params) => {
+      try {
+        return params?.row?.status || "INACTIVE";
+      } catch (e) {
+        console.warn("Error getting status value:", e);
+        return "INACTIVE";
+      }
+    }
   },
   {
     field: "traffic_channel_id",
     headerName: "Traffic Source",
     width: 150,
     valueGetter: (params) => {
-      // Check multiple possible paths to get traffic channel name with proper null checks
-      if (params.row && params.row.traffic_channel_id && typeof params.row.traffic_channel_id === 'object' && params.row.traffic_channel_id.channelName) {
-        return params.row.traffic_channel_id.channelName;
-      } else if (params.row && params.row.traffic_channel_name) {
-        return params.row.traffic_channel_name;
-      } else if (params.row && params.row.traffic_channel_id) {
-        return `Source #${params.row.traffic_channel_id}`;
-      } else {
+      try {
+        // Check multiple possible paths to get traffic channel name with proper null checks
+        if (params?.row?.traffic_channel_id && typeof params.row.traffic_channel_id === 'object' && params.row.traffic_channel_id.channelName) {
+          return params.row.traffic_channel_id.channelName;
+        } else if (params?.row?.traffic_channel_name) {
+          return params.row.traffic_channel_name;
+        } else if (params?.row?.traffic_channel_id) {
+          return `Source #${params.row.traffic_channel_id}`;
+        } else {
+          return "N/A";
+        }
+      } catch (e) {
+        console.warn("Error getting traffic channel value:", e);
         return "N/A";
       }
     }
@@ -681,23 +726,49 @@ const columns = [
     field: "costType", 
     headerName: "Cost Type", 
     width: 100,
-    valueGetter: (params) => params.row ? (params.row.costType || "N/A") : "N/A"
+    valueGetter: (params) => {
+      try {
+        return params?.row?.costType || "N/A";
+      } catch (e) {
+        console.warn("Error getting cost type value:", e);
+        return "N/A";
+      }
+    }
   },
   { 
     field: "costValue", 
     headerName: "Cost", 
     width: 80,
-    valueGetter: (params) => params.row ? (params.row.costValue || 0) : 0,
-    valueFormatter: (params) => `$${parseFloat(params.value).toFixed(2)}` 
+    valueGetter: (params) => {
+      try {
+        return params?.row?.costValue || 0;
+      } catch (e) {
+        console.warn("Error getting cost value:", e);
+        return 0;
+      }
+    },
+    valueFormatter: (params) => {
+      try {
+        return `$${parseFloat(params?.value || 0).toFixed(2)}`;
+      } catch (e) {
+        console.warn("Error formatting cost value:", e);
+        return "$0.00";
+      }
+    }
   },
   {
     field: "clicks",
     headerName: "Clicks",
     width: 80,
     valueGetter: (params) => {
-      if (!params.row) return 0;
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.clicks || 0;
+      try {
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.clicks || 0;
+      } catch (e) {
+        console.warn("Error getting clicks value:", e);
+        return 0;
+      }
     }
   },
   {
@@ -705,9 +776,14 @@ const columns = [
     headerName: "Conversions",
     width: 110,
     valueGetter: (params) => {
-      if (!params.row) return 0;
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.conversions || 0;
+      try {
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.conversions || 0;
+      } catch (e) {
+        console.warn("Error getting conversions value:", e);
+        return 0;
+      }
     }
   },
   {
@@ -715,58 +791,99 @@ const columns = [
     headerName: "CR%",
     width: 80,
     valueGetter: (params) => {
-      if (!params.row) return "0.00";
-      const campaignMetrics = metrics[params.row.id] || {};
-      const clicks = campaignMetrics.clicks || 0;
-      const conversions = campaignMetrics.conversions || 0;
-      return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+      try {
+        if (!params?.row?.id) return "0.00";
+        const campaignMetrics = metrics[params.row.id] || {};
+        const clicks = campaignMetrics.clicks || 0;
+        const conversions = campaignMetrics.conversions || 0;
+        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+      } catch (e) {
+        console.warn("Error getting CR value:", e);
+        return "0.00";
+      }
     },
-    valueFormatter: (params) => `${params.value}%`
+    valueFormatter: (params) => {
+      try {
+        return `${params?.value || "0.00"}%`;
+      } catch (e) {
+        console.warn("Error formatting CR value:", e);
+        return "0.00%";
+      }
+    }
   },
   {
     field: "revenue",
     headerName: "Revenue",
     width: 100,
     valueGetter: (params) => {
-      if (!params.row) return 0;
-      const campaignMetrics = metrics[params.row.id] || {};
-      return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+      try {
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+      } catch (e) {
+        console.warn("Error getting revenue value:", e);
+        return 0;
+      }
     },
-    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    valueFormatter: (params) => {
+      try {
+        return `$${Number(params?.value || 0).toFixed(2)}`;
+      } catch (e) {
+        console.warn("Error formatting revenue value:", e);
+        return "$0.00";
+      }
+    }
   },
   {
     field: "profit",
     headerName: "Profit",
     width: 100,
     valueGetter: (params) => {
-      if (!params.row) return 0;
-      const campaignMetrics = metrics[params.row.id] || {};
-      // Calculate profit if not directly available
-      if (campaignMetrics.profit !== undefined) {
-        return campaignMetrics.profit;
-      } else {
-        const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-        const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
-        return revenue - cost;
+      try {
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        // Calculate profit if not directly available
+        if (campaignMetrics.profit !== undefined) {
+          return campaignMetrics.profit;
+        } else {
+          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+          return revenue - cost;
+        }
+      } catch (e) {
+        console.warn("Error getting profit value:", e);
+        return 0;
       }
     },
-    valueFormatter: (params) => `$${Number(params.value).toFixed(2)}`
+    valueFormatter: (params) => {
+      try {
+        return `$${Number(params?.value || 0).toFixed(2)}`;
+      } catch (e) {
+        console.warn("Error formatting profit value:", e);
+        return "$0.00";
+      }
+    }
   },
   {
     field: "offer_id",
     headerName: "Offer",
     width: 120,
     valueGetter: (params) => {
-      if (!params.row) return "N/A";
-      // Find offer name from the offers list if available
-      const offerItem = offersList.find(
-        offer => offer.Serial_No === params.row.offer_id
-      );
-      
-      if (offerItem) {
-        return offerItem.Offer_name;
-      } else {
-        return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+      try {
+        if (!params?.row?.offer_id) return "N/A";
+        // Find offer name from the offers list if available
+        const offerItem = offersList.find(
+          offer => offer.Serial_No === params.row.offer_id
+        );
+        
+        if (offerItem) {
+          return offerItem.Offer_name;
+        } else {
+          return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+        }
+      } catch (e) {
+        console.warn("Error getting offer value:", e);
+        return "N/A";
       }
     }
   },
@@ -775,43 +892,59 @@ const columns = [
     headerName: "Actions",
     width: 120,
     renderCell: (params) => {
-      if (!params.row) return null;
-      return (
-        <Box display="flex">
-          <IconButton
-            size="small"
-            onClick={() => handleEditClick(params.row)}
-            title="Edit Campaign"
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-              // Function to copy tracking URL
-              const domain = params.row.domain?.url || 
-                            (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                            "yourdomain.com";
-              const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id}`;
-              navigator.clipboard.writeText(trackingUrl);
-              setSnackbarMessage("Tracking URL copied to clipboard!");
-              setSnackbarOpen(true);
-            }}
-            title="Copy Tracking URL"
-          >
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-              window.open(`/campaigns/${params.row.id}`, '_blank');
-            }}
-            title="View Campaign Details"
-          >
-            <LaunchIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      );
+      try {
+        if (!params?.row?.id) return null;
+        return (
+          <Box display="flex">
+            <IconButton
+              size="small"
+              onClick={() => handleEditClick(params.row)}
+              title="Edit Campaign"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => {
+                try {
+                  // Function to copy tracking URL
+                  const domain = params.row.domain?.url || 
+                                (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                                "yourdomain.com";
+                  const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
+                  navigator.clipboard.writeText(trackingUrl);
+                  setSnackbarMessage("Tracking URL copied to clipboard!");
+                  setSnackbarOpen(true);
+                } catch (err) {
+                  console.error("Error copying tracking URL:", err);
+                  setSnackbarMessage("Error copying URL. See console for details.");
+                  setSnackbarSeverity("error");
+                  setSnackbarOpen(true);
+                }
+              }}
+              title="Copy Tracking URL"
+            >
+              <ContentCopyIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => {
+                try {
+                  window.open(`/campaigns/${params.row.id}`, '_blank');
+                } catch (err) {
+                  console.error("Error opening campaign details:", err);
+                }
+              }}
+              title="View Campaign Details"
+            >
+              <LaunchIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        );
+      } catch (e) {
+        console.warn("Error rendering actions cell:", e);
+        return null;
+      }
     }
   },
 ];

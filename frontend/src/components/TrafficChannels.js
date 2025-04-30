@@ -1057,7 +1057,7 @@ const TrafficChannels = () => {
 
                       {/* Currency */}
                       <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
-                        <Typography sx={{ width: "30%" }}>Currency:</Typography>
+                        <Typography sx={{ width: "40%" }}>Currency:</Typography>
                         <FormControl fullWidth error={!!formErrors.currency}>
                           <Select
                             name="currency"
@@ -1094,7 +1094,7 @@ const TrafficChannels = () => {
                         </FormControl>
                       </Grid>
                       <Grid item xs={12}>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: -1 }}>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
                           If no currency is selected, the value selected in the profile will be used.
                         </Typography>
                       </Grid>
