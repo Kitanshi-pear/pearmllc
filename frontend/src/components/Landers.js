@@ -67,7 +67,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
         '';
       
       // Format the final URL with the domain and click path
-      const finalUrl = `https://${landerData.domain}/click${queryParamsFormatted}`;
+      const finalUrl = `https://${landerData.domain}/click`;
 
       const payload = {
         ...landerData,
