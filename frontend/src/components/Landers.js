@@ -152,7 +152,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
           <Typography variant="subtitle2">Click URL</Typography>
           <TextField
             fullWidth
-            value={`${landerData.domain}/click`}
+            value={`https://${landerData.domain}/click`}
             margin="dense"
             InputProps={{ readOnly: true }}
           />
