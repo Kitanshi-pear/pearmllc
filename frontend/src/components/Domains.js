@@ -17,9 +17,7 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
 
     useEffect(() => {
         if (domainData) {
-            // Extract domain name from URL or use domain field directly
-            const domainName = domainData.domain || domainData.url?.replace('https://', '') || '';
-            setUrl(domainName);
+            setUrl(domainData.url?.replace('https://', '') || '');
             setSslEnabled(domainData.sslEnabled || false);
         } else {
             setUrl('');
@@ -194,7 +192,7 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
         <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 3, pt: 2 }}>
                 <DialogTitle sx={{ p: 0, fontSize: "20px", fontWeight: 500 }}>
-                    SSL Provisioning for {domain?.domain || domain?.url?.replace('https://', '')}
+                    SSL Provisioning for {domain?.url?.replace('https://', '')}
                 </DialogTitle>
             </Box>
 
@@ -329,16 +327,10 @@ const DomainsPage = () => {
                 const response = await axios.get(`https://pearmllc.onrender.com/api/domains/${id}`);
                 const domain = response.data;
 
-                console.log('API response for single domain:', domain);
-
-                // We need to handle the API response correctly
-                // The single domain endpoint returns raw domain data, not the formatted one
                 const formatted = [{
                     ...domain,
                     serial_no: 1,
-                    // Use domain field directly since it's already in the API response
-                    domain: domain.domain || '',
-                    url: domain.url || `https://${domain.domain}`,
+                    url: `https://${domain.domain}`,
                     cname_acm_name: domain.cname_acm_name || '',
                     cname_acm_value: domain.cname_acm_value || '',
                     created_at: domain.created_at || '',
@@ -354,14 +346,13 @@ const DomainsPage = () => {
                 const response = await axios.get('https://pearmllc.onrender.com/api/domains');
                 const data = response.data;
 
-                console.log('API response for all domains:', data);
-
-                // The list endpoint already returns formatted data
-                // Just ensure we have all needed fields
                 const formatted = data.map((d, idx) => ({
                     ...d,
-                    serial_no: d.serial_no || idx + 1,
-                    domain: d.domain || d.url?.replace('https://', '') || '',
+                    serial_no: idx + 1,
+                    cname_acm_name: d.cname_acm_name || '',
+                    cname_acm_value: d.cname_acm_value || '',
+                    created_at: d.created_at || '',
+                    ssl_expiry: d.ssl_expiry || '',
                     reissue: d.reissue_only || false,
                     // Always allow managing SSL if it's not active or if reissue is needed
                     needsSSLManagement: d.status !== 'active' || d.reissue_only
@@ -433,8 +424,7 @@ const DomainsPage = () => {
                 setDomains(prev => prev.map(d => d.id === updated.id ? {
                     ...d,
                     ...updated,
-                    domain: updated.domain,
-                    url: updated.url || `https://${updated.domain}`,
+                    url: `https://${updated.domain}`,
                     sslEnabled: updated.status !== 'active',
                     needsSSLManagement: updated.status !== 'active' || updated.reissue_only
                 } : d));
@@ -451,11 +441,9 @@ const DomainsPage = () => {
                 const newDomain = {
                     ...created,
                     serial_no: domains.length + 1,
-                    domain: created.domain,
-                    url: created.url || `https://${created.domain}`,
+                    url: `https://${created.domain}`,
                     sslEnabled: created.status !== 'active',
-                    needsSSLManagement: created.status !== 'active',
-                    reissue: created.reissue_only || false
+                    needsSSLManagement: created.status !== 'active'
                 };
                 
                 setDomains(prev => [...prev, newDomain]);
@@ -479,8 +467,6 @@ const DomainsPage = () => {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/provision`);
             showNotification('Certificate requested successfully', 'success');
             
-            console.log('SSL provision response:', response.data);
-            
             // Store the updated status in our local state to maintain continuity
             setDomainStatuses(prevStatuses => ({
                 ...prevStatuses,
@@ -492,17 +478,7 @@ const DomainsPage = () => {
                 }
             }));
             
-            // Update the selectedDomain if it's the one we're currently working with
-            if (selectedDomain && selectedDomain.id === domainId) {
-                setSelectedDomain(prev => ({
-                    ...prev,
-                    status: 'verifying',
-                    cname_acm_name: response.data.cname?.name || prev.cname_acm_name,
-                    cname_acm_value: response.data.cname?.value || prev.cname_acm_value
-                }));
-            }
-            
-            // No need to fetch domains immediately - this would interrupt the user flow
+            // Don't fetch domains immediately - this would interrupt the user flow
             // We'll refresh when they close the modal
             
             return response.data;
@@ -517,8 +493,6 @@ const DomainsPage = () => {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/deploy`);
             showNotification('CloudFront deployed successfully', 'success');
             
-            console.log('CloudFront deploy response:', response.data);
-            
             // Store the updated status in our local state
             setDomainStatuses(prevStatuses => ({
                 ...prevStatuses,
@@ -528,22 +502,6 @@ const DomainsPage = () => {
                     cloudfront_domain: response.data.cloudfront_domain || ''
                 }
             }));
-            
-            // Update the selectedDomain if it's the one we're currently working with
-            if (selectedDomain && selectedDomain.id === domainId) {
-                setSelectedDomain(prev => ({
-                    ...prev,
-                    status: 'active',
-                    cloudfront_domain: response.data.cloudfront_domain || prev.cloudfront_domain
-                }));
-            }
-            
-            // Delay the domains refresh so it doesn't interrupt the modal flow
-            setTimeout(() => {
-                if (!openSSLModal) {
-                    fetchDomains();
-                }
-            }, 500);
             
             return response.data;
         } catch (error) {
@@ -557,8 +515,6 @@ const DomainsPage = () => {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/auto-route53`);
             showNotification('DNS record added to Route 53', 'success');
             
-            console.log('Route53 auto add response:', response.data);
-            
             // Store the updated status in our local state
             setDomainStatuses(prevStatuses => ({
                 ...prevStatuses,
@@ -567,17 +523,6 @@ const DomainsPage = () => {
                     status: 'verifying_dns'
                 }
             }));
-            
-            // Update the selectedDomain if it's the one we're currently working with
-            if (selectedDomain && selectedDomain.id === domainId) {
-                setSelectedDomain(prev => ({
-                    ...prev,
-                    status: 'verifying_dns'
-                }));
-            }
-            
-            // Don't fetch domains immediately - this disrupts the user flow
-            // Instead, we'll do it when they close the modal
             
             return response.data;
         } catch (error) {
@@ -617,6 +562,11 @@ const DomainsPage = () => {
                 if (!params || !params.row) return null;
                 
                 const domain = params.row;
+                // Check if we have local state for this domain's status
+                const localStatus = domain.id && domainStatuses[domain.id]?.status;
+                const effectiveStatus = localStatus || domain.status;
+                const needsSSLManagement = effectiveStatus !== 'active' || domain.reissue;
+                
                 return (
                     <Box>
                         <Tooltip title="Edit Domain">
@@ -629,8 +579,8 @@ const DomainsPage = () => {
                             <span> {/* Wrapper to allow disabled Tooltip */}
                                 <IconButton 
                                     onClick={() => handleManageSSL(domain)}
-                                    disabled={!domain.needsSSLManagement}
-                                    color={domain.needsSSLManagement ? 'primary' : 'default'}
+                                    disabled={!needsSSLManagement}
+                                    color={needsSSLManagement ? 'primary' : 'default'}
                                 >
                                     <Refresh />
                                 </IconButton>
@@ -640,20 +590,8 @@ const DomainsPage = () => {
                 );
             },
         },
-        { 
-            field: 'id', 
-            headerName: 'ID', 
-            width: 100 
-        },
-        { 
-            field: 'url', 
-            headerName: 'Domain', 
-            width: 200,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                return params.row.url || `https://${params.row.domain}` || '';
-            }
-        },
+        { field: 'id', headerName: 'ID', width: 100 },
+        { field: 'url', headerName: 'Domain', width: 200 },
         {
             field: 'status',
             headerName: 'Status',
@@ -724,37 +662,21 @@ const DomainsPage = () => {
             field: 'created_at',
             headerName: 'Created',
             width: 180,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                return params.row.created_at || '';
-            },
-            renderCell: (params) => {
-                if (!params || !params.value) return null;
+            valueFormatter: (params) => {
+                if (!params || !params.value) return '';
                 const date = new Date(params.value);
-                return (
-                    <Typography variant="body2">
-                        {isNaN(date.getTime()) ? '' : date.toLocaleString()}
-                    </Typography>
-                );
-            }
+                return isNaN(date.getTime()) ? '' : date.toLocaleString();
+            },
         },
         {
             field: 'ssl_expiry',
             headerName: 'SSL Expires',
             width: 180,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                return params.row.ssl_expiry || '';
-            },
-            renderCell: (params) => {
-                if (!params || !params.value) return null;
+            valueFormatter: (params) => {
+                if (!params || !params.value) return '';
                 const date = new Date(params.value);
-                return (
-                    <Typography variant="body2">
-                        {isNaN(date.getTime()) ? '' : date.toLocaleDateString()}
-                    </Typography>
-                );
-            }
+                return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+            },
         },
         {
             field: 'cloudfront_domain',
