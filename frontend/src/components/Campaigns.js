@@ -56,7 +56,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
       setLoading(true);
       
       // Fetch traffic channels
-      fetch(`${API_URL}/api/traffic/trafficChannels`)
+      fetch(`${API_URL}/api/traffic`)
         .then((res) => res.json())
         .then((data) => {
           // Ensure data is an array
