@@ -1041,8 +1041,29 @@ const columns = [
         tryAlternativeEndpoints();
       });
   };
-  
-  // 2. Update the handleSuccessfulResponse function with the same improved field normalization:
+
+  // Function to try alternative API endpoints
+  const tryAlternativeEndpoints = () => {
+    console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
+    
+    axios.get(`${API_URL}/api/campaign`)
+      .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
+      .catch((err) => {
+        console.log("Trying another alternative endpoint:", `${API_URL}/api/campaigns/list`);
+        
+        axios.get(`${API_URL}/api/campaigns/list`)
+          .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
+          .catch((altErr) => {
+            console.error("All campaign fetching attempts failed");
+            setLoading(false);
+            setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
+            setSnackbarSeverity("error");
+            setSnackbarOpen(true);
+          });
+      });
+  };
+    
+  // Handle successful API response
   const handleSuccessfulResponse = (res, logMessage) => {
     console.log(logMessage, res.data);
     
