@@ -17,12 +17,19 @@ import {
   Tab,
   Tabs,
   Paper,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -73,6 +80,12 @@ const generatePostbackTemplate = (baseUrl = window.location.origin, sourceType =
     return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}&sub2=${POSTBACK_MACROS.SUB2}`;
   } else if (sourceType.toLowerCase() === 'google') {
     return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.GCLID}`;
+  } else if (sourceType.toLowerCase() === 'tiktok') {
+    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}`;
+  } else if (sourceType.toLowerCase() === 'taboola') {
+    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub_id=${POSTBACK_MACROS.SUB1}`;
+  } else if (sourceType.toLowerCase() === 'outbrain') {
+    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub_id=${POSTBACK_MACROS.SUB1}`;
   } else {
     return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&status=1`;
   }
@@ -99,12 +112,19 @@ const OfferSourcePage = () => {
   const [editMode, setEditMode] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [filterText, setFilterText] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [titleText, setTitle] = useState("");
   const [tabValue, setTabValue] = useState(0);
   const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
   
   // Postback testing state
   const [testPostbackData, setTestPostbackData] = useState({
@@ -136,7 +156,7 @@ const OfferSourcePage = () => {
   const [testResult, setTestResult] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
 
-  const currencies = ["USD", "EUR", "INR", "GBP"];
+  const currencies = ["USD", "EUR", "INR", "GBP", "CAD", "AUD", "JPY", "CNY"];
   const roles = [
     "Event ID",
     "First Name",
@@ -161,6 +181,11 @@ const OfferSourcePage = () => {
     "TikTok",
     "Taboola",
     "Outbrain",
+    "Snapchat",
+    "Pinterest",
+    "Twitter",
+    "LinkedIn",
+    "Reddit",
     "Other"
   ];
 
@@ -183,7 +208,8 @@ const OfferSourcePage = () => {
     google_ads_id: "", // Google Ads account ID
     conversion_id: "", // Google conversion ID
     conversion_label: "", // Google conversion label
-    default_event_name: "purchase" // Default event name
+    default_event_name: "purchase", // Default event name
+    is_active: true  // Active status
   });
 
   const handleDateChange = (e) => {
@@ -195,6 +221,7 @@ const OfferSourcePage = () => {
   };
 
   const fetchOfferSources = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(
         "https://pearmllc.onrender.com/offersource/list"
@@ -206,7 +233,7 @@ const OfferSourcePage = () => {
         serial_no: index + 1,
         source_name: item.name,
         source_type: item.sourceType || "Other",
-        Timestamp: item.createdAt,
+        timestamp: item.createdAt,
         postback: item.postback_url,
         pixel_id: item.pixel_id || "",
         api_key: item.api_key || "",
@@ -222,21 +249,34 @@ const OfferSourcePage = () => {
         token: item.token,
         description: item.description,
         role: item.role,
-        clicks: 0,
-        lp_clicks: 0,
-        conversion: 0,
-        total_cpa: 0,
-        epc: 0,
-        total_revenue: 0,
-        cost: 0,
-        profit: 0,
-        total_roi: 0,
-        lp_views: 0,
+        is_active: item.is_active !== false, // Default to true if not specified
+        clicks: item.clicks || 0,
+        lp_clicks: item.lp_clicks || 0,
+        conversion: item.conversions || 0,
+        total_cpa: item.total_cpa || 0,
+        epc: item.epc || 0,
+        total_revenue: item.total_revenue || 0,
+        cost: item.cost || 0,
+        profit: item.profit || 0,
+        total_roi: item.total_roi || 0,
+        lp_views: item.lp_views || 0,
       }));
 
       setRows(formatted);
+      setSnackbar({
+        open: true,
+        message: 'Sources loaded successfully',
+        severity: 'success'
+      });
     } catch (err) {
       console.error("Failed to fetch offer sources:", err.message);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load sources: ' + (err.response?.data?.message || err.message),
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -265,9 +305,40 @@ const OfferSourcePage = () => {
       google_ads_id: row.google_ads_id || "",
       conversion_id: row.conversion_id || "",
       conversion_label: row.conversion_label || "",
-      default_event_name: row.default_event_name || "purchase"
+      default_event_name: row.default_event_name || "purchase",
+      is_active: row.is_active !== false // Default to true if not specified
     });
     setOpenTemplateModal(true);
+  };
+
+  const handleDeleteClick = (row) => {
+    setSelectedRowId(row.id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await axios.delete(
+        `https://pearmllc.onrender.com/offersource/delete/${selectedRowId}`
+      );
+      
+      setSnackbar({
+        open: true,
+        message: 'Source deleted successfully',
+        severity: 'success'
+      });
+      
+      fetchOfferSources();
+      setDeleteConfirmOpen(false);
+      setSelectedRowId(null);
+    } catch (error) {
+      console.error("Error deleting source:", error.message);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete source: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+    }
   };
 
   const handleSaveTemplate = async () => {
@@ -291,7 +362,8 @@ const OfferSourcePage = () => {
         google_ads_id: newTemplate.google_ads_id,
         conversion_id: newTemplate.conversion_id,
         conversion_label: newTemplate.conversion_label,
-        default_event_name: newTemplate.default_event_name
+        default_event_name: newTemplate.default_event_name,
+        is_active: newTemplate.is_active
       };
 
       if (editMode && selectedRowId) {
@@ -299,13 +371,21 @@ const OfferSourcePage = () => {
           `https://pearmllc.onrender.com/offersource/update/${selectedRowId}`,
           payload
         );
-        console.log("Updated successfully");
+        setSnackbar({
+          open: true,
+          message: 'Source updated successfully',
+          severity: 'success'
+        });
       } else {
         await axios.post(
           "https://pearmllc.onrender.com/offersource/create",
           payload
         );
-        console.log("Created successfully");
+        setSnackbar({
+          open: true,
+          message: 'Source created successfully',
+          severity: 'success'
+        });
       }
 
       fetchOfferSources();
@@ -330,10 +410,16 @@ const OfferSourcePage = () => {
         google_ads_id: "",
         conversion_id: "",
         conversion_label: "",
-        default_event_name: "purchase"
+        default_event_name: "purchase",
+        is_active: true
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
+      setSnackbar({
+        open: true,
+        message: 'Failed to save source: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
     }
   };
 
@@ -348,8 +434,11 @@ const OfferSourcePage = () => {
 
   const handleCopyPostback = () => {
     navigator.clipboard.writeText(newTemplate.postbackUrl);
-    // You could add a snackbar notification here
-    alert("Postback URL copied to clipboard!");
+    setSnackbar({
+      open: true,
+      message: 'Postback URL copied to clipboard',
+      severity: 'success'
+    });
   };
 
   const handleGeneratePostbackTemplate = () => {
@@ -441,12 +530,53 @@ const OfferSourcePage = () => {
           >
             <EditIcon fontSize="small" />
           </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteClick(params.row)}
+            title="Delete"
+            color="error"
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
         </Box>
       ),
     },
-    { field: "source_type", headerName: "Type", width: 120 },
+    { 
+      field: "source_type", 
+      headerName: "Type", 
+      width: 120,
+      renderCell: (params) => (
+        <Tooltip title={`${params.value} source`}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            width: '100%'
+          }}>
+            <Typography>{params.value}</Typography>
+          </Box>
+        </Tooltip>
+      )
+    },
     {
-      field: "Timestamp",
+      field: "is_active",
+      headerName: "Status",
+      width: 120,
+      renderCell: (params) => (
+        <Box
+          sx={{
+            backgroundColor: params.value ? "#e6f7e7" : "#ffebee",
+            color: params.value ? "#2e7d32" : "#d32f2f",
+            borderRadius: 1,
+            px: 1,
+            py: 0.5,
+          }}
+        >
+          {params.value ? "Active" : "Inactive"}
+        </Box>
+      ),
+    },
+    {
+      field: "timestamp",
       headerName: "Timestamp",
       width: 200,
       valueGetter: (params) =>
@@ -469,16 +599,33 @@ const OfferSourcePage = () => {
             </Typography>
           </Tooltip>
           {params.value && (
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenPostbackTest(params.row);
-              }}
-              title="Test Postback"
-            >
-              <VisibilityIcon fontSize="small" />
-            </IconButton>
+            <>
+              <IconButton 
+                size="small" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(params.value);
+                  setSnackbar({
+                    open: true,
+                    message: 'Postback URL copied to clipboard',
+                    severity: 'success'
+                  });
+                }}
+                title="Copy Postback"
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+              <IconButton 
+                size="small" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPostbackTest(params.row);
+                }}
+                title="Test Postback"
+              >
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </>
           )}
         </Box>
       )
@@ -486,17 +633,78 @@ const OfferSourcePage = () => {
     { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
     { field: "lp_clicks", headerName: "LP Clicks", width: 120, type: "number" },
     { field: "conversion", headerName: "Conversions", width: 150, type: "number" },
-    { field: "total_cpa", headerName: "Total CPA ($)", width: 150, type: "number" },
-    { field: "epc", headerName: "EPC ($)", width: 120, type: "number" },
+    { 
+      field: "total_cpa", 
+      headerName: "Total CPA ($)", 
+      width: 150, 
+      type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: "epc", 
+      headerName: "EPC ($)", 
+      width: 120, 
+      type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2);
+      }
+    },
     {
       field: "total_revenue",
       headerName: "Total Revenue ($)",
       width: 180,
       type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2);
+      }
     },
-    { field: "cost", headerName: "Cost ($)", width: 150, type: "number" },
-    { field: "profit", headerName: "Profit ($)", width: 150, type: "number" },
-    { field: "total_roi", headerName: "Total ROI (%)", width: 150, type: "number" },
+    { 
+      field: "cost", 
+      headerName: "Cost ($)", 
+      width: 150, 
+      type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: "profit", 
+      headerName: "Profit ($)", 
+      width: 150, 
+      type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: "total_roi", 
+      headerName: "Total ROI (%)", 
+      width: 150, 
+      type: "number",
+      valueFormatter: (params) => {
+        if (params.value == null) {
+          return '0.00';
+        }
+        return params.value.toFixed(2) + '%';
+      }
+    },
     { field: "lp_views", headerName: "LP Views", width: 150, type: "number" },
   ];
 
@@ -512,7 +720,7 @@ const OfferSourcePage = () => {
           >
             <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
               <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-                Date 2025-04-10 - 2025-04-10
+                Date {new Date().toISOString().split('T')[0]}
               </Typography>
               <Typography variant="body1" sx={{ fontWeight: "400" }}>
                 Today
@@ -576,6 +784,10 @@ const OfferSourcePage = () => {
     );
   };
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   return (
     <Layout>
       <Box>
@@ -586,37 +798,48 @@ const OfferSourcePage = () => {
           sx={{ mb: 2 }}
         >
           <Typography variant="h4">Offer Source</Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              setOpenTemplateModal(true);
-              setEditMode(false);
-              setSelectedRowId(null);
-              setNewTemplate({
-                name: "",
-                alias: "",
-                postbackUrl: "",
-                sourceType: "",
-                currency: "USD",
-                offerUrl: "",
-                clickid: "",
-                sum: "",
-                parameter: "",
-                token: "",
-                description: "",
-                role: "",
-                pixel_id: "",
-                api_key: "",
-                google_ads_id: "",
-                conversion_id: "",
-                conversion_label: "",
-                default_event_name: "purchase"
-              });
-            }}
-          >
-            Add New Source
-          </Button>
+          <Box display="flex" gap={2}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={fetchOfferSources}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                setOpenTemplateModal(true);
+                setEditMode(false);
+                setSelectedRowId(null);
+                setNewTemplate({
+                  name: "",
+                  alias: "",
+                  postbackUrl: "",
+                  sourceType: "",
+                  currency: "USD",
+                  offerUrl: "",
+                  clickid: "",
+                  sum: "",
+                  parameter: "",
+                  token: "",
+                  description: "",
+                  role: "",
+                  pixel_id: "",
+                  api_key: "",
+                  google_ads_id: "",
+                  conversion_id: "",
+                  conversion_label: "",
+                  default_event_name: "purchase",
+                  is_active: true
+                });
+              }}
+            >
+              Add New Source
+            </Button>
+          </Box>
         </Box>
 
         <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
@@ -663,13 +886,27 @@ const OfferSourcePage = () => {
             p: 2,
           }}
         >
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            pageSize={5}
-            rowsPerPageOptions={[5, 10, 15]}
-            disableSelectionOnClick
-          />
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+              <CircularProgress />
+            </Box>
+          ) : (
+            <DataGrid
+              rows={rows}
+              columns={columns}
+              pageSize={10}
+              rowsPerPageOptions={[5, 10, 15, 20, 50]}
+              disableSelectionOnClick
+              components={{
+                NoRowsOverlay: () => (
+                  <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
+                    <Typography variant="h6" color="text.secondary">No Sources Found</Typography>
+                    <Typography variant="body2" color="text.secondary">Add your first traffic source to get started</Typography>
+                  </Box>
+                ),
+              }}
+            />
+          )}
         </Box>
 
         {/* Enhanced Modal Component with Tabs */}
@@ -732,40 +969,41 @@ const OfferSourcePage = () => {
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
-                        <Select
-                          fullWidth
-                          value={newTemplate.sourceType}
-                          onChange={handleSourceTypeChange}
-                          displayEmpty
-                          label="Source Type"
-                        >
-                          <MenuItem value="" disabled>Select Source Type</MenuItem>
-                          {source_types.map((type) => (
-                            <MenuItem key={type} value={type}>
-                              {type}
-                            </MenuItem>
-                          ))}
-                        </Select>
+                        <FormControl fullWidth>
+                          <InputLabel>Source Type</InputLabel>
+                          <Select
+                            value={newTemplate.sourceType}
+                            onChange={handleSourceTypeChange}
+                            label="Source Type"
+                          >
+                            <MenuItem value="" disabled>Select Source Type</MenuItem>
+                            {source_types.map((type) => (
+                              <MenuItem key={type} value={type}>
+                                {type}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Grid>
                     </Grid>
                     
-                    <Select
-                      fullWidth
-                      value={newTemplate.currency}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, currency: e.target.value })
-                      }
-                      sx={{ mt: 2 }}
-                      displayEmpty
-                      label="Currency"
-                    >
-                      <MenuItem value="" disabled>Select Currency</MenuItem>
-                      {currencies.map((currency) => (
-                        <MenuItem key={currency} value={currency}>
-                          {currency}
-                        </MenuItem>
-                      ))}
-                    </Select>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel>Currency</InputLabel>
+                      <Select
+                        value={newTemplate.currency}
+                        onChange={(e) =>
+                          setNewTemplate({ ...newTemplate, currency: e.target.value })
+                        }
+                        label="Currency"
+                      >
+                        <MenuItem value="" disabled>Select Currency</MenuItem>
+                        {currencies.map((currency) => (
+                          <MenuItem key={currency} value={currency}>
+                            {currency}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     
                     <TextField
                       fullWidth
@@ -775,7 +1013,26 @@ const OfferSourcePage = () => {
                         setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
                       }
                       sx={{ mt: 2 }}
+                      helperText="Template for generating tracking links (optional)"
                     />
+                    
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={6}>
+                          <Typography variant="body2">Status</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Select
+                            value={newTemplate.is_active}
+                            onChange={(e) => setNewTemplate({ ...newTemplate, is_active: e.target.value })}
+                            fullWidth
+                          >
+                            <MenuItem value={true}>Active</MenuItem>
+                            <MenuItem value={false}>Inactive</MenuItem>
+                          </Select>
+                        </Grid>
+                      </Grid>
+                    </FormControl>
                   </CardContent>
                 </Card>
 
@@ -792,6 +1049,7 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, clickid: e.target.value })
                           }
+                          helperText="Parameter name for tracking clicks (e.g., 'clickid', 'cid', etc.)"
                         />
                       </Grid>
                       <Grid item xs={6}>
@@ -802,6 +1060,7 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, sum: e.target.value })
                           }
+                          helperText="Parameter name for payout value (e.g., 'payout', 'amount', etc.)"
                         />
                       </Grid>
                     </Grid>
@@ -844,21 +1103,23 @@ const OfferSourcePage = () => {
                         />
                       </Grid>
                       <Grid item xs={3}>
-                        <Select
-                          fullWidth
-                          value={newTemplate.role}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, role: e.target.value })
-                          }
-                          displayEmpty
-                        >
-                          <MenuItem value="" disabled>Select Role</MenuItem>
-                          {roles.map((role) => (
-                            <MenuItem key={role} value={role}>
-                              {role}
-                            </MenuItem>
-                          ))}
-                        </Select>
+                        <FormControl fullWidth>
+                          <InputLabel>Role</InputLabel>
+                          <Select
+                            value={newTemplate.role}
+                            onChange={(e) =>
+                              setNewTemplate({ ...newTemplate, role: e.target.value })
+                            }
+                            label="Role"
+                          >
+                            <MenuItem value="" disabled>Select Role</MenuItem>
+                            {roles.map((role) => (
+                              <MenuItem key={role} value={role}>
+                                {role}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Grid>
                     </Grid>
                   </CardContent>
@@ -1347,6 +1608,64 @@ const OfferSourcePage = () => {
             </Box>
           </Box>
         </Modal>
+        
+        {/* Delete Confirmation Dialog */}
+        <Modal
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "400px",
+              bgcolor: "background.paper",
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" gutterBottom>
+              Confirm Deletion
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3 }}>
+              Are you sure you want to delete this traffic source? This action cannot be undone.
+            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button 
+                onClick={() => setDeleteConfirmOpen(false)} 
+                sx={{ mr: 2 }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                color="error" 
+                onClick={handleConfirmDelete}
+              >
+                Delete
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+        
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert 
+            onClose={handleCloseSnackbar} 
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Layout>
   );

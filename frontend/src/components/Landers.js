@@ -117,7 +117,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
       '';
     
-    return `https://${landerData.domain}/click${queryParamsFormatted}`;
+    return `https://${landerData.domain}/click`;
   };
 
   return (
