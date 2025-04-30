@@ -17,7 +17,9 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
 
     useEffect(() => {
         if (domainData) {
-            setUrl(domainData.url?.replace('https://', '') || '');
+            // Remove https:// if present in the URL
+            const cleanUrl = domainData.url?.replace('https://', '') || '';
+            setUrl(cleanUrl);
             setSslEnabled(domainData.sslEnabled || false);
         } else {
             setUrl('');
@@ -477,9 +479,16 @@ const DomainsPage = () => {
                     cname_acm_value: response.data.cname?.value || ''
                 }
             }));
-            
-            // Don't fetch domains immediately - this would interrupt the user flow
-            // We'll refresh when they close the modal
+
+            // Update domains data to reflect changes
+            setDomains(prevDomains => 
+                prevDomains.map(d => d.id === domainId ? {
+                    ...d,
+                    status: 'verifying',
+                    cname_acm_name: response.data.cname?.name || d.cname_acm_name,
+                    cname_acm_value: response.data.cname?.value || d.cname_acm_value
+                } : d)
+            );
             
             return response.data;
         } catch (error) {
@@ -502,6 +511,15 @@ const DomainsPage = () => {
                     cloudfront_domain: response.data.cloudfront_domain || ''
                 }
             }));
+
+            // Update domains data to reflect changes
+            setDomains(prevDomains => 
+                prevDomains.map(d => d.id === domainId ? {
+                    ...d,
+                    status: 'active',
+                    cloudfront_domain: response.data.cloudfront_domain || d.cloudfront_domain
+                } : d)
+            );
             
             return response.data;
         } catch (error) {
@@ -523,6 +541,14 @@ const DomainsPage = () => {
                     status: 'verifying_dns'
                 }
             }));
+
+            // Update domains data to reflect changes
+            setDomains(prevDomains => 
+                prevDomains.map(d => d.id === domainId ? {
+                    ...d,
+                    status: 'verifying_dns'
+                } : d)
+            );
             
             return response.data;
         } catch (error) {
@@ -637,59 +663,40 @@ const DomainsPage = () => {
         {
             field: 'cname_acm_name',
             headerName: 'CNAME Name',
-            width: 250,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                
-                // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cname_acm_name) || params.row.cname_acm_name || '';
-            }
+            width: 250
         },
         {
             field: 'cname_acm_value',
             headerName: 'CNAME Value',
-            width: 250,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                
-                // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cname_acm_value) || params.row.cname_acm_value || '';
-            }
+            width: 250
         },
         {
             field: 'created_at',
             headerName: 'Created',
             width: 180,
             valueFormatter: (params) => {
-                if (!params || !params.value) return '';
-                const date = new Date(params.value);
+                const value = params?.value;
+                if (!value) return '';
+                const date = new Date(value);
                 return isNaN(date.getTime()) ? '' : date.toLocaleString();
-            },
+            }
         },
         {
             field: 'ssl_expiry',
             headerName: 'SSL Expires',
             width: 180,
             valueFormatter: (params) => {
-                if (!params || !params.value) return '';
-                const date = new Date(params.value);
+                const value = params?.value;
+                if (!value) return '';
+                const date = new Date(value);
                 return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
-            },
+            }
         },
         {
             field: 'cloudfront_domain',
             headerName: 'CloudFront Domain',
-            width: 250,
-            valueGetter: (params) => {
-                if (!params || !params.row) return '';
-                
-                // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cloudfront_domain) || params.row.cloudfront_domain || '';
-            }
-        },
+            width: 250
+        }
     ];
 
     return (
