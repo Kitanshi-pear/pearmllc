@@ -996,7 +996,7 @@ const TrafficChannels = () => {
 
                       {/* Cost Update Depth with description */}
                       <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
-                        <Typography sx={{ width: "30%" }}>Cost Update Depth:</Typography>
+                        <Typography sx={{ width: "60%" }}>Cost Update Depth:</Typography>
                         <FormControl fullWidth error={!!formErrors.costUpdateDepth}>
                           <Select
                             name="costUpdateDepth"
@@ -1027,7 +1027,7 @@ const TrafficChannels = () => {
 
                       {/* Cost Update Frequency */}
                       <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
-                        <Typography sx={{ width: "30%" }}>Cost Update Frequency:</Typography>
+                        <Typography sx={{ width: "60%" }}>Cost Update Frequency:</Typography>
                         <FormControl fullWidth error={!!formErrors.costUpdateFrequency}>
                           <Select
                             name="costUpdateFrequency"

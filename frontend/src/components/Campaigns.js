@@ -660,7 +660,7 @@ const columns = [
     }
   },
   { 
-    field: "name", 
+    field: "title", 
     headerName: "Campaign Name", 
     flex: 1,
     valueGetter: (params) => {
