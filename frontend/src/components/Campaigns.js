@@ -667,7 +667,7 @@ const columns = [
       try {
         // Try multiple possible field names for campaign name
         return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
-               params?.row?.campaignName || "Unnamed Campaign"; 
+               params?.row?.campaignName; 
       } catch (e) {
         console.warn("Error getting name value:", e);
         return "Unnamed Campaign";
@@ -708,22 +708,10 @@ const columns = [
     width: 150,
     valueGetter: (params) => {
       try {
-        // Check multiple possible paths to get traffic channel name
-        if (params?.row?.traffic_channel_name) {
-          return params.row.traffic_channel_name;
-        }
-        else if (params?.row?.traffic_channel && params.row.traffic_channel.channelName) {
-          return params.row.traffic_channel.channelName;
-        }
-        else if (params?.row?.traffic_channel_id && typeof params.row.traffic_channel_id === 'object' && params.row.traffic_channel_id.channelName) {
-          return params.row.traffic_channel_id.channelName;
-        } 
-        else if (params?.row?.traffic_channel_id) {
-          return `Source #${params.row.traffic_channel_id}`;
-        } 
-        else {
-          return "N/A";
-        }
+        // Your traffic_channel_id is a simple ID number, so format it consistently
+        return params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null
+          ? `Source #${params.row.traffic_channel_id}`
+          : "N/A";
       } catch (e) {
         console.warn("Error getting traffic channel value:", e);
         return "N/A";
