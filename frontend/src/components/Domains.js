@@ -576,7 +576,7 @@ const DomainsPage = () => {
     // Helper function to get appropriate tooltip text
     const getSSLButtonTooltip = (domain) => {
         // Check if we have local status information
-        const localStatus = domainStatuses[domain.id]?.status || domain.status;
+        const localStatus = domain?.id && domainStatuses[domain.id]?.status || domain.status;
         
         if (localStatus === 'active' && !domain.reissue) {
             return 'SSL Already Active';
@@ -624,8 +624,8 @@ const DomainsPage = () => {
             width: 130,
             renderCell: (params) => {
                 // Check if we have a more up-to-date status in our local state
-                const domainId = params.row.id;
-                const status = domainStatuses[domainId]?.status || params.value;
+                const domainId = params.row?.id;
+                const status = domainId && domainStatuses[domainId]?.status || params.value;
                 
                 let color = 'default';
                 let label = status;
@@ -664,8 +664,8 @@ const DomainsPage = () => {
             width: 250,
             valueGetter: (params) => {
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return domainStatuses[domainId]?.cname_acm_name || params.value;
+                const domainId = params.row?.id;
+                return domainId && domainStatuses[domainId]?.cname_acm_name || params.value;
             }
         },
         {
@@ -674,8 +674,8 @@ const DomainsPage = () => {
             width: 250,
             valueGetter: (params) => {
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return domainStatuses[domainId]?.cname_acm_value || params.value;
+                const domainId = params.row?.id;
+                return domainId && domainStatuses[domainId]?.cname_acm_value || params.value;
             }
         },
         {
@@ -706,8 +706,8 @@ const DomainsPage = () => {
             width: 250,
             valueGetter: (params) => {
                 // Check if we have a more up-to-date value in our local state
-                const domainId = params.row.id;
-                return domainStatuses[domainId]?.cloudfront_domain || params.value;
+                const domainId = params.row?.id;
+                return domainId && domainStatuses[domainId]?.cloudfront_domain || params.value;
             }
         },
     ];

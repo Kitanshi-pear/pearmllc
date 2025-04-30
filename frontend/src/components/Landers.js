@@ -720,6 +720,7 @@ const LandingPage = () => {
     }
   };
 
+  // Fixed columns definition with proper null checks
   const columns = [
     { field: 'id', headerName: 'ID', width: 80 },
     {
@@ -727,6 +728,7 @@ const LandingPage = () => {
       headerName: 'Name',
       width: 220,
       renderCell: (params) => {
+        if (!params || !params.row) return null;
         const row = params.row;
         return (
           <Box
@@ -772,28 +774,31 @@ const LandingPage = () => {
       field: 'url', 
       headerName: 'URL', 
       width: 300,
-      renderCell: (params) => (
-        <Tooltip title={params.value}>
-          <Typography
-            variant="body2"
-            sx={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              width: '100%'
-            }}
-          >
-            {params.value}
-          </Typography>
-        </Tooltip>
-      )
+      renderCell: (params) => {
+        if (!params || params.value == null) return null;
+        return (
+          <Tooltip title={params.value}>
+            <Typography
+              variant="body2"
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                width: '100%'
+              }}
+            >
+              {params.value}
+            </Typography>
+          </Tooltip>
+        );
+      }
     },
     { 
       field: 'createdAt', 
       headerName: 'Created', 
       width: 180,
       valueFormatter: (params) => {
-        if (!params.value) return '';
+        if (!params || params.value == null) return '';
         return new Date(params.value).toLocaleString();
       }
     },
@@ -827,7 +832,7 @@ const LandingPage = () => {
       width: 100,
       type: 'number',
       valueFormatter: (params) => {
-        if (params.value == null) return '';
+        if (!params || params.value == null) return '';
         return params.value.toFixed(2);
       }
     },
@@ -837,7 +842,7 @@ const LandingPage = () => {
       width: 130,
       type: 'number',
       valueFormatter: (params) => {
-        if (params.value == null) return '';
+        if (!params || params.value == null) return '';
         return params.value.toFixed(2);
       }
     },
@@ -847,7 +852,7 @@ const LandingPage = () => {
       width: 110,
       type: 'number',
       valueFormatter: (params) => {
-        if (params.value == null) return '';
+        if (!params || params.value == null) return '';
         return params.value.toFixed(2);
       }
     },
@@ -857,7 +862,7 @@ const LandingPage = () => {
       width: 100,
       type: 'number',
       valueFormatter: (params) => {
-        if (params.value == null) return '';
+        if (!params || params.value == null) return '';
         return `${params.value.toFixed(2)}%`;
       }
     }
