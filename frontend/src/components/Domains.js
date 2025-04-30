@@ -400,7 +400,7 @@ const DomainsPage = () => {
         const updatedDomain = {...domain};
         
         // Check if we have local status information that's more current than what's in the domain object
-        if (domainStatuses[domain.id]) {
+        if (domain.id && domainStatuses[domain.id]) {
             // Apply any tracked status changes to ensure continuity
             updatedDomain.status = domainStatuses[domain.id].status;
             updatedDomain.cname_acm_name = domainStatuses[domain.id].cname_acm_name || updatedDomain.cname_acm_name;
@@ -575,8 +575,10 @@ const DomainsPage = () => {
 
     // Helper function to get appropriate tooltip text
     const getSSLButtonTooltip = (domain) => {
+        if (!domain) return 'Manage SSL';
+        
         // Check if we have local status information
-        const localStatus = domain?.id && domainStatuses[domain.id]?.status || domain.status;
+        const localStatus = domain.id && domainStatuses[domain.id]?.status || domain.status;
         
         if (localStatus === 'active' && !domain.reissue) {
             return 'SSL Already Active';
@@ -621,8 +623,20 @@ const DomainsPage = () => {
                 );
             },
         },
-        { field: 'id', headerName: 'ID', width: 100 },
-        { field: 'url', headerName: 'Domain', width: 200 },
+        { 
+            field: 'id', 
+            headerName: 'ID', 
+            width: 100 
+        },
+        { 
+            field: 'domain', 
+            headerName: 'Domain', 
+            width: 200,
+            valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                return params.row.domain || params.row.url?.replace('https://', '') || '';
+            }
+        },
         {
             field: 'status',
             headerName: 'Status',
@@ -632,7 +646,7 @@ const DomainsPage = () => {
                 
                 // Check if we have a more up-to-date status in our local state
                 const domainId = params.row.id;
-                const status = (domainId && domainStatuses[domainId]?.status) || params.value;
+                const status = (domainId && domainStatuses[domainId]?.status) || params.row.status;
                 
                 let color = 'default';
                 let label = status;
@@ -674,7 +688,7 @@ const DomainsPage = () => {
                 
                 // Check if we have a more up-to-date value in our local state
                 const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cname_acm_name) || params.value || '';
+                return (domainId && domainStatuses[domainId]?.cname_acm_name) || params.row.cname_acm_name || '';
             }
         },
         {
@@ -686,32 +700,44 @@ const DomainsPage = () => {
                 
                 // Check if we have a more up-to-date value in our local state
                 const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cname_acm_value) || params.value || '';
+                return (domainId && domainStatuses[domainId]?.cname_acm_value) || params.row.cname_acm_value || '';
             }
         },
         {
             field: 'created_at',
             headerName: 'Created',
             width: 180,
-            valueFormatter: (params) => {
-                if (!params) return '';
-                const value = params.value;
-                if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleString();
+            valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                return params.row.created_at || '';
             },
+            renderCell: (params) => {
+                if (!params || !params.value) return null;
+                const date = new Date(params.value);
+                return (
+                    <Typography variant="body2">
+                        {isNaN(date.getTime()) ? '' : date.toLocaleString()}
+                    </Typography>
+                );
+            }
         },
         {
             field: 'ssl_expiry',
             headerName: 'SSL Expires',
             width: 180,
-            valueFormatter: (params) => {
-                if (!params) return '';
-                const value = params.value;
-                if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+            valueGetter: (params) => {
+                if (!params || !params.row) return '';
+                return params.row.ssl_expiry || '';
             },
+            renderCell: (params) => {
+                if (!params || !params.value) return null;
+                const date = new Date(params.value);
+                return (
+                    <Typography variant="body2">
+                        {isNaN(date.getTime()) ? '' : date.toLocaleDateString()}
+                    </Typography>
+                );
+            }
         },
         {
             field: 'cloudfront_domain',
@@ -722,7 +748,7 @@ const DomainsPage = () => {
                 
                 // Check if we have a more up-to-date value in our local state
                 const domainId = params.row.id;
-                return (domainId && domainStatuses[domainId]?.cloudfront_domain) || params.value || '';
+                return (domainId && domainStatuses[domainId]?.cloudfront_domain) || params.row.cloudfront_domain || '';
             }
         },
     ];
@@ -760,7 +786,7 @@ const DomainsPage = () => {
                         <DataGrid
                             rows={domains}
                             columns={columns}
-                            getRowId={(row) => row?.serial_no ?? Math.random()}
+                            getRowId={(row) => row?.serial_no ?? row?.id ?? Math.random()}
                             pageSize={10}
                             rowsPerPageOptions={[10, 20, 50]}
                             disableSelectionOnClick

@@ -27,7 +27,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       setLanderData({
         name: landerToEdit.name || '',
         type: landerToEdit.type || 'LANDING',
-        url: landerToEdit.url?.replace(`${landerToEdit.domain}/click`, '') || '',
+        url: landerToEdit.url?.replace(`https://${landerToEdit.domain}/click`, '') || '',
         domain: landerToEdit.domain || '',
         tags: landerToEdit.tags || []
       });
