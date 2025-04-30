@@ -24,11 +24,17 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
   useEffect(() => {
     if (landerToEdit) {
+      // Extract the domain and parameters from the full URL
+      const domain = landerToEdit.domain || '';
+      // Extract the part after "/click" (query parameters)
+      const urlParts = landerToEdit.url?.split('/click');
+      const queryParams = urlParts?.length > 1 ? urlParts[1] : '';
+      
       setLanderData({
         name: landerToEdit.name || '',
         type: landerToEdit.type || 'LANDING',
-        url: landerToEdit.url?.replace(`https://${landerToEdit.domain}/click`, '') || '',
-        domain: landerToEdit.domain || '',
+        url: queryParams || '',
+        domain: domain,
         tags: landerToEdit.tags || []
       });
     } else {
@@ -54,8 +60,14 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
   const handleSave = async () => {
     try {
-      const baseMacros = landerData.url.split('?')[1] || '';
-      const finalUrl = `${landerData.domain}/click${baseMacros ? '?' + baseMacros : ''}`;
+      // Get query parameters (ensure proper formatting with ? if needed)
+      const queryParams = landerData.url.trim();
+      const queryParamsFormatted = queryParams ? 
+        (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
+        '';
+      
+      // Format the final URL with the domain and click path
+      const finalUrl = `https://${landerData.domain}/click${queryParamsFormatted}`;
 
       const payload = {
         ...landerData,
@@ -95,6 +107,19 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       .catch(err => console.error('Error fetching domains:', err));
   }, []);
 
+  // Calculate the preview URL to show the user
+  const getPreviewUrl = () => {
+    if (!landerData.domain) return '';
+    
+    // Get query parameters (ensure proper formatting with ? if needed)
+    const queryParams = landerData.url.trim();
+    const queryParamsFormatted = queryParams ? 
+      (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
+      '';
+    
+    return `https://${landerData.domain}/click${queryParamsFormatted}`;
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>{landerToEdit ? 'Edit Lander' : 'Create Lander'}</DialogTitle>
@@ -108,14 +133,30 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
           onChange={handleChange}
         />
 
+        <FormControl fullWidth margin="normal">
+          <InputLabel>Tracking domain</InputLabel>
+          <Select
+            name="domain"
+            value={landerData.domain}
+            onChange={handleChange}
+          >
+            {domains.map((domain) => (
+              <MenuItem key={domain.id} value={domain.url}>
+                {domain.url}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
         <TextField
-          label="Append Macros (e.g., sub1={sub1})"
+          label="Query Parameters (e.g., ?sub1={sub1})"
           name="url"
           fullWidth
           margin="normal"
           value={landerData.url}
           onChange={handleChange}
           placeholder="?sub1={sub1}&sub2={sub2}"
+          helperText="Add query parameters after the /click path"
         />
 
         <Box mt={2} mb={2}>
@@ -133,26 +174,11 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
           </Box>
         </Box>
 
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Tracking domain</InputLabel>
-          <Select
-            name="domain"
-            value={landerData.domain}
-            onChange={handleChange}
-          >
-            {domains.map((domain) => (
-              <MenuItem key={domain.id} value={domain.url}>
-                {domain.url}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
         <Box mt={2}>
-          <Typography variant="subtitle2">Click URL</Typography>
+          <Typography variant="subtitle2">Click URL Preview</Typography>
           <TextField
             fullWidth
-            value={`https://${landerData.domain}/click`}
+            value={getPreviewUrl()}
             margin="dense"
             InputProps={{ readOnly: true }}
           />
@@ -161,7 +187,12 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        <Button variant="contained" color="primary" onClick={handleSave}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={handleSave}
+          disabled={!landerData.name || !landerData.domain}
+        >
           {landerToEdit ? 'Update' : 'Save'}
         </Button>
       </DialogActions>
@@ -176,7 +207,7 @@ const LandingPage = () => {
   const [landers, setLanders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [landerToEdit, setLanderToEdit] = useState(null);
+  const [editLander, setEditLander] = useState(null);
 
   const fetchLanders = () => {
     setLoading(true);
@@ -184,7 +215,7 @@ const LandingPage = () => {
       .then(res => res.json())
       .then(data => {
         const formatted = data.map((lander, index) => ({
-          id: lander.Serial_No ?? index + 1,
+          id: lander.id || lander.Serial_No || index + 1,
           ...lander
         }));
         setLanders(formatted);
@@ -201,17 +232,17 @@ const LandingPage = () => {
   }, []);
 
   const handleOpen = () => {
-    setLanderToEdit(null);
+    setEditLander(null);
     setOpen(true);
   };
 
   const handleClose = () => {
     setOpen(false);
-    setLanderToEdit(null);
+    setEditLander(null);
   };
 
   const handleRowClick = (params) => {
-    setLanderToEdit(params.row);
+    setEditLander(params.row);
     setOpen(true);
   };
 
@@ -221,8 +252,6 @@ const LandingPage = () => {
     '{os}', '{browser}', '{referrerdomain}'
   ];
 
-const [editLander, setEditLander] = useState(null);
-
   const columns = [
     { field: 'id', headerName: 'ID', width: 80 },
     {
@@ -230,6 +259,7 @@ const [editLander, setEditLander] = useState(null);
       headerName: 'Name',
       width: 220,
       renderCell: (params) => {
+        if (!params || !params.row) return null;
         const row = params.row;
         return (
           <Box
@@ -246,7 +276,8 @@ const [editLander, setEditLander] = useState(null);
               <EditIcon
                 fontSize="small"
                 sx={{ cursor: 'pointer' }}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setEditLander(row);
                   setOpen(true);
                 }}
@@ -254,27 +285,113 @@ const [editLander, setEditLander] = useState(null);
               <ContentCopyIcon
                 fontSize="small"
                 sx={{ cursor: 'pointer' }}
-                onClick={() => navigator.clipboard.writeText(row.url)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(row.url);
+                }}
               />
             </Box>
           </Box>
         );
       }
     },
-    { field: 'url', headerName: 'URL', width: 300 },
-    // { field: 'domain', headerName: 'Domain', width: 200 },
-    { field: 'createdAt', headerName: 'Created At', width: 180 },
-    { field: 'updatedAt', headerName: 'Updated At', width: 180 },
+    { 
+      field: 'url', 
+      headerName: 'URL', 
+      width: 300,
+      renderCell: (params) => {
+        if (!params || params.value == null) return null;
+        return (
+          <Typography
+            variant="body2"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              width: '100%'
+            }}
+          >
+            {params.value}
+          </Typography>
+        );
+      } 
+    },
+    { 
+      field: 'createdAt', 
+      headerName: 'Created At', 
+      width: 180,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return new Date(params.value).toLocaleString();
+      }
+    },
+    { 
+      field: 'updatedAt', 
+      headerName: 'Updated At', 
+      width: 180,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return new Date(params.value).toLocaleString();
+      }
+    },
     { field: 'clicks', headerName: 'Clicks', width: 100 },
     { field: 'lp_clicks', headerName: 'LP Clicks', width: 100 },
     { field: 'lp_views', headerName: 'LP Views', width: 100 },
     { field: 'conversion', headerName: 'Conversions', width: 100 },
-    { field: 'total_cpa', headerName: 'Total CPA ($)', width: 130 },
-    { field: 'epc', headerName: 'EPC ($)', width: 100 },
-    { field: 'total_revenue', headerName: 'Revenue ($)', width: 130 },
-    { field: 'cost', headerName: 'Cost ($)', width: 100 },
-    { field: 'profit', headerName: 'Profit ($)', width: 100 },
-    { field: 'total_roi', headerName: 'ROI (%)', width: 100 },
+    { 
+      field: 'total_cpa', 
+      headerName: 'Total CPA ($)', 
+      width: 130,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: 'epc', 
+      headerName: 'EPC ($)', 
+      width: 100,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: 'total_revenue', 
+      headerName: 'Revenue ($)', 
+      width: 130,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: 'cost', 
+      headerName: 'Cost ($)', 
+      width: 100,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: 'profit', 
+      headerName: 'Profit ($)', 
+      width: 100,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return params.value.toFixed(2);
+      }
+    },
+    { 
+      field: 'total_roi', 
+      headerName: 'ROI (%)', 
+      width: 100,
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return `${params.value.toFixed(2)}%`;
+      }
+    },
     { field: 'impressions', headerName: 'Impressions', width: 120 }
   ];
 
@@ -299,7 +416,7 @@ const [editLander, setEditLander] = useState(null);
             rowsPerPageOptions={[100, 200, 500]}
             checkboxSelection
             disableSelectionOnClick
-            onRowClick={(params) => handleRowClick(params)}
+            onRowClick={handleRowClick}
             sx={{
               "& .MuiDataGrid-columnHeader": {
                 backgroundColor: "#f0f0f0",
@@ -307,6 +424,9 @@ const [editLander, setEditLander] = useState(null);
               },
               "& .MuiDataGrid-row:hover": {
                 backgroundColor: "#f1f1f1"
+              },
+              "& .MuiDataGrid-cell:focus-within": {
+                outline: "none !important"
               }
             }}
           />
@@ -315,10 +435,7 @@ const [editLander, setEditLander] = useState(null);
 
       <LanderModal
         open={open}
-        onClose={() => {
-          setOpen(false);
-          setEditLander(null);
-        }}
+        onClose={handleClose}
         macros={macros}
         onLanderCreated={fetchLanders}
         landerToEdit={editLander}
