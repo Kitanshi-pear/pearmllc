@@ -117,6 +117,14 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
             const result = await onProvision(domain.id);
             setResponse(result);
             setActiveStep(1);
+            // We update the current domain object to reflect its new status
+            if (domain && typeof domain === 'object') {
+                domain.status = 'verifying';
+                if (result?.cname) {
+                    domain.cname_acm_name = result.cname.name;
+                    domain.cname_acm_value = result.cname.value;
+                }
+            }
         } catch (err) {
             setError(err.message || 'Failed to provision certificate');
         } finally {
@@ -131,6 +139,13 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
             const result = await onDeploy(domain.id);
             setResponse(result);
             setActiveStep(2);
+            // Update domain object to reflect its new status
+            if (domain && typeof domain === 'object') {
+                domain.status = 'active';
+                if (result?.cloudfront_domain) {
+                    domain.cloudfront_domain = result.cloudfront_domain;
+                }
+            }
         } catch (err) {
             setError(err.message || 'Failed to deploy CloudFront');
         } finally {
@@ -144,10 +159,32 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
         try {
             const result = await onAutoRoute53(domain.id);
             setResponse(result);
+            // Update domain status to indicate DNS record has been added through Route53
+            if (domain && typeof domain === 'object') {
+                domain.status = 'verifying_dns';
+            }
+            showNotification('DNS record added to Route 53. Proceeding with verification...');
         } catch (err) {
             setError(err.message || 'Failed to add DNS record to Route 53');
         } finally {
             setLoading(false);
+        }
+    };
+    
+    // Helper function to show notifications from within the modal
+    const showNotification = (message) => {
+        if (onDeploy && typeof onDeploy === 'function') {
+            // We're leveraging the parent's notification system
+            // This is a bit of a hack, but it works since we know the parent has a showNotification function
+            try {
+                const mockResponse = { data: { message } };
+                onDeploy.constructor({
+                    response: mockResponse,
+                    message
+                });
+            } catch (e) {
+                console.log('Could not show notification:', message);
+            }
         }
     };
 
@@ -277,6 +314,9 @@ const DomainsPage = () => {
     const [selectedDomain, setSelectedDomain] = useState(null);
     const [openSSLModal, setOpenSSLModal] = useState(false);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
+    
+    // Keep track of domain statuses in local state so we can resume from the right step
+    const [domainStatuses, setDomainStatuses] = useState({});
 
     const { id } = useParams();
 
@@ -356,7 +396,19 @@ const DomainsPage = () => {
     };
 
     const handleManageSSL = (domain) => {
-        setSelectedDomain(domain);
+        // Make sure we're working with the most up-to-date domain data
+        const updatedDomain = {...domain};
+        
+        // Check if we have local status information that's more current than what's in the domain object
+        if (domainStatuses[domain.id]) {
+            // Apply any tracked status changes to ensure continuity
+            updatedDomain.status = domainStatuses[domain.id].status;
+            updatedDomain.cname_acm_name = domainStatuses[domain.id].cname_acm_name || updatedDomain.cname_acm_name;
+            updatedDomain.cname_acm_value = domainStatuses[domain.id].cname_acm_value || updatedDomain.cname_acm_value;
+            updatedDomain.cloudfront_domain = domainStatuses[domain.id].cloudfront_domain || updatedDomain.cloudfront_domain;
+        }
+        
+        setSelectedDomain(updatedDomain);
         setOpenSSLModal(true);
     };
 
@@ -415,7 +467,31 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/provision`);
             showNotification('Certificate requested successfully', 'success');
-            fetchDomains(); // Refresh domains list
+            
+            // Store the updated status in our local state to maintain continuity
+            setDomainStatuses(prevStatuses => ({
+                ...prevStatuses,
+                [domainId]: {
+                    ...prevStatuses[domainId],
+                    status: 'verifying',
+                    cname_acm_name: response.data.cname?.name || '',
+                    cname_acm_value: response.data.cname?.value || ''
+                }
+            }));
+            
+            // Update the selectedDomain if it's the one we're currently working with
+            if (selectedDomain && selectedDomain.id === domainId) {
+                setSelectedDomain(prev => ({
+                    ...prev,
+                    status: 'verifying',
+                    cname_acm_name: response.data.cname?.name || prev.cname_acm_name,
+                    cname_acm_value: response.data.cname?.value || prev.cname_acm_value
+                }));
+            }
+            
+            // No need to fetch domains immediately - this would interrupt the user flow
+            // We'll refresh when they close the modal
+            
             return response.data;
         } catch (error) {
             console.error("Error provisioning SSL:", error);
@@ -427,7 +503,33 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/deploy`);
             showNotification('CloudFront deployed successfully', 'success');
-            fetchDomains(); // Refresh domains list
+            
+            // Store the updated status in our local state
+            setDomainStatuses(prevStatuses => ({
+                ...prevStatuses,
+                [domainId]: {
+                    ...prevStatuses[domainId],
+                    status: 'active',
+                    cloudfront_domain: response.data.cloudfront_domain || ''
+                }
+            }));
+            
+            // Update the selectedDomain if it's the one we're currently working with
+            if (selectedDomain && selectedDomain.id === domainId) {
+                setSelectedDomain(prev => ({
+                    ...prev,
+                    status: 'active',
+                    cloudfront_domain: response.data.cloudfront_domain || prev.cloudfront_domain
+                }));
+            }
+            
+            // Delay the domains refresh so it doesn't interrupt the modal flow
+            setTimeout(() => {
+                if (!openSSLModal) {
+                    fetchDomains();
+                }
+            }, 500);
+            
             return response.data;
         } catch (error) {
             console.error("Error deploying CloudFront:", error);
@@ -439,7 +541,27 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/auto-route53`);
             showNotification('DNS record added to Route 53', 'success');
-            fetchDomains(); // Refresh domains list
+            
+            // Store the updated status in our local state
+            setDomainStatuses(prevStatuses => ({
+                ...prevStatuses,
+                [domainId]: {
+                    ...prevStatuses[domainId],
+                    status: 'verifying_dns'
+                }
+            }));
+            
+            // Update the selectedDomain if it's the one we're currently working with
+            if (selectedDomain && selectedDomain.id === domainId) {
+                setSelectedDomain(prev => ({
+                    ...prev,
+                    status: 'verifying_dns'
+                }));
+            }
+            
+            // Don't fetch domains immediately - this disrupts the user flow
+            // Instead, we'll do it when they close the modal
+            
             return response.data;
         } catch (error) {
             console.error("Error adding to Route 53:", error);
@@ -453,11 +575,14 @@ const DomainsPage = () => {
 
     // Helper function to get appropriate tooltip text
     const getSSLButtonTooltip = (domain) => {
-        if (domain.status === 'active' && !domain.reissue) {
+        // Check if we have local status information
+        const localStatus = domainStatuses[domain.id]?.status || domain.status;
+        
+        if (localStatus === 'active' && !domain.reissue) {
             return 'SSL Already Active';
         }
         
-        if (domain.status === 'verifying' || domain.status === 'verifying_dns') {
+        if (localStatus === 'verifying' || localStatus === 'verifying_dns') {
             return 'Continue DNS Verification';
         }
         
@@ -498,7 +623,10 @@ const DomainsPage = () => {
             headerName: 'Status',
             width: 130,
             renderCell: (params) => {
-                const status = params.value;
+                // Check if we have a more up-to-date status in our local state
+                const domainId = params.row.id;
+                const status = domainStatuses[domainId]?.status || params.value;
+                
                 let color = 'default';
                 let label = status;
                 
@@ -534,11 +662,21 @@ const DomainsPage = () => {
             field: 'cname_acm_name',
             headerName: 'CNAME Name',
             width: 250,
+            valueGetter: (params) => {
+                // Check if we have a more up-to-date value in our local state
+                const domainId = params.row.id;
+                return domainStatuses[domainId]?.cname_acm_name || params.value;
+            }
         },
         {
             field: 'cname_acm_value',
             headerName: 'CNAME Value',
             width: 250,
+            valueGetter: (params) => {
+                // Check if we have a more up-to-date value in our local state
+                const domainId = params.row.id;
+                return domainStatuses[domainId]?.cname_acm_value || params.value;
+            }
         },
         {
             field: 'created_at',
@@ -566,6 +704,11 @@ const DomainsPage = () => {
             field: 'cloudfront_domain',
             headerName: 'CloudFront Domain',
             width: 250,
+            valueGetter: (params) => {
+                // Check if we have a more up-to-date value in our local state
+                const domainId = params.row.id;
+                return domainStatuses[domainId]?.cloudfront_domain || params.value;
+            }
         },
     ];
 
@@ -632,7 +775,11 @@ const DomainsPage = () => {
             {selectedDomain && (
                 <SSLProvisioningModal
                     open={openSSLModal}
-                    handleClose={() => setOpenSSLModal(false)}
+                    handleClose={() => {
+                        setOpenSSLModal(false);
+                        // Refresh domains after closing the modal to ensure UI is updated
+                        fetchDomains();
+                    }}
                     domain={selectedDomain}
                     onProvision={handleProvisionSSL}
                     onDeploy={handleDeployCloudFront}
