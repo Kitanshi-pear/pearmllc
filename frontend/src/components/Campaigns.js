@@ -660,15 +660,17 @@ const columns = [
     }
   },
   { 
-    field: "title", 
+    field: "name", // Changed from "title" to match your data structure
     headerName: "Campaign Name", 
     flex: 1,
     valueGetter: (params) => {
       try {
-        return params?.row?.name || "";
+        // Try multiple possible field names for campaign name
+        return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
+               params?.row?.campaignName || "Unnamed Campaign"; 
       } catch (e) {
         console.warn("Error getting name value:", e);
-        return "";
+        return "Unnamed Campaign";
       }
     }
   },
@@ -706,14 +708,20 @@ const columns = [
     width: 150,
     valueGetter: (params) => {
       try {
-        // Check multiple possible paths to get traffic channel name with proper null checks
-        if (params?.row?.traffic_channel_id && typeof params.row.traffic_channel_id === 'object' && params.row.traffic_channel_id.channelName) {
-          return params.row.traffic_channel_id.channelName;
-        } else if (params?.row?.traffic_channel_name) {
+        // Check multiple possible paths to get traffic channel name
+        if (params?.row?.traffic_channel_name) {
           return params.row.traffic_channel_name;
-        } else if (params?.row?.traffic_channel_id) {
+        }
+        else if (params?.row?.traffic_channel && params.row.traffic_channel.channelName) {
+          return params.row.traffic_channel.channelName;
+        }
+        else if (params?.row?.traffic_channel_id && typeof params.row.traffic_channel_id === 'object' && params.row.traffic_channel_id.channelName) {
+          return params.row.traffic_channel_id.channelName;
+        } 
+        else if (params?.row?.traffic_channel_id) {
           return `Source #${params.row.traffic_channel_id}`;
-        } else {
+        } 
+        else {
           return "N/A";
         }
       } catch (e) {
@@ -982,10 +990,39 @@ const columns = [
           }
         }
         
-        const campaignsWithIds = campaignsData.map((campaign) => ({
-          ...campaign,
-          id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
-        }));
+        // Add proper field mapping before setting state
+        const campaignsWithIds = campaignsData.map((campaign) => {
+          // Log original field names to help debug
+          console.log("Original campaign fields:", Object.keys(campaign).join(", "));
+          
+          // Standardize campaign fields
+          const normalizedCampaign = {
+            ...campaign,
+            // Ensure ID field exists
+            id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+            
+            // Ensure name field exists - map from possible alternative field names
+            name: campaign.name || campaign.campaign_name || campaign.title || 
+                  campaign.campaignName || "Unnamed Campaign",
+                  
+            // Ensure traffic channel info is normalized
+            traffic_channel_name: campaign.traffic_channel_name || 
+                                (campaign.traffic_channel && campaign.traffic_channel.channelName) ||
+                                (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                                null,
+                                
+            // Ensure status field exists
+            status: campaign.status || "INACTIVE"
+          };
+          
+          // Log normalized campaign to verify
+          console.log("Normalized campaign:", normalizedCampaign);
+          
+          return normalizedCampaign;
+        });
+        
+        // Debug logging of first campaign after normalization
+        console.log("First campaign example:", campaignsWithIds.length > 0 ? campaignsWithIds[0] : "No campaigns");
         
         setCampaigns(campaignsWithIds);
         
@@ -1004,29 +1041,8 @@ const columns = [
         tryAlternativeEndpoints();
       });
   };
-
-  // Function to try alternative API endpoints
-  const tryAlternativeEndpoints = () => {
-    console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
-    
-    axios.get(`${API_URL}/api/campaign`)
-      .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
-      .catch((err) => {
-        console.log("Trying another alternative endpoint:", `${API_URL}/api/campaigns/list`);
-        
-        axios.get(`${API_URL}/api/campaigns/list`)
-          .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
-          .catch((altErr) => {
-            console.error("All campaign fetching attempts failed");
-            setLoading(false);
-            setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
-            setSnackbarSeverity("error");
-            setSnackbarOpen(true);
-          });
-      });
-  };
-    
-  // Handle successful API response
+  
+  // 2. Update the handleSuccessfulResponse function with the same improved field normalization:
   const handleSuccessfulResponse = (res, logMessage) => {
     console.log(logMessage, res.data);
     
@@ -1044,10 +1060,28 @@ const columns = [
       }
     }
     
-    const campaignsWithIds = campaignsData.map((campaign) => ({
-      ...campaign,
-      id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
-    }));
+    // Add proper field mapping before setting state
+    const campaignsWithIds = campaignsData.map((campaign) => {
+      // Standardize campaign fields
+      return {
+        ...campaign,
+        // Ensure ID field exists
+        id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+        
+        // Ensure name field exists - map from possible alternative field names
+        name: campaign.name || campaign.campaign_name || campaign.title || 
+              campaign.campaignName || "Unnamed Campaign",
+              
+        // Ensure traffic channel info is normalized
+        traffic_channel_name: campaign.traffic_channel_name || 
+                            (campaign.traffic_channel && campaign.traffic_channel.channelName) ||
+                            (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                            null,
+                            
+        // Ensure status field exists
+        status: campaign.status || "INACTIVE"
+      };
+    });
     
     setCampaigns(campaignsWithIds);
     

@@ -1057,7 +1057,7 @@ const TrafficChannels = () => {
 
                       {/* Currency */}
                       <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
-                        <Typography sx={{ width: "40%" }}>Currency:</Typography>
+                        <Typography sx={{ width: "80%" }}>Currency:</Typography>
                         <FormControl fullWidth error={!!formErrors.currency}>
                           <Select
                             name="currency"
