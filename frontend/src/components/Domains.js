@@ -17,7 +17,9 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
 
     useEffect(() => {
         if (domainData) {
-            setUrl(domainData.url?.replace('https://', '') || '');
+            // Extract domain name from URL or use domain field directly
+            const domainName = domainData.domain || domainData.url?.replace('https://', '') || '';
+            setUrl(domainName);
             setSslEnabled(domainData.sslEnabled || false);
         } else {
             setUrl('');
@@ -192,7 +194,7 @@ const SSLProvisioningModal = ({ open, handleClose, domain, onProvision, onDeploy
         <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 3, pt: 2 }}>
                 <DialogTitle sx={{ p: 0, fontSize: "20px", fontWeight: 500 }}>
-                    SSL Provisioning for {domain?.url?.replace('https://', '')}
+                    SSL Provisioning for {domain?.domain || domain?.url?.replace('https://', '')}
                 </DialogTitle>
             </Box>
 
@@ -327,18 +329,24 @@ const DomainsPage = () => {
                 const response = await axios.get(`https://pearmllc.onrender.com/api/domains/${id}`);
                 const domain = response.data;
 
+                console.log('API response for single domain:', domain);
+
+                // We need to handle the API response correctly
+                // The single domain endpoint returns raw domain data, not the formatted one
                 const formatted = [{
                     ...domain,
                     serial_no: 1,
-                    url: `https://${domain.domain}`,
+                    // Use domain field directly since it's already in the API response
+                    domain: domain.domain || '',
+                    url: domain.url || `https://${domain.domain}`,
                     cname_acm_name: domain.cname_acm_name || '',
                     cname_acm_value: domain.cname_acm_value || '',
                     created_at: domain.created_at || '',
                     ssl_expiry: domain.ssl_expiry || '',
                     sslEnabled: domain.status !== 'active',
-                    reissue: domain.reissue || false,
+                    reissue: domain.reissue_only || false,
                     // Always allow managing SSL if it's not active or if reissue is needed
-                    needsSSLManagement: domain.status !== 'active' || domain.reissue
+                    needsSSLManagement: domain.status !== 'active' || domain.reissue_only
                 }];
 
                 setDomains(formatted);
@@ -346,17 +354,17 @@ const DomainsPage = () => {
                 const response = await axios.get('https://pearmllc.onrender.com/api/domains');
                 const data = response.data;
 
+                console.log('API response for all domains:', data);
+
+                // The list endpoint already returns formatted data
+                // Just ensure we have all needed fields
                 const formatted = data.map((d, idx) => ({
                     ...d,
-                    serial_no: idx + 1,
-                    url: `https://${d.domain}`,
-                    cname_acm_name: d.cname_acm_name || '',
-                    cname_acm_value: d.cname_acm_value || '',
-                    created_at: d.created_at || '',
-                    ssl_expiry: d.ssl_expiry || '',
-                    reissue: d.reissue || false,
+                    serial_no: d.serial_no || idx + 1,
+                    domain: d.domain || d.url?.replace('https://', '') || '',
+                    reissue: d.reissue_only || false,
                     // Always allow managing SSL if it's not active or if reissue is needed
-                    needsSSLManagement: d.status !== 'active' || d.reissue
+                    needsSSLManagement: d.status !== 'active' || d.reissue_only
                 }));
 
                 setDomains(formatted);
@@ -425,9 +433,10 @@ const DomainsPage = () => {
                 setDomains(prev => prev.map(d => d.id === updated.id ? {
                     ...d,
                     ...updated,
-                    url: `https://${updated.domain}`,
+                    domain: updated.domain,
+                    url: updated.url || `https://${updated.domain}`,
                     sslEnabled: updated.status !== 'active',
-                    needsSSLManagement: updated.status !== 'active' || updated.reissue
+                    needsSSLManagement: updated.status !== 'active' || updated.reissue_only
                 } : d));
                 
                 showNotification('Domain updated successfully', 'success');
@@ -442,9 +451,11 @@ const DomainsPage = () => {
                 const newDomain = {
                     ...created,
                     serial_no: domains.length + 1,
-                    url: `https://${created.domain}`,
+                    domain: created.domain,
+                    url: created.url || `https://${created.domain}`,
                     sslEnabled: created.status !== 'active',
-                    needsSSLManagement: created.status !== 'active'
+                    needsSSLManagement: created.status !== 'active',
+                    reissue: created.reissue_only || false
                 };
                 
                 setDomains(prev => [...prev, newDomain]);
@@ -467,6 +478,8 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/provision`);
             showNotification('Certificate requested successfully', 'success');
+            
+            console.log('SSL provision response:', response.data);
             
             // Store the updated status in our local state to maintain continuity
             setDomainStatuses(prevStatuses => ({
@@ -503,6 +516,8 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/deploy`);
             showNotification('CloudFront deployed successfully', 'success');
+            
+            console.log('CloudFront deploy response:', response.data);
             
             // Store the updated status in our local state
             setDomainStatuses(prevStatuses => ({
@@ -541,6 +556,8 @@ const DomainsPage = () => {
         try {
             const response = await axios.post(`https://pearmllc.onrender.com/api/domains/${domainId}/auto-route53`);
             showNotification('DNS record added to Route 53', 'success');
+            
+            console.log('Route53 auto add response:', response.data);
             
             // Store the updated status in our local state
             setDomainStatuses(prevStatuses => ({
@@ -629,12 +646,12 @@ const DomainsPage = () => {
             width: 100 
         },
         { 
-            field: 'domain', 
+            field: 'url', 
             headerName: 'Domain', 
             width: 200,
             valueGetter: (params) => {
                 if (!params || !params.row) return '';
-                return params.row.domain || params.row.url?.replace('https://', '') || '';
+                return params.row.url || `https://${params.row.domain}` || '';
             }
         },
         {
