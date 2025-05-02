@@ -332,7 +332,7 @@ const DomainsPage = () => {
                 const formatted = [{
                     ...domain,
                     serial_no: 1,
-                    url: `https://${domain.domain}`,
+                    url: domain?.domain ? `https://${domain.domain}` : '',
                     cname_acm_name: domain.cname_acm_name || '',
                     cname_acm_value: domain.cname_acm_value || '',
                     created_at: domain.created_at || '',
@@ -351,6 +351,7 @@ const DomainsPage = () => {
                 const formatted = data.map((d, idx) => ({
                     ...d,
                     serial_no: idx + 1,
+                    url: d.domain ? `https://${d.domain}` : '', 
                     cname_acm_name: d.cname_acm_name || '',
                     cname_acm_value: d.cname_acm_value || '',
                     created_at: d.created_at || '',
@@ -413,29 +414,34 @@ const DomainsPage = () => {
         setOpenSSLModal(true);
     };
 
+    // FIX: Improved error handling in handleSaveDomain function
     const handleSaveDomain = async (domain) => {
         try {
             if (domain?.id) {
                 // Update existing domain
                 const response = await axios.put(`https://pearmllc.onrender.com/api/domains/${domain.id}`, {
-                    url: domain.url,
+                    domain: domain.url, // FIX: Use correct property name 'domain' instead of 'url'
                     sslEnabled: domain.sslEnabled
                 });
 
                 const updated = response.data;
+                
+                // FIX: Ensure the updated data is properly mapped to our UI format
                 setDomains(prev => prev.map(d => d.id === updated.id ? {
                     ...d,
                     ...updated,
-                    url: `https://${updated.domain}`,
+                    url: updated.domain ? `https://${updated.domain}` : d.url,
                     sslEnabled: updated.status !== 'active',
-                    needsSSLManagement: updated.status !== 'active' || updated.reissue_only
+                    needsSSLManagement: updated.status !== 'active' || updated.reissue_only,
+                    created_at: updated.created_at || d.created_at,
+                    ssl_expiry: updated.ssl_expiry || d.ssl_expiry
                 } : d));
                 
                 showNotification('Domain updated successfully', 'success');
             } else {
-                // Create new domain
+                // Create new domain - FIX: Use correct property names in API request
                 const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    url: domain.url,
+                    domain: domain.url, // FIX: Use correct property name 'domain' instead of 'url'
                     sslEnabled: domain.sslEnabled
                 });
 
@@ -443,9 +449,11 @@ const DomainsPage = () => {
                 const newDomain = {
                     ...created,
                     serial_no: domains.length + 1,
-                    url: `https://${created.domain}`,
+                    url: created.domain ? `https://${created.domain}` : '',
                     sslEnabled: created.status !== 'active',
-                    needsSSLManagement: created.status !== 'active'
+                    needsSSLManagement: created.status !== 'active',
+                    created_at: created.created_at || new Date().toISOString(),
+                    ssl_expiry: created.ssl_expiry || ''
                 };
                 
                 setDomains(prev => [...prev, newDomain]);
@@ -459,7 +467,9 @@ const DomainsPage = () => {
             }
         } catch (error) {
             console.error("Error saving domain:", error);
-            showNotification('Failed to save domain', 'error');
+            // FIX: Improved error message with details from the response if available
+            const errorMsg = error.response?.data?.error || error.message || 'Failed to save domain';
+            showNotification(errorMsg, 'error');
         }
     };
 
@@ -517,7 +527,9 @@ const DomainsPage = () => {
                 prevDomains.map(d => d.id === domainId ? {
                     ...d,
                     status: 'active',
-                    cloudfront_domain: response.data.cloudfront_domain || d.cloudfront_domain
+                    cloudfront_domain: response.data.cloudfront_domain || d.cloudfront_domain,
+                    // FIX: Update SSL expiry if provided in the response
+                    ssl_expiry: response.data.ssl_expiry || d.ssl_expiry
                 } : d)
             );
             
@@ -675,10 +687,15 @@ const DomainsPage = () => {
             headerName: 'Created',
             width: 180,
             valueFormatter: (params) => {
+                // FIX: Improved date handling for created_at column
                 const value = params?.value;
                 if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleString();
+                try {
+                    const date = new Date(value);
+                    return isNaN(date.getTime()) ? '' : date.toLocaleString();
+                } catch (error) {
+                    return value; // If parsing fails, return the original value
+                }
             }
         },
         {
@@ -686,10 +703,15 @@ const DomainsPage = () => {
             headerName: 'SSL Expires',
             width: 180,
             valueFormatter: (params) => {
+                // FIX: Improved date handling for ssl_expiry column
                 const value = params?.value;
                 if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+                try {
+                    const date = new Date(value);
+                    return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+                } catch (error) {
+                    return value; // If parsing fails, return the original value
+                }
             }
         },
         {
