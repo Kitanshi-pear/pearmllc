@@ -13,11 +13,32 @@ const cloudfront = new AWS.CloudFront();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // === 1. Create Domain
+// === 1. Create Domain
 router.post('/', async (req, res) => {
   try {
+    console.log('Domain create request body:', req.body);
+    
     const { url, sslEnabled } = req.body;
+    console.log('Extracted url:', url, 'sslEnabled:', sslEnabled);
+    
+    if (!url) {
+      console.error('Validation error: URL is missing or empty');
+      return res.status(400).json({ error: 'Validation error', details: 'URL is required' });
+    }
+    
     const domainName = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    console.log('Cleaned domainName:', domainName);
+    
     const userId = req.user?.id || 1;
+    console.log('Using userId:', userId);
+
+    console.log('Creating domain with:', {
+      user_id: userId,
+      domain: domainName,
+      status: sslEnabled ? 'pending' : 'active',
+      ssl_expiry: null,
+      reissue_only: false
+    });
 
     const domain = await Domain.create({
       user_id: userId,
@@ -27,9 +48,36 @@ router.post('/', async (req, res) => {
       reissue_only: false
     });
 
+    console.log('Domain created successfully:', domain.toJSON());
     res.status(201).json(domain);
   } catch (error) {
     console.error('Error creating domain:', error);
+    
+    // Enhance error reporting for Sequelize validation errors
+    if (error.name === 'SequelizeValidationError') {
+      const validationErrors = error.errors.map(e => ({
+        field: e.path,
+        message: e.message,
+        type: e.type
+      }));
+      console.error('Validation error details:', JSON.stringify(validationErrors, null, 2));
+      return res.status(400).json({ 
+        error: 'Validation error', 
+        details: 'Invalid fields', 
+        validationErrors
+      });
+    }
+    
+    // For unique constraint violations (e.g., duplicate domain)
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const field = error.errors[0]?.path || 'unknown field';
+      console.error('Unique constraint violation on:', field);
+      return res.status(400).json({ 
+        error: 'Validation error', 
+        details: `The ${field} already exists` 
+      });
+    }
+    
     res.status(500).json({ error: 'Domain creation failed', details: error.message });
   }
 });
