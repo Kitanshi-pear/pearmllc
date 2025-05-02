@@ -19,62 +19,106 @@ router.post('/', async (req, res) => {
     console.log('Domain create request body:', req.body);
     
     const { url, sslEnabled } = req.body;
-    console.log('Extracted url:', url, 'sslEnabled:', sslEnabled);
-    
     if (!url) {
-      console.error('Validation error: URL is missing or empty');
       return res.status(400).json({ error: 'Validation error', details: 'URL is required' });
     }
     
+    // Clean the domain name
     const domainName = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    console.log('Cleaned domainName:', domainName);
+    console.log('Cleaned domain name:', domainName);
+    
+    // Check if the domain already exists to give a better error message
+    const existingDomain = await Domain.findOne({
+      where: { domain: domainName }
+    });
+    
+    if (existingDomain) {
+      console.log('Domain already exists:', existingDomain.domain);
+      return res.status(400).json({ 
+        error: 'Validation error', 
+        details: `Domain "${domainName}" already exists` 
+      });
+    }
     
     const userId = req.user?.id || 1;
-    console.log('Using userId:', userId);
+    
+    // Try to create the domain without specifying an ID
+    try {
+      const domain = await Domain.create({
+        user_id: userId,
+        domain: domainName,
+        status: sslEnabled ? 'pending' : 'active',
+        ssl_expiry: null,
+        reissue_only: false
+      });
 
-    console.log('Creating domain with:', {
-      user_id: userId,
-      domain: domainName,
-      status: sslEnabled ? 'pending' : 'active',
-      ssl_expiry: null,
-      reissue_only: false
-    });
-
-    const domain = await Domain.create({
-      user_id: userId,
-      domain: domainName,
-      status: sslEnabled ? 'pending' : 'active',
-      ssl_expiry: null,
-      reissue_only: false
-    });
-
-    console.log('Domain created successfully:', domain.toJSON());
-    res.status(201).json(domain);
+      console.log('Domain created successfully:', domain.id);
+      return res.status(201).json(domain);
+    } catch (createError) {
+      // If we hit a primary key error, try to fix the sequence
+      if (createError.message && createError.message.includes('PRIMARY')) {
+        console.error('PRIMARY key conflict detected. Attempting to find max ID...');
+        
+        try {
+          // Find the maximum ID in the table
+          const maxIdResult = await Domain.findOne({
+            attributes: [[Domain.sequelize.fn('MAX', Domain.sequelize.col('id')), 'maxId']],
+            raw: true
+          });
+          
+          const maxId = maxIdResult.maxId || 0;
+          console.log('Current max ID:', maxId);
+          
+          // Try to create with explicit ID to bypass sequence issue
+          const domainWithId = await Domain.create({
+            id: maxId + 1, // Set ID manually to max + 1
+            user_id: userId,
+            domain: domainName,
+            status: sslEnabled ? 'pending' : 'active',
+            ssl_expiry: null,
+            reissue_only: false
+          });
+          
+          console.log('Domain created with explicit ID:', domainWithId.id);
+          return res.status(201).json(domainWithId);
+        } catch (retryError) {
+          console.error('Error during retry with explicit ID:', retryError);
+          throw retryError; // Re-throw to be caught by outer catch block
+        }
+      } else {
+        // If it's not a PRIMARY key error, re-throw
+        throw createError;
+      }
+    }
   } catch (error) {
     console.error('Error creating domain:', error);
     
-    // Enhance error reporting for Sequelize validation errors
+    // Enhanced error handling
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const field = error.errors[0]?.path || 'unknown field';
+      return res.status(400).json({ 
+        error: 'Validation error', 
+        details: `The ${field} already exists` 
+      });
+    }
+    
+    if (error.message && error.message.includes('PRIMARY')) {
+      return res.status(500).json({ 
+        error: 'Database error', 
+        details: 'Primary key conflict. Database sequence may need to be reset.' 
+      });
+    }
+    
     if (error.name === 'SequelizeValidationError') {
       const validationErrors = error.errors.map(e => ({
         field: e.path,
         message: e.message,
         type: e.type
       }));
-      console.error('Validation error details:', JSON.stringify(validationErrors, null, 2));
       return res.status(400).json({ 
         error: 'Validation error', 
         details: 'Invalid fields', 
         validationErrors
-      });
-    }
-    
-    // For unique constraint violations (e.g., duplicate domain)
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      const field = error.errors[0]?.path || 'unknown field';
-      console.error('Unique constraint violation on:', field);
-      return res.status(400).json({ 
-        error: 'Validation error', 
-        details: `The ${field} already exists` 
       });
     }
     
