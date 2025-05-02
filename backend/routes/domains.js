@@ -17,7 +17,7 @@ router.post('/', async (req, res) => {
   try {
     const { url, sslEnabled } = req.body;
     const domainName = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const userId = req.user?.id || 1;
+    const userId = req.user?.id;
 
     const domain = await Domain.create({
       user_id: userId,

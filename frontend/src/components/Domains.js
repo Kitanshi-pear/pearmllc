@@ -5,16 +5,15 @@ import {
     Snackbar, Alert, Stepper, Step, StepLabel
 } from "@mui/material";
 import { DataGrid } from '@mui/x-data-grid';
-import { Edit, Refresh, BugReport } from "@mui/icons-material";
+import { Edit, Refresh } from "@mui/icons-material";
 import Layout from "./Layout";
 import axios from "axios";
 import { useParams } from 'react-router-dom';
 
-// Add/Edit Domain Modal Component with Improved Validation
+// Add/Edit Domain Modal Component
 const DomainModal = ({ open, handleClose, onSave, domainData }) => {
     const [url, setUrl] = useState('');
     const [sslEnabled, setSslEnabled] = useState(false);
-    const [urlError, setUrlError] = useState('');
 
     useEffect(() => {
         if (domainData) {
@@ -26,47 +25,14 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
             setUrl('');
             setSslEnabled(false);
         }
-        setUrlError(''); // Reset error state when modal opens/changes
-    }, [domainData, open]);
-
-    const validateUrl = (value) => {
-        if (!value || value.trim() === '') {
-            setUrlError('Domain URL is required');
-            return false;
-        }
-        
-        // Check for valid domain format (basic check)
-        const urlPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]*(\.[a-zA-Z0-9][a-zA-Z0-9-]*)+$/;
-        if (!urlPattern.test(value)) {
-            setUrlError('Please enter a valid domain name (e.g., example.com)');
-            return false;
-        }
-        
-        setUrlError('');
-        return true;
-    };
-
-    const handleUrlChange = (e) => {
-        const newUrl = e.target.value;
-        setUrl(newUrl);
-        
-        // Clear error if field is not empty
-        if (newUrl && newUrl.trim() !== '') {
-            setUrlError('');
-        }
-    };
+    }, [domainData]);
 
     const handleSubmit = () => {
-        if (!validateUrl(url)) {
-            return; // Don't submit if validation fails
-        }
-        
         const updatedData = {
             ...domainData,
             url,
             sslEnabled,
         };
-        
         onSave(updatedData);
         handleClose();
     };
@@ -87,10 +53,8 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
                     variant="outlined"
                     sx={{ mb: 2 }}
                     value={url}
-                    onChange={handleUrlChange}
-                    error={!!urlError}
-                    helperText={urlError || "Enter domain name without https:// or www."}
-                    onBlur={() => validateUrl(url)}
+                    onChange={(e) => setUrl(e.target.value)}
+                    helperText="Enter domain name without https:// or www."
                 />
 
                 <FormControlLabel
@@ -105,13 +69,7 @@ const DomainModal = ({ open, handleClose, onSave, domainData }) => {
                 />
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 3 }}>
-                    <Button 
-                        variant="contained" 
-                        onClick={handleSubmit}
-                        disabled={!!urlError}
-                    >
-                        Save
-                    </Button>
+                    <Button variant="contained" onClick={handleSubmit}>Save</Button>
                     <Button onClick={handleClose}>Cancel</Button>
                 </Stack>
             </DialogContent>
@@ -457,21 +415,6 @@ const DomainsPage = () => {
 
     const handleSaveDomain = async (domain) => {
         try {
-            // Validate input before sending to API
-            if (!domain.url || domain.url.trim() === '') {
-                showNotification('Domain URL is required', 'error');
-                return;
-            }
-            
-            // Check for valid domain format
-            const urlPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]*(\.[a-zA-Z0-9][a-zA-Z0-9-]*)+$/;
-            const cleanUrl = domain.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            
-            if (!urlPattern.test(cleanUrl)) {
-                showNotification('Please enter a valid domain name (e.g., example.com)', 'error');
-                return;
-            }
-
             if (domain?.id) {
                 // Update existing domain
                 const response = await axios.put(`https://pearmllc.onrender.com/api/domains/${domain.id}`, {
@@ -490,11 +433,9 @@ const DomainsPage = () => {
                 
                 showNotification('Domain updated successfully', 'success');
             } else {
-                // Create new domain - with improved error handling
-                console.log("Creating domain with:", { url: cleanUrl, sslEnabled: domain.sslEnabled });
-                
+                // Create new domain
                 const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    url: cleanUrl, // Keep 'url' to match what API expects
+                    url: domain.url,
                     sslEnabled: domain.sslEnabled
                 });
 
@@ -518,24 +459,7 @@ const DomainsPage = () => {
             }
         } catch (error) {
             console.error("Error saving domain:", error);
-            
-            // Improved error message handling
-            const errorDetails = error.response?.data?.details || '';
-            const validationErrors = error.response?.data?.validationErrors || [];
-            
-            let errorMessage = 'Failed to save domain';
-            
-            if (errorDetails) {
-                errorMessage += `: ${errorDetails}`;
-            }
-            
-            if (validationErrors.length > 0) {
-                // Format validation errors for display
-                const formattedErrors = validationErrors.map(e => `${e.field}: ${e.message}`).join(', ');
-                errorMessage += ` (${formattedErrors})`;
-            }
-            
-            showNotification(errorMessage, 'error');
+            showNotification('Failed to save domain', 'error');
         }
     };
 
@@ -635,62 +559,6 @@ const DomainsPage = () => {
 
     const handleRefresh = () => {
         fetchDomains();
-    };
-
-    // Diagnostic Tool (for debugging)
-    const runDomainDiagnostic = async () => {
-        showNotification('Running domain creation diagnostic...', 'info');
-        
-        try {
-            // Test 1: Check API connectivity
-            const connectivityTest = await axios.get('https://pearmllc.onrender.com/api/domains');
-            console.log('Connectivity test passed:', connectivityTest.status);
-            
-            // Test 2: Try to create a test domain with detailed logging
-            const testDomain = `test-${Date.now()}.example.com`;
-            
-            console.log('Attempting to create test domain:', testDomain);
-            
-            try {
-                const testResponse = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    url: testDomain,
-                    sslEnabled: false
-                });
-                
-                console.log('Test domain created successfully:', testResponse.data);
-                showNotification(`Diagnostic test passed! Created domain: ${testDomain}`, 'success');
-                
-                // Clean up test domain
-                console.log('Cleaning up test domain...');
-                await axios.delete(`https://pearmllc.onrender.com/api/domains/${testResponse.data.id}/delete`);
-                console.log('Test domain deleted');
-                
-            } catch (createError) {
-                console.error('Test domain creation failed:', createError);
-                
-                // Log detailed error info
-                const status = createError.response?.status;
-                const responseData = createError.response?.data;
-                
-                showNotification(`Domain creation diagnostic failed with status ${status}: ${JSON.stringify(responseData)}`, 'error');
-                
-                // Extract more info from the error
-                if (createError.response?.data?.validationErrors) {
-                    console.log('Validation errors:', createError.response.data.validationErrors);
-                }
-                
-                // Check if it's a database constraint issue
-                if (createError.message.includes('constraint') || 
-                    (responseData && responseData.details && responseData.details.includes('constraint'))) {
-                    console.log('Possible database constraint violation');
-                    showNotification('Diagnostic indicates a database constraint issue', 'error');
-                }
-            }
-            
-        } catch (error) {
-            console.error('Domain diagnostic failed:', error);
-            showNotification('Domain creation diagnostic failed. Check console for details.', 'error');
-        }
     };
 
     // Helper function to get appropriate tooltip text
@@ -844,16 +712,6 @@ const DomainsPage = () => {
                             startIcon={<Refresh />}
                         >
                             Refresh
-                        </Button>
-                        {/* Diagnostic Button (for debugging) */}
-                        <Button 
-                            variant="outlined" 
-                            color="secondary" 
-                            onClick={runDomainDiagnostic} 
-                            sx={{ mr: 2 }}
-                            startIcon={<BugReport />}
-                        >
-                            Run Diagnostic
                         </Button>
                         <Button 
                             variant="contained" 
