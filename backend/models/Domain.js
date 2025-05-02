@@ -1,12 +1,13 @@
 module.exports = (sequelize, DataTypes) => {
   const Domain = sequelize.define('Domain', {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT.UNSIGNED,
+      autoIncrement: true,       // <-- IMPORTANT
       primaryKey: true,
-      autoIncrement: true,
     },
     status: {
       type: DataTypes.ENUM('pending', 'verifying', 'active', 'error'),
+      allowNull: true,
       defaultValue: 'pending',
     },
     user_id: {
@@ -14,11 +15,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     domain: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(255),
       allowNull: false,
     },
     certificate_arn: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     cname_acm_name: {
@@ -39,10 +40,12 @@ module.exports = (sequelize, DataTypes) => {
     },
     created_at: {
       type: DataTypes.DATE,
+      allowNull: true,
       defaultValue: DataTypes.NOW,
     },
     reissue_only: {
       type: DataTypes.BOOLEAN,
+      allowNull: true,
       defaultValue: false,
     },
   }, {

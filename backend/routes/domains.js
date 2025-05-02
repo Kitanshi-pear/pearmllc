@@ -30,8 +30,19 @@ router.post('/', async (req, res) => {
     res.status(201).json(domain);
   } catch (error) {
     console.error('Error creating domain:', error);
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors.map(e => ({
+          message: e.message,
+          path: e.path,
+          value: e.value
+        }))
+      });
+    }
     res.status(500).json({ error: 'Domain creation failed', details: error.message });
   }
+  
 });
 
 // === 2. Request ACM Certificate
