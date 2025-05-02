@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, CircularProgress, Typography, Button, Select, Dialog,
   DialogTitle, DialogContent, DialogActions, FormControl, InputLabel,
-  Chip, MenuItem, TextField
+  Chip, MenuItem, TextField, Card, CardContent, Grid
 } from "@mui/material";
 import { DataGrid } from '@mui/x-data-grid';
 import Layout from "./Layout";
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-
+import DatePicker from '@mui/lab/DatePicker';
+import AdapterDateFns from '@mui/lab/AdapterDateFns';
+import LocalizationProvider from '@mui/lab/LocalizationProvider';
 
 // Modal component to create a new lander
 const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) => {
@@ -200,7 +202,118 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
   );
 };
 
+// Date Range Selector Component
+const DateRangeSelector = ({ startDate, endDate, onDateChange }) => {
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Box display="flex" gap={2}>
+        <DatePicker
+          label="Start Date"
+          value={startDate}
+          onChange={(newDate) => onDateChange('startDate', newDate)}
+          renderInput={(params) => <TextField {...params} />}
+        />
+        <DatePicker
+          label="End Date"
+          value={endDate}
+          onChange={(newDate) => onDateChange('endDate', newDate)}
+          renderInput={(params) => <TextField {...params} />}
+          minDate={startDate}
+        />
+      </Box>
+    </LocalizationProvider>
+  );
+};
 
+// Metrics Summary Component
+const MetricsSummary = ({ selectedRows }) => {
+  // Calculate totals and averages for selected rows
+  const getTotals = () => {
+    if (!selectedRows || selectedRows.length === 0) return null;
+    
+    const totals = {
+      impressions: 0,
+      clicks: 0,
+      lp_views: 0,
+      lp_clicks: 0,
+      conversion: 0,
+      total_revenue: 0,
+      cost: 0,
+      profit: 0
+    };
+    
+    selectedRows.forEach(row => {
+      totals.impressions += row.impressions || 0;
+      totals.clicks += row.clicks || 0;
+      totals.lp_views += row.lp_views || 0;
+      totals.lp_clicks += row.lp_clicks || 0;
+      totals.conversion += row.conversion || 0;
+      totals.total_revenue += row.total_revenue || 0;
+      totals.cost += row.cost || 0;
+      totals.profit += row.profit || 0;
+    });
+    
+    // Calculate averages
+    const averages = {
+      ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
+      lpctr: totals.lp_views > 0 ? (totals.lp_clicks / totals.lp_views) * 100 : 0,
+      cr: totals.clicks > 0 ? (totals.conversion / totals.clicks) * 100 : 0,
+      epc: totals.clicks > 0 ? totals.total_revenue / totals.clicks : 0,
+      roi: totals.cost > 0 ? ((totals.total_revenue - totals.cost) / totals.cost) * 100 : 0
+    };
+    
+    return { totals, averages };
+  };
+  
+  const metrics = getTotals();
+  
+  if (!metrics) return null;
+  
+  return (
+    <Card variant="outlined" sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Summary for {selectedRows.length} Selected Landers
+        </Typography>
+        
+        <Grid container spacing={2}>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Impressions</Typography>
+            <Typography variant="body1">{metrics.totals.impressions.toLocaleString()}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Clicks</Typography>
+            <Typography variant="body1">{metrics.totals.clicks.toLocaleString()}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Conversions</Typography>
+            <Typography variant="body1">{metrics.totals.conversion.toLocaleString()}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">CTR</Typography>
+            <Typography variant="body1">{metrics.averages.ctr.toFixed(2)}%</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Revenue</Typography>
+            <Typography variant="body1">${metrics.totals.total_revenue.toFixed(2)}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Cost</Typography>
+            <Typography variant="body1">${metrics.totals.cost.toFixed(2)}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">Profit</Typography>
+            <Typography variant="body1">${metrics.totals.profit.toFixed(2)}</Typography>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Typography variant="subtitle2">ROI</Typography>
+            <Typography variant="body1">{metrics.averages.roi.toFixed(2)}%</Typography>
+          </Grid>
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+};
 
 // Main page component
 const LandingPage = () => {
@@ -208,28 +321,105 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editLander, setEditLander] = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // 30 days ago
+  const [endDate, setEndDate] = useState(new Date()); // Today
 
-  const fetchLanders = () => {
+  const fetchLanders = async () => {
     setLoading(true);
-    fetch('https://pearmllc.onrender.com/api/landers')
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data.map((lander, index) => ({
-          id: lander.id || lander.Serial_No || index + 1,
-          ...lander
-        }));
-        setLanders(formatted);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    try {
+      // Get all landers
+      const landersRes = await fetch('https://pearmllc.onrender.com/api/landers');
+      const landersData = await landersRes.json();
+      
+      // Format dates for API
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      // Get metrics for each lander
+      const landersWithMetrics = await Promise.all(landersData.map(async (lander, index) => {
+        try {
+          // Fetch metrics for this lander
+          const metricsRes = await fetch(
+            `https://pearmllc.onrender.com/api/metrics/lander/${lander.id}?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
+          );
+          
+          if (!metricsRes.ok) {
+            throw new Error(`Failed to fetch metrics for lander ${lander.id}`);
+          }
+          
+          const metrics = await metricsRes.json();
+          
+          return {
+            id: lander.id || lander.Serial_No || index + 1,
+            ...lander,
+            // Map metrics to the lander object
+            impressions: metrics.impressions || 0,
+            clicks: metrics.clicks || 0,
+            lp_views: metrics.lpviews || 0,
+            lp_clicks: metrics.lpclicks || 0,
+            conversion: metrics.conversions || 0,
+            total_revenue: metrics.revenue || 0,
+            cost: metrics.cost || 0,
+            profit: metrics.profit || 0,
+            total_cpa: metrics.ctc || 0,
+            epc: metrics.epc || 0,
+            total_roi: metrics.roi || 0,
+            ctr: metrics.ctr || 0,
+            lpctr: metrics.lpctr || 0,
+            cr: metrics.cr || 0
+          };
+        } catch (error) {
+          console.error(`Error fetching metrics for lander ${lander.id}:`, error);
+          
+          // Return lander with default metrics if fetch fails
+          return {
+            id: lander.id || lander.Serial_No || index + 1,
+            ...lander,
+            impressions: 0,
+            clicks: 0,
+            lp_views: 0,
+            lp_clicks: 0,
+            conversion: 0,
+            total_revenue: 0,
+            cost: 0,
+            profit: 0,
+            total_cpa: 0,
+            epc: 0,
+            total_roi: 0,
+            ctr: 0,
+            lpctr: 0,
+            cr: 0
+          };
+        }
+      }));
+      
+      setLanders(landersWithMetrics);
+    } catch (err) {
+      console.error('Error fetching landers:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchLanders();
-  }, []);
+  }, [startDate, endDate]); // Refetch when date range changes
+
+  const handleDateChange = (type, value) => {
+    if (type === 'startDate') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+  };
+
+  const handleSelectionChange = (newSelection) => {
+    const selectedRowsData = newSelection.map(id => 
+      landers.find(lander => lander.id === id)
+    );
+    setSelectedRows(selectedRowsData);
+  };
 
   const handleOpen = () => {
     setEditLander(null);
@@ -244,6 +434,52 @@ const LandingPage = () => {
   const handleRowClick = (params) => {
     setEditLander(params.row);
     setOpen(true);
+  };
+
+  const handleExportCSV = () => {
+    const dataToExport = selectedRows.length > 0 ? selectedRows : landers;
+    
+    // Format data for CSV
+    const headers = [
+      'ID', 'Name', 'URL', 'Impressions', 'Clicks', 'LP Views', 'LP Clicks',
+      'Conversions', 'CTR (%)', 'LP CTR (%)', 'CR (%)', 'CPA ($)', 'EPC ($)',
+      'Revenue ($)', 'Cost ($)', 'Profit ($)', 'ROI (%)'
+    ];
+    
+    const csvData = dataToExport.map(lander => [
+      lander.id,
+      lander.name,
+      lander.url,
+      lander.impressions,
+      lander.clicks,
+      lander.lp_views,
+      lander.lp_clicks,
+      lander.conversion,
+      lander.ctr ? lander.ctr.toFixed(2) : '0.00',
+      lander.lpctr ? lander.lpctr.toFixed(2) : '0.00',
+      lander.cr ? lander.cr.toFixed(2) : '0.00',
+      lander.total_cpa ? lander.total_cpa.toFixed(2) : '0.00',
+      lander.epc ? lander.epc.toFixed(2) : '0.00',
+      lander.total_revenue ? lander.total_revenue.toFixed(2) : '0.00',
+      lander.cost ? lander.cost.toFixed(2) : '0.00',
+      lander.profit ? lander.profit.toFixed(2) : '0.00',
+      lander.total_roi ? lander.total_roi.toFixed(2) : '0.00'
+    ]);
+    
+    // Create CSV content
+    const csvContent = [headers, ...csvData]
+      .map(row => row.join(','))
+      .join('\n');
+    
+    // Create and download CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `landers_metrics_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const macros = [
@@ -334,65 +570,154 @@ const LandingPage = () => {
         return new Date(params.value).toLocaleString();
       }
     },
-    { field: 'clicks', headerName: 'Clicks', width: 100 },
-    { field: 'lp_clicks', headerName: 'LP Clicks', width: 100 },
-    { field: 'lp_views', headerName: 'LP Views', width: 100 },
-    { field: 'conversion', headerName: 'Conversions', width: 100 },
     { 
-      field: 'total_cpa', 
-      headerName: 'Total CPA ($)', 
-      width: 130,
+      field: 'impressions', 
+      headerName: 'Impressions', 
+      width: 120,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right'
+    },
+    { 
+      field: 'clicks', 
+      headerName: 'Clicks', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right'
+    },
+    { 
+      field: 'lp_views', 
+      headerName: 'LP Views', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right' 
+    },
+    { 
+      field: 'lp_clicks', 
+      headerName: 'LP Clicks', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right'
+    },
+    { 
+      field: 'conversion', 
+      headerName: 'Conversions', 
+      width: 120,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right'
+    },
+    { 
+      field: 'ctr', 
+      headerName: 'CTR (%)', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
-        return params.value.toFixed(2);
+        return `${params.value.toFixed(2)}%`;
+      }
+    },
+    { 
+      field: 'lpctr', 
+      headerName: 'LP CTR (%)', 
+      width: 110,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return `${params.value.toFixed(2)}%`;
+      }
+    },
+    { 
+      field: 'cr', 
+      headerName: 'CR (%)', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return `${params.value.toFixed(2)}%`;
+      }
+    },
+    { 
+      field: 'total_cpa', 
+      headerName: 'CPA ($)', 
+      width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (params) => {
+        if (!params || params.value == null) return '';
+        return `$${params.value.toFixed(2)}`;
       }
     },
     { 
       field: 'epc', 
       headerName: 'EPC ($)', 
       width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
-        return params.value.toFixed(2);
+        return `$${params.value.toFixed(2)}`;
       }
     },
     { 
       field: 'total_revenue', 
       headerName: 'Revenue ($)', 
-      width: 130,
+      width: 120,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
-        return params.value.toFixed(2);
+        return `$${params.value.toFixed(2)}`;
       }
     },
     { 
       field: 'cost', 
       headerName: 'Cost ($)', 
       width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
-        return params.value.toFixed(2);
+        return `$${params.value.toFixed(2)}`;
       }
     },
     { 
       field: 'profit', 
       headerName: 'Profit ($)', 
       width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
-        return params.value.toFixed(2);
+        return `$${params.value.toFixed(2)}`;
       }
     },
     { 
       field: 'total_roi', 
       headerName: 'ROI (%)', 
       width: 100,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
       valueFormatter: (params) => {
         if (!params || params.value == null) return '';
         return `${params.value.toFixed(2)}%`;
       }
-    },
-    { field: 'impressions', headerName: 'Impressions', width: 120 }
+    }
   ];
 
   return (
@@ -400,23 +725,48 @@ const LandingPage = () => {
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h5">Landers</Typography>
-          <Button variant="contained" color="primary" onClick={handleOpen}>
-            + New Lander
-          </Button>
+          <Box display="flex" gap={2}>
+            <Button variant="contained" color="primary" onClick={handleOpen}>
+              + New Lander
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              onClick={handleExportCSV}
+              disabled={loading}
+            >
+              Export CSV
+            </Button>
+          </Box>
         </Box>
 
+        <Box mb={3}>
+          <DateRangeSelector 
+            startDate={startDate}
+            endDate={endDate}
+            onDateChange={handleDateChange}
+          />
+        </Box>
+
+        {selectedRows.length > 0 && (
+          <MetricsSummary selectedRows={selectedRows} />
+        )}
+
         {loading ? (
-          <CircularProgress />
+          <Box display="flex" justifyContent="center" my={5}>
+            <CircularProgress />
+          </Box>
         ) : (
           <DataGrid
             rows={landers}
             columns={columns}
             autoHeight
             pageSize={100}
-            rowsPerPageOptions={[100, 200, 500]}
+            rowsPerPageOptions={[25, 50, 100, 200, 500]}
             checkboxSelection
             disableSelectionOnClick
             onRowClick={handleRowClick}
+            onSelectionModelChange={handleSelectionChange}
             sx={{
               "& .MuiDataGrid-columnHeader": {
                 backgroundColor: "#f0f0f0",
@@ -428,6 +778,11 @@ const LandingPage = () => {
               "& .MuiDataGrid-cell:focus-within": {
                 outline: "none !important"
               }
+            }}
+            initialState={{
+              sorting: {
+                sortModel: [{ field: 'impressions', sort: 'desc' }],
+              },
             }}
           />
         )}
