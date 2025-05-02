@@ -417,13 +417,22 @@ const DomainsPage = () => {
     // FIX: Improved error handling in handleSaveDomain function
     const handleSaveDomain = async (domain) => {
         try {
+            // Remove https:// from the URL if present
+            const cleanUrl = domain.url.replace(/^https?:\/\//, '');
+            
             if (domain?.id) {
-                // Update existing domain
+                // Update existing domain - Log what we're sending
+                console.log("Updating domain with data:", {
+                    domain: cleanUrl,
+                    sslEnabled: domain.sslEnabled
+                });
+                
                 const response = await axios.put(`https://pearmllc.onrender.com/api/domains/${domain.id}`, {
-                    domain: domain.url, // FIX: Use correct property name 'domain' instead of 'url'
+                    domain: cleanUrl, // Clean URL without protocol
                     sslEnabled: domain.sslEnabled
                 });
 
+                console.log("Update response:", response.data);
                 const updated = response.data;
                 
                 // FIX: Ensure the updated data is properly mapped to our UI format
@@ -431,6 +440,7 @@ const DomainsPage = () => {
                     ...d,
                     ...updated,
                     url: updated.domain ? `https://${updated.domain}` : d.url,
+                    domainName: updated.domain || '',
                     sslEnabled: updated.status !== 'active',
                     needsSSLManagement: updated.status !== 'active' || updated.reissue_only,
                     created_at: updated.created_at || d.created_at,
@@ -439,17 +449,24 @@ const DomainsPage = () => {
                 
                 showNotification('Domain updated successfully', 'success');
             } else {
-                // Create new domain - FIX: Use correct property names in API request
+                // Create new domain - Log what we're sending
+                console.log("Creating domain with data:", {
+                    domain: cleanUrl,
+                    sslEnabled: domain.sslEnabled
+                });
+                
                 const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    domain: domain.url, // FIX: Use correct property name 'domain' instead of 'url'
+                    domain: cleanUrl, // Clean URL without protocol
                     sslEnabled: domain.sslEnabled
                 });
 
+                console.log("Create response:", response.data);
                 const created = response.data;
                 const newDomain = {
                     ...created,
                     serial_no: domains.length + 1,
                     url: created.domain ? `https://${created.domain}` : '',
+                    domainName: created.domain || '',
                     sslEnabled: created.status !== 'active',
                     needsSSLManagement: created.status !== 'active',
                     created_at: created.created_at || new Date().toISOString(),
@@ -467,8 +484,14 @@ const DomainsPage = () => {
             }
         } catch (error) {
             console.error("Error saving domain:", error);
+            // Log the full error for debugging
+            if (error.response) {
+                console.error("Response data:", error.response.data);
+                console.error("Response status:", error.response.status);
+            }
+            
             // FIX: Improved error message with details from the response if available
-            const errorMsg = error.response?.data?.error || error.message || 'Failed to save domain';
+            const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to save domain';
             showNotification(errorMsg, 'error');
         }
     };
@@ -629,7 +652,25 @@ const DomainsPage = () => {
             },
         },
         { field: 'id', headerName: 'ID', width: 100 },
-        { field: 'url', headerName: 'Domain', width: 200 },
+        { 
+            field: 'domainName', 
+            headerName: 'Domain Name', 
+            width: 200,
+            // Display fallbacks for the domain name
+            valueGetter: (params) => {
+                return params.row.domainName || params.row.domain || (params.row.url && params.row.url.replace(/^https?:\/\//, '')) || '';
+            }
+        },
+        { 
+            field: 'url', 
+            headerName: 'URL', 
+            width: 250,
+            // Ensure we have a proper URL format
+            valueGetter: (params) => {
+                const domainValue = params.row.domainName || params.row.domain || '';
+                return domainValue ? `https://${domainValue}` : params.row.url || '';
+            }
+        },
         {
             field: 'status',
             headerName: 'Status',
@@ -675,27 +716,32 @@ const DomainsPage = () => {
         {
             field: 'cname_acm_name',
             headerName: 'CNAME Name',
-            width: 250
+            width: 200
         },
         {
             field: 'cname_acm_value',
             headerName: 'CNAME Value',
-            width: 250
+            width: 220
         },
         {
             field: 'created_at',
             headerName: 'Created',
             width: 180,
             valueFormatter: (params) => {
-                // FIX: Improved date handling for created_at column
+                // Enhanced date handling for created_at column
                 const value = params?.value;
-                if (!value) return '';
+                if (!value) return 'N/A';
                 try {
                     const date = new Date(value);
-                    return isNaN(date.getTime()) ? '' : date.toLocaleString();
+                    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
                 } catch (error) {
-                    return value; // If parsing fails, return the original value
+                    console.log("Error formatting created_at:", error);
+                    return 'Error'; // Show explicit error indicator
                 }
+            },
+            // Ensure the column has data for sorting
+            valueGetter: (params) => {
+                return params.row.created_at || new Date().toISOString();
             }
         },
         {
@@ -703,21 +749,22 @@ const DomainsPage = () => {
             headerName: 'SSL Expires',
             width: 180,
             valueFormatter: (params) => {
-                // FIX: Improved date handling for ssl_expiry column
+                // Enhanced date handling for ssl_expiry column
                 const value = params?.value;
-                if (!value) return '';
+                if (!value) return 'N/A';
                 try {
                     const date = new Date(value);
-                    return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+                    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
                 } catch (error) {
-                    return value; // If parsing fails, return the original value
+                    console.log("Error formatting ssl_expiry:", error);
+                    return 'Error'; // Show explicit error indicator
                 }
             }
         },
         {
             field: 'cloudfront_domain',
             headerName: 'CloudFront Domain',
-            width: 250
+            width: 220
         }
     ];
 
