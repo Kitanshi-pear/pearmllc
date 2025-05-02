@@ -421,7 +421,7 @@ const DomainsPage = () => {
                     url: domain.url,
                     sslEnabled: domain.sslEnabled
                 });
-    
+
                 const updated = response.data;
                 setDomains(prev => prev.map(d => d.id === updated.id ? {
                     ...d,
@@ -433,16 +433,16 @@ const DomainsPage = () => {
                 
                 showNotification('Domain updated successfully', 'success');
             } else {
-                // Create new domain - FIX HERE
-                // For new domains, we need to ensure the URL is properly formatted
+                // Create new domain - FIXED
                 // Remove https:// or http:// if present in the URL
                 const cleanUrl = domain.url.replace(/^https?:\/\//, '');
                 
+                // Send 'url' parameter to match what the API expects
                 const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    domain: cleanUrl, // Changed 'url' to 'domain' to match expected API format
+                    url: cleanUrl, 
                     sslEnabled: domain.sslEnabled
                 });
-    
+
                 const created = response.data;
                 const newDomain = {
                     ...created,
@@ -463,7 +463,8 @@ const DomainsPage = () => {
             }
         } catch (error) {
             console.error("Error saving domain:", error);
-            showNotification('Failed to save domain: ' + (error.response?.data?.message || error.message), 'error');
+            // Show more detailed error message from the API
+            showNotification('Failed to save domain: ' + (error.response?.data?.error || error.message), 'error');
         }
     };
 
