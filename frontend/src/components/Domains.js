@@ -360,6 +360,9 @@ const DomainsPage = () => {
                     needsSSLManagement: d.status !== 'active' || d.reissue_only
                 }));
 
+                // Log the formatted data to see what we're working with
+                console.log('Formatted domain data:', formatted);
+                
                 setDomains(formatted);
             }
         } catch (error) {
@@ -434,32 +437,44 @@ const DomainsPage = () => {
                 showNotification('Domain updated successfully', 'success');
             } else {
                 // Create new domain
-                const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
-                    url: domain.url,
-                    sslEnabled: domain.sslEnabled
-                });
+                const cleanUrl = domain.url.replace(/^https?:\/\//, '');
+                try {
+                    const response = await axios.post('https://pearmllc.onrender.com/api/domains', {
+                        url: cleanUrl,
+                        sslEnabled: domain.sslEnabled
+                    });
 
-                const created = response.data;
-                const newDomain = {
-                    ...created,
-                    serial_no: domains.length + 1,
-                    url: `https://${created.domain}`,
-                    sslEnabled: created.status !== 'active',
-                    needsSSLManagement: created.status !== 'active'
-                };
-                
-                setDomains(prev => [...prev, newDomain]);
-                showNotification('Domain created successfully', 'success');
-                
-                // Auto-start SSL provisioning if enabled
-                if (domain.sslEnabled) {
-                    setSelectedDomain(newDomain);
-                    setOpenSSLModal(true);
+                    const created = response.data;
+                    const newDomain = {
+                        ...created,
+                        serial_no: domains.length + 1,
+                        url: `https://${created.domain}`,
+                        sslEnabled: created.status !== 'active',
+                        needsSSLManagement: created.status !== 'active'
+                    };
+                    
+                    setDomains(prev => [...prev, newDomain]);
+                    showNotification('Domain created successfully', 'success');
+                    
+                    // Auto-start SSL provisioning if enabled
+                    if (domain.sslEnabled) {
+                        setSelectedDomain(newDomain);
+                        setOpenSSLModal(true);
+                    }
+                } catch (error) {
+                    console.error("Error creating domain:", error);
+                    
+                    // Handle PRIMARY key error
+                    if (error.response?.data?.details?.includes('PRIMARY')) {
+                        showNotification('Primary key conflict. Please try again with a different domain name.', 'error');
+                    } else {
+                        showNotification(`Failed to create domain: ${error.response?.data?.details || error.message}`, 'error');
+                    }
                 }
             }
         } catch (error) {
             console.error("Error saving domain:", error);
-            showNotification('Failed to save domain', 'error');
+            showNotification(`Failed to save domain: ${error.response?.data?.details || error.message}`, 'error');
         }
     };
 
@@ -579,6 +594,20 @@ const DomainsPage = () => {
         return domain.reissue ? 'Reissue SSL Certificate' : 'Manage SSL';
     };
 
+    // Helper function to format dates properly
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid date';
+            return date.toLocaleString();
+        } catch (error) {
+            console.error('Error formatting date:', dateString, error);
+            return 'Error';
+        }
+    };
+
     const columns = [
         {
             field: 'action',
@@ -674,22 +703,43 @@ const DomainsPage = () => {
             field: 'created_at',
             headerName: 'Created',
             width: 180,
-            valueFormatter: (params) => {
+            renderCell: (params) => {
                 const value = params?.value;
-                if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleString();
+                return <Typography>{formatDate(value)}</Typography>;
             }
         },
         {
             field: 'ssl_expiry',
             headerName: 'SSL Expires',
             width: 180,
-            valueFormatter: (params) => {
+            renderCell: (params) => {
                 const value = params?.value;
-                if (!value) return '';
-                const date = new Date(value);
-                return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+                if (!value) return <Typography>-</Typography>;
+                
+                try {
+                    const date = new Date(value);
+                    if (isNaN(date.getTime())) return <Typography>Invalid date</Typography>;
+                    
+                    // Calculate if the expiry is near (within 30 days)
+                    const now = new Date();
+                    const diffDays = Math.floor((date - now) / (1000 * 60 * 60 * 24));
+                    
+                    let color = 'inherit';
+                    if (diffDays < 0) {
+                        color = 'error';  // Expired
+                    } else if (diffDays < 30) {
+                        color = 'warning';  // Expiring soon
+                    }
+                    
+                    return (
+                        <Typography color={color}>
+                            {date.toLocaleDateString()}
+                        </Typography>
+                    );
+                } catch (error) {
+                    console.error('Error formatting SSL expiry date:', value, error);
+                    return <Typography>Error</Typography>;
+                }
             }
         },
         {
