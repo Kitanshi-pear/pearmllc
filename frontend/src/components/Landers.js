@@ -26,20 +26,37 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
   useEffect(() => {
     if (landerToEdit) {
-      // Extract the domain and parameters from the full URL
-      const domain = landerToEdit.domain || '';
-      // Extract the part after "/click" (query parameters)
-      const urlParts = landerToEdit.url?.split('/click');
-      const queryParams = urlParts?.length > 1 ? urlParts[1] : '';
+      // When editing a lander, populate the form with existing data
+      let domain = '';
+      let queryParams = '';
+      
+      // Extract domain and query parameters from the full URL
+      if (landerToEdit.url) {
+        try {
+          // Parse the URL to extract domain and path
+          const urlObj = new URL(landerToEdit.url);
+          domain = urlObj.hostname;
+          
+          // Get the part after '/click' if it exists
+          const pathParts = urlObj.pathname.split('/click');
+          const path = pathParts.length > 1 ? pathParts[1] : '';
+          
+          // Combine path and search params for the full query string
+          queryParams = path + urlObj.search;
+        } catch (error) {
+          console.error('Error parsing URL:', error);
+        }
+      }
       
       setLanderData({
         name: landerToEdit.name || '',
         type: landerToEdit.type || 'LANDING',
         url: queryParams || '',
-        domain: domain,
+        domain: domain || '',
         tags: landerToEdit.tags || []
       });
     } else {
+      // Reset form for new lander
       setLanderData({
         name: '',
         type: 'LANDING',
@@ -69,7 +86,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
         '';
       
       // Format the final URL with the domain and click path
-      const finalUrl = `https://${landerData.domain}/click`;
+      const finalUrl = `https://${landerData.domain}/click${queryParamsFormatted}`;
 
       const payload = {
         ...landerData,
@@ -119,7 +136,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
       '';
     
-    return `https://${landerData.domain}/click`;
+    return `https://${landerData.domain}/click${queryParamsFormatted}`;
   };
 
   return (
@@ -141,6 +158,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
             name="domain"
             value={landerData.domain}
             onChange={handleChange}
+            label="Tracking domain"
           >
             {domains.map((domain) => (
               <MenuItem key={domain.id} value={domain.url}>
@@ -324,12 +342,16 @@ const LandingPage = () => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // 30 days ago
   const [endDate, setEndDate] = useState(new Date()); // Today
+  const [selectionModel, setSelectionModel] = useState([]);
 
   const fetchLanders = async () => {
     setLoading(true);
     try {
       // Get all landers
       const landersRes = await fetch('https://pearmllc.onrender.com/api/landers');
+      if (!landersRes.ok) {
+        throw new Error('Failed to fetch landers');
+      }
       const landersData = await landersRes.json();
       
       // Format dates for API
@@ -344,11 +366,27 @@ const LandingPage = () => {
             `https://pearmllc.onrender.com/api/metrics/lander/${lander.id}?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
           );
           
-          if (!metricsRes.ok) {
-            throw new Error(`Failed to fetch metrics for lander ${lander.id}`);
-          }
+          let metrics = {
+            impressions: 0,
+            clicks: 0,
+            lpviews: 0,
+            lpclicks: 0,
+            conversions: 0,
+            revenue: 0,
+            cost: 0,
+            profit: 0,
+            ctr: 0,
+            lpctr: 0,
+            cr: 0,
+            epc: 0,
+            ctc: 0,
+            roi: 0
+          };
           
-          const metrics = await metricsRes.json();
+          if (metricsRes.ok) {
+            const metricsData = await metricsRes.json();
+            metrics = metricsData || metrics;
+          }
           
           return {
             id: lander.id || lander.Serial_No || index + 1,
@@ -414,10 +452,11 @@ const LandingPage = () => {
     }
   };
 
-  const handleSelectionChange = (newSelection) => {
-    const selectedRowsData = newSelection.map(id => 
+  const handleSelectionModelChange = (newSelectionModel) => {
+    setSelectionModel(newSelectionModel);
+    const selectedRowsData = newSelectionModel.map(id => 
       landers.find(lander => lander.id === id)
-    );
+    ).filter(Boolean); // Filter out any undefined values
     setSelectedRows(selectedRowsData);
   };
 
@@ -766,7 +805,8 @@ const LandingPage = () => {
             checkboxSelection
             disableSelectionOnClick
             onRowClick={handleRowClick}
-            onSelectionModelChange={handleSelectionChange}
+            selectionModel={selectionModel}
+            onSelectionModelChange={handleSelectionModelChange}
             sx={{
               "& .MuiDataGrid-columnHeader": {
                 backgroundColor: "#f0f0f0",
