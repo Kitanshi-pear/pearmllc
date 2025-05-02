@@ -37,22 +37,19 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
           const urlObj = new URL(landerToEdit.url);
           domain = urlObj.hostname;
           
-          // Get the part after '/click' if it exists
-          const pathParts = urlObj.pathname.split('/click');
-          const path = pathParts.length > 1 ? pathParts[1] : '';
-          
-          // Combine path and search params for the full query string
-          queryParams = path + urlObj.search;
+          // Get the query parameters (search part of the URL)
+          queryParams = urlObj.search;
         } catch (error) {
           console.error('Error parsing URL:', error);
         }
       }
       
+      // Set the form data with parsed values
       setLanderData({
         name: landerToEdit.name || '',
         type: landerToEdit.type || 'LANDING',
-        url: queryParams || '',
-        domain: domain || '',
+        url: queryParams, // Just the query parameters portion
+        domain: domain, // Just the domain portion
         tags: landerToEdit.tags || []
       });
     } else {
@@ -72,22 +69,43 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
   };
 
   const handleMacroClick = (macro) => {
-    let separator = landerData.url.includes('?') ? '&' : '?';
-    let updatedUrl = landerData.url + (landerData.url.endsWith('?') || landerData.url.endsWith('&') ? '' : separator) + macro.slice(1, -1) + '={' + macro.slice(1, -1) + '}';
-    setLanderData({ ...landerData, url: updatedUrl });
+    // Extract the parameter name without braces
+    const paramName = macro.replace('{', '').replace('}', '');
+    
+    // Determine if we need to add ? or & as separator
+    let currentUrl = landerData.url || '';
+    let separator = '';
+    
+    if (currentUrl === '') {
+      separator = '?';
+    } else if (currentUrl.includes('?')) {
+      if (currentUrl.endsWith('?') || currentUrl.endsWith('&')) {
+        separator = '';
+      } else {
+        separator = '&';
+      }
+    } else {
+      separator = '?';
+    }
+    
+    // Construct the new parameter
+    const newParam = `${separator}${paramName}=${macro}`;
+    
+    // Update the URL
+    setLanderData({ ...landerData, url: currentUrl + newParam });
   };
 
   const handleSave = async () => {
     try {
       // Get query parameters (ensure proper formatting with ? if needed)
-      const queryParams = landerData.url.trim();
-      const queryParamsFormatted = queryParams ? 
-        (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
-        '';
+      let queryParams = landerData.url.trim();
+      if (queryParams && !queryParams.startsWith('?')) {
+        queryParams = `?${queryParams}`;
+      }
       
       // Format the final URL with the domain and click path
-      const finalUrl = `https://${landerData.domain}/click${queryParamsFormatted}`;
-
+      const finalUrl = `https://${landerData.domain}/click${queryParams}`;
+      
       const payload = {
         ...landerData,
         url: finalUrl
@@ -131,12 +149,12 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
     if (!landerData.domain) return '';
     
     // Get query parameters (ensure proper formatting with ? if needed)
-    const queryParams = landerData.url.trim();
-    const queryParamsFormatted = queryParams ? 
-      (queryParams.startsWith('?') ? queryParams : `?${queryParams}`) : 
-      '';
+    let queryParams = landerData.url.trim();
+    if (queryParams && !queryParams.startsWith('?')) {
+      queryParams = `?${queryParams}`;
+    }
     
-    return `https://${landerData.domain}/click${queryParamsFormatted}`;
+    return `https://${landerData.domain}/click${queryParams}`;
   };
 
   // All available macro tokens based on the image
