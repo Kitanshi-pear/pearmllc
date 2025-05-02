@@ -139,81 +139,205 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
     return `https://${landerData.domain}/click${queryParamsFormatted}`;
   };
 
+  // All available macro tokens based on the image
+  const allMacros = [
+    '{lpkeyua}', '{sub1}', '{sub2}', '{sub3}', '{sub4}', '{sub5}', '{sub6}', '{sub7}', '{sub8}', '{sub9}',
+    '{sub10}', '{sub11}', '{sub12}', '{sub13}', '{sub14}', '{sub15}', '{sub16}', '{sub17}', '{sub18}',
+    '{sub19}', '{sub20}', '{rt_campaignid}', '{rt_adgroupid}', '{rt_adid}', '{rt_placementid}', '{rt_source}',
+    '{rt_medium}', '{rt_campaign}', '{rt_adgroup}', '{rt_ad}', '{rt_placement}', '{rt_keyword}', '{rt_role_1}',
+    '{rt_role_2}', '{clickid}', '{campaignid}', '{campaignname}', '{sourceid}', '{trafficsourcename}', '{useragent}',
+    '{os}', '{osversion}', '{browser}', '{browserver}', '{brand}', '{model}', '{country}', '{countryname}',
+    '{region}', '{city}', '{isp}', '{ip}', '{language}', '{timestamp}', '{clicktime}', '{prelanderid}',
+    '{prelandername}', '{landerid}', '{landername}', '{offerid}', '{offername}', '{referrerdomain}', '{connectiontype}',
+    '{palias}', '{networkid}', '{networkname}'
+  ];
+
+  const landingTypes = [
+    { value: 'LANDING', label: 'LANDING' },
+    { value: 'PRE-LANDING', label: 'PRE-LANDING' },
+    { value: 'LISTICLE LANDING', label: 'LISTICLE LANDING' },
+    { value: 'LISTICLE PRE-LANDING', label: 'LISTICLE PRE-LANDING' }
+  ];
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{landerToEdit ? 'Edit Lander' : 'Create Lander'}</DialogTitle>
+      <DialogTitle>{landerToEdit ? 'Edit Lander' : 'Landing'}</DialogTitle>
       <DialogContent>
-        <TextField
-          label="Name"
-          name="name"
-          fullWidth
-          margin="normal"
-          value={landerData.name}
-          onChange={handleChange}
-        />
-
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Tracking domain</InputLabel>
-          <Select
-            name="domain"
-            value={landerData.domain}
+        {/* Name field */}
+        <Box sx={{ mb: 3, mt: 1 }}>
+          <Typography component="label" htmlFor="name" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
+            Name *
+          </Typography>
+          <TextField
+            id="name"
+            name="name"
+            fullWidth
+            variant="outlined"
+            value={landerData.name}
             onChange={handleChange}
-            label="Tracking domain"
-          >
-            {domains.map((domain) => (
-              <MenuItem key={domain.id} value={domain.url}>
-                {domain.url}
-              </MenuItem>
+            required
+          />
+        </Box>
+
+        {/* Landing page type selection */}
+        <Box sx={{ mb: 3 }}>
+          <Typography component="div" sx={{ mb: 1, fontWeight: 'medium' }}>
+            Type
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Choose the type of your landing page.
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+            {landingTypes.map((type) => (
+              <Box
+                key={type.value}
+                onClick={() => setLanderData({ ...landerData, type: type.value })}
+                sx={{
+                  flex: '1 0 21%',
+                  m: 0.5,
+                  p: 2,
+                  textAlign: 'center',
+                  bgcolor: landerData.type === type.value ? '#e3f2fd' : '#f5f5f5',
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  border: landerData.type === type.value ? '1px solid #90caf9' : '1px solid transparent'
+                }}
+              >
+                <Typography variant="body2" fontWeight={landerData.type === type.value ? 'bold' : 'regular'}>
+                  {type.label}
+                </Typography>
+              </Box>
             ))}
-          </Select>
-        </FormControl>
+          </Box>
+        </Box>
 
-        <TextField
-          label="Query Parameters (e.g., ?sub1={sub1})"
-          name="url"
-          fullWidth
-          margin="normal"
-          value={landerData.url}
-          onChange={handleChange}
-          placeholder="?sub1={sub1}&sub2={sub2}"
-          helperText="Add query parameters after the /click path"
-        />
+        {/* URL field */}
+        <Box sx={{ mb: 3 }}>
+          <Typography component="label" htmlFor="url" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
+            URL *
+          </Typography>
+          <TextField
+            id="url"
+            name="url"
+            fullWidth
+            variant="outlined"
+            value={landerData.url}
+            onChange={handleChange}
+            placeholder="?sub1={sub1}&sub2={sub2}"
+            required
+          />
+        </Box>
 
-        <Box mt={2} mb={2}>
-          <Typography variant="subtitle2" gutterBottom>Quick Add Macros:</Typography>
-          <Box display="flex" flexWrap="wrap" gap={1}>
-            {macros.map((macro, index) => (
+        {/* Macros/tokens */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+            {allMacros.map((macro, index) => (
               <Chip
                 key={index}
                 label={`+ ${macro}`}
                 onClick={() => handleMacroClick(macro)}
                 variant="outlined"
                 size="small"
+                sx={{ 
+                  borderRadius: 1,
+                  bgcolor: '#f5f5f5',
+                  m: 0.25,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: '#e0e0e0',
+                  }
+                }}
               />
             ))}
           </Box>
         </Box>
 
-        <Box mt={2}>
-          <Typography variant="subtitle2">Click URL Preview</Typography>
-          <TextField
-            fullWidth
-            value={getPreviewUrl()}
-            margin="dense"
-            InputProps={{ readOnly: true }}
-          />
+        {/* Tracking domain */}
+        <Box sx={{ mb: 3 }}>
+          <Typography component="label" htmlFor="domain" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
+            Tracking domain *
+          </Typography>
+          <FormControl fullWidth variant="outlined">
+            <Select
+              id="domain"
+              name="domain"
+              value={landerData.domain}
+              onChange={handleChange}
+              displayEmpty
+              renderValue={(selected) => selected || "Select a tracking domain"}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 300,
+                  },
+                },
+              }}
+            >
+              {domains.map((domain) => (
+                <MenuItem key={domain.id} value={domain.url}>
+                  {domain.url}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            We strongly advise using custom tracking domain. Tracking script and /click URL should use the same tracking domain.
+            You can set-up domain in Tools &gt; Domains
+          </Typography>
+        </Box>
+
+        {/* Click URL Preview */}
+        <Box sx={{ mb: 3 }}>
+          <Typography component="label" htmlFor="preview-url" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
+            Click URL
+          </Typography>
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              id="preview-url"
+              fullWidth
+              variant="outlined"
+              value={getPreviewUrl()}
+              InputProps={{
+                readOnly: true,
+                startAdornment: (
+                  <Box sx={{ mr: 1, color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ marginRight: 8 }}>📋</span>
+                  </Box>
+                ),
+              }}
+            />
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Replace URL to offer (hop-link) on your landing page with tracking.domain/click URL. You can add additional parameters to 
+            the URL, ex: /click?sub1=variation1 to collect additional details on landing page performance.
+          </Typography>
+        </Box>
+
+        {/* Tags section */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body1" fontWeight="medium" sx={{ mb: 1 }}>
+            Tags selected:
+          </Typography>
+          {/* Tags would go here - empty in the image */}
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button 
+          variant="outlined" 
+          onClick={onClose}
+          sx={{ mr: 1 }}
+        >
+          CLOSE
+        </Button>
         <Button 
           variant="contained" 
           color="primary" 
           onClick={handleSave}
           disabled={!landerData.name || !landerData.domain}
+          sx={{ px: 4 }}
         >
-          {landerToEdit ? 'Update' : 'Save'}
+          SAVE
         </Button>
       </DialogActions>
     </Dialog>
