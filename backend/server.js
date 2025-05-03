@@ -1,7 +1,6 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const axios = require("axios");
 const session = require("cookie-session");
 const path = require("path");
 const fs = require("fs");
@@ -121,52 +120,7 @@ for (const route of routeConfig) {
 
 console.log(`📝 ${successfulRoutes}/${routeConfig.length} routes loaded successfully`);
 
-// ✅ Google OAuth
-console.log("📝 Setting up Google OAuth...");
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
-
-if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
-  console.warn("⚠️ Google OAuth credentials missing");
-}
-
-app.get("/auth/google", (req, res) => {
-  console.log("📝 Google OAuth authorization request");
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${CLIENT_ID}&scope=https://www.googleapis.com/auth/adwords&redirect_uri=${REDIRECT_URI}&access_type=offline&prompt=consent`;
-  res.redirect(authUrl);
-});
-
-app.get("/auth/google/callback", async (req, res) => {
-  console.log("📝 Google OAuth callback received");
-  const code = req.query.code;
-  if (!code) {
-    console.error("❌ No authorization code provided");
-    return res.status(400).send("No authorization code provided");
-  }
-
-  try {
-    console.log("📝 Exchanging code for tokens...");
-    const tokenResponse = await axios.post("https://oauth2.googleapis.com/token", {
-      code,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      redirect_uri: REDIRECT_URI,
-      grant_type: "authorization_code",
-    });
-
-    const { access_token, refresh_token } = tokenResponse.data;
-    req.session.access_token = access_token;
-    req.session.refresh_token = refresh_token;
-    console.log("✅ OAuth tokens received and stored in session");
-
-    res.redirect("https://pearmllc.onrender.com/traffic-channels");
-  } catch (error) {
-    console.error("❌ OAuth Callback Error:", error.response?.data || error);
-    res.status(500).send("Authentication failed");
-  }
-});
-
+// ✅ Auth endpoints (simplified - no Google OAuth)
 app.get("/auth/logout", (req, res) => {
   console.log("📝 User logout requested");
   req.session = null;
