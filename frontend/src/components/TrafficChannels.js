@@ -355,7 +355,7 @@ const TrafficChannels = () => {
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
       // Updated API endpoint to match your specified endpoint
-      const response = await axios.get(`${API_URL}/traffic-channels`, {
+      const response = await axios.get(`${API_URL}/api/traffic`, {
         params: {
           start_date: formattedStartDate,
           end_date: formattedEndDate
@@ -377,7 +377,7 @@ const TrafficChannels = () => {
       
       // Check auth status
       try {
-        const authResponse = await axios.get(`${API_URL}/traffic-channels/auth/status`);
+        const authResponse = await axios.get(`${API_URL}/api/traffic/auth/status`);
         setAuthStatus(authResponse.data);
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -425,8 +425,8 @@ const TrafficChannels = () => {
       
       // Redirect to OAuth
       const authUrl = platform === "google" 
-        ? `${API_URL}/traffic-channels/auth/google` 
-        : `${API_URL}/traffic-channels/auth/facebook`;
+        ? `${API_URL}/api/traffic/auth/google` 
+        : `${API_URL}/api/traffic/auth/facebook`;
       
       window.location.href = authUrl;
     } catch (err) {
@@ -521,7 +521,7 @@ const TrafficChannels = () => {
     if (window.confirm("Are you sure you want to delete this channel?")) {
       try {
         setLoading(prev => ({ ...prev, delete: true }));
-        const response = await axios.delete(`${API_URL}/traffic-channels/${channelId}`);
+        const response = await axios.delete(`${API_URL}/api/traffic/${channelId}`);
         
         if (response.data.deactivated) {
           // Channel was not deleted but marked as inactive
@@ -580,7 +580,7 @@ const TrafficChannels = () => {
       if (editMode) {
         // Update existing channel
         response = await axios.put(
-          `${API_URL}/traffic-channels/${selectedRow.id}`, 
+          `${API_URL}/api/traffic/${selectedRow.id}`, 
           formData
         );
         
@@ -598,7 +598,7 @@ const TrafficChannels = () => {
         });
       } else {
         // Create new channel
-        response = await axios.post(`${API_URL}/traffic-channels`, formData);
+        response = await axios.post(`${API_URL}/api/traffic`, formData);
         
         // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);
@@ -653,7 +653,7 @@ const TrafficChannels = () => {
 
   // Handle row click to navigate to detailed view
   const handleRowClick = (params) => {
-    navigate(`/traffic-channels/${params.id}/details`);
+    navigate(`/api/traffic/${params.id}/details`);
   };
 
   return (
