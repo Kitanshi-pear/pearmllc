@@ -19,8 +19,8 @@ const GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 
 // Set redirect URIs based on environment
 const isProduction = process.env.NODE_ENV === "production";
-const BACKEND_URL = isProduction ? process.env.BACKEND_URL : "http://localhost:5000";
-const FRONTEND_URL = isProduction ? process.env.FRONTEND_URL : "http://localhost:3000/traffic-channels";
+const BACKEND_URL = isProduction ? process.env.BACKEND_URL : "https://pearmllc.onrender.com";
+const FRONTEND_URL = isProduction ? process.env.FRONTEND_URL : "https://pearmllc.onrender.com";
 const GOOGLE_REDIRECT_URI = `${BACKEND_URL}/traffic-channels/auth/google/callback`;
 
 // Store tokens in memory (replace with database storage in production)
