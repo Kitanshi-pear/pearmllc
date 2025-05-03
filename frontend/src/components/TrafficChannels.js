@@ -1,6 +1,6 @@
 // src/components/TrafficChannels.js
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import InfoIcon from "@mui/icons-material/Info";
@@ -107,6 +107,148 @@ const TrafficChannels = () => {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Handle OAuth redirect on component mount
+  useEffect(() => {
+    // Parse URL parameters
+    const searchParams = new URLSearchParams(location.search);
+    const success = searchParams.get('success');
+    const platform = searchParams.get('platform');
+    const session = searchParams.get('session');
+    const error = searchParams.get('error');
+    const message = searchParams.get('message');
+
+    if (platform) {
+      // Check if we have stored OAuth state
+      const storedState = localStorage.getItem('oauthState');
+      if (storedState) {
+        const state = JSON.parse(storedState);
+        
+        if (success === 'true') {
+          // Store session token
+          if (session) {
+            localStorage.setItem(`${platform.toLowerCase()}Session`, session);
+          }
+          
+          // Show success message
+          setSnackbar({
+            open: true,
+            message: `Successfully connected to ${platform}!`,
+            severity: 'success'
+          });
+          
+          // Restore modal state
+          if (state.modalOpen === 'template') {
+            setOpenModal(true);
+          } else if (state.modalOpen === 'setup') {
+            // Restore form data
+            setFormData(state.formData);
+            setSelectedChannel(state.selectedChannel);
+            setEditMode(state.editMode);
+            if (state.selectedRow) {
+              setSelectedRow(state.selectedRow);
+            }
+            setOpenSecondModal(true);
+          }
+          
+          // Update auth status
+          setAuthStatus(prev => ({
+            ...prev,
+            [platform.toLowerCase()]: true
+          }));
+        } else if (error === 'true') {
+          // Show error message
+          setSnackbar({
+            open: true,
+            message: message || `Failed to connect to ${platform}`,
+            severity: 'error'
+          });
+          
+          // Still restore modal state even on error
+          if (state.modalOpen === 'template') {
+            setOpenModal(true);
+          } else if (state.modalOpen === 'setup') {
+            setFormData(state.formData);
+            setSelectedChannel(state.selectedChannel);
+            setEditMode(state.editMode);
+            if (state.selectedRow) {
+              setSelectedRow(state.selectedRow);
+            }
+            setOpenSecondModal(true);
+          }
+        }
+        
+        // Clean up localStorage and URL
+        localStorage.removeItem('oauthState');
+        navigate(location.pathname, { replace: true });
+      }
+    }
+  }, [location, navigate]);
+
+  // Check auth status function
+  const checkAuthStatus = async () => {
+    try {
+      const googleSession = localStorage.getItem('googleSession');
+      const facebookSession = localStorage.getItem('facebookSession');
+      
+      // Pick the session token to use
+      let sessionToken = googleSession || facebookSession;
+      
+      if (sessionToken) {
+        const response = await axios.get(`${API_URL}/traffic-channels/auth/status`, {
+          headers: {
+            Authorization: `Bearer ${sessionToken}`
+          }
+        });
+        
+        setAuthStatus({
+          facebook: response.data.facebook?.connected || false,
+          google: response.data.google?.connected || false
+        });
+      }
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+    }
+  };
+
+  // Check auth status on mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  // Modified handleAuth function to save state
+  const handleAuth = async (platform) => {
+    setLoading(prev => ({ ...prev, [platform]: true }));
+    
+    try {
+      // Save current state before redirecting
+      const stateToSave = {
+        modalOpen: openModal ? 'template' : openSecondModal ? 'setup' : null,
+        formData: formData,
+        selectedChannel: selectedChannel,
+        editMode: editMode,
+        selectedRow: selectedRow
+      };
+      
+      localStorage.setItem('oauthState', JSON.stringify(stateToSave));
+      
+      // Redirect to OAuth
+      const authUrl = platform === "google" 
+        ? `${API_URL}/traffic-channels/auth/google` 
+        : `${API_URL}/traffic-channels/auth/facebook`;
+      
+      window.location.href = authUrl;
+    } catch (err) {
+      console.error(`${platform} OAuth Error:`, err);
+      setSnackbar({
+        open: true,
+        message: `Failed to connect to ${platform}. Please try again.`,
+        severity: "error"
+      });
+      setLoading(prev => ({ ...prev, [platform]: false }));
+    }
+  };
 
   // Define the table columns
   const columns = [
@@ -295,31 +437,29 @@ const TrafficChannels = () => {
       const formattedStartDate = dateRange.startDate.toISOString().split('T')[0];
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
-      // Updated API endpoint to match your specified endpoint
-      const response = await axios.get(`${API_URL}/api/traffic`, {
+      // Updated API endpoint to match your backend
+      const response = await axios.get(`${API_URL}/traffic-channels`, {
         params: {
           start_date: formattedStartDate,
           end_date: formattedEndDate
         }
       });
       
-      // Ensure that all rows have the expected properties, even if they're null
+      // Process the data - the backend already includes metrics
       const processedData = response.data.map(row => ({
         ...row,
-        clicks: row.clicks ?? 0,
-        conversions: row.conversions ?? 0,
-        revenue: row.revenue ?? 0,
-        cost: row.cost ?? 0,
-        profit: row.profit ?? 0,
-        roi: row.roi ?? 0
+        clicks: row.metrics?.clicks ?? 0,
+        conversions: row.metrics?.conversions ?? 0,
+        revenue: row.metrics?.revenue ?? 0,
+        cost: row.metrics?.cost ?? 0,
+        profit: row.metrics?.profit ?? 0,
+        roi: row.metrics?.roi ?? 0
       }));
       
-      // Set the rows with metrics data already included from the backend
       setRows(processedData);
       
-      // Check auth status - keeping the original endpoint structure for this call
-      const authResponse = await axios.get(`${API_URL}/trafficChannels/authStatus`);
-      setAuthStatus(authResponse.data);
+      // Check auth status after fetching channels
+      await checkAuthStatus();
     } catch (error) {
       console.error("Error fetching channels:", error);
       setSnackbar({
@@ -345,30 +485,6 @@ const TrafficChannels = () => {
       )
     )
   : [];
-
-  // Handle authentication for platforms
-  const handleAuth = async (platform) => {
-    setLoading(prev => ({ ...prev, [platform]: true }));
-    
-    try {
-      // Updated API endpoints to match your specified endpoint
-      const authUrl = platform === "google" 
-        ? `${API_URL}/api/traffic/auth/google` 
-        : `${API_URL}/api/traffic/auth/facebook`;
-      
-      // Open auth URL
-      window.location.href = authUrl;
-    } catch (err) {
-      console.error(`${platform} OAuth Error:`, err);
-      setSnackbar({
-        open: true,
-        message: `Failed to connect to ${platform}. Please try again.`,
-        severity: "error"
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, [platform]: false }));
-    }
-  };
 
   // Form change handler
   const handleFormChange = (e) => {
@@ -463,8 +579,8 @@ const TrafficChannels = () => {
     if (window.confirm("Are you sure you want to delete this channel?")) {
       try {
         setLoading(prev => ({ ...prev, delete: true }));
-        // Updated API endpoint to match your specified endpoint
-        const response = await axios.delete(`${API_URL}/api/traffic/${channelId}`);
+        // Updated API endpoint to match your backend
+        const response = await axios.delete(`${API_URL}/traffic-channels/${channelId}`);
         
         if (response.data.deactivated) {
           // Channel was not deleted but marked as inactive
@@ -521,9 +637,9 @@ const TrafficChannels = () => {
       
       let response;
       if (editMode) {
-        // Update existing channel - updated API endpoint
+        // Update existing channel
         response = await axios.put(
-          `${API_URL}/api/traffic/${selectedRow.id}`, 
+          `${API_URL}/traffic-channels/${selectedRow.id}`, 
           formData
         );
         
@@ -540,8 +656,8 @@ const TrafficChannels = () => {
           severity: "success"
         });
       } else {
-        // Create new channel - updated API endpoint
-        response = await axios.post(`${API_URL}/api/traffic`, formData);
+        // Create new channel
+        response = await axios.post(`${API_URL}/traffic-channels`, formData);
         
         // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);
@@ -692,9 +808,6 @@ const TrafficChannels = () => {
                     startDate: newStartDate,
                     endDate: new Date()
                   });
-                  
-                  // Refresh data with new date range
-                  fetchChannels();
                 }}
               >
                 Last 30 Days

@@ -19,6 +19,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
 // Store tokens in memory (replace with database storage in production)
 let googleTokenStore = {};
+let facebookTokenStore = {};
 
 // ----- OAuth Endpoints -----
 
@@ -47,9 +48,29 @@ router.get('/auth/facebook/callback', async (req, res) => {
         });
 
         console.log("✅ Facebook Access Token Response:", tokenResponse.data);
+        
+        // Get user info
+        const userResponse = await axios.get('https://graph.facebook.com/me', {
+            params: {
+                access_token: tokenResponse.data.access_token,
+                fields: 'id,name,email'
+            }
+        });
+
+        // Store token
+        const userId = userResponse.data.id;
+        facebookTokenStore[userId] = {
+            access_token: tokenResponse.data.access_token,
+            expires_at: tokenResponse.data.expires_in ? Date.now() + (tokenResponse.data.expires_in * 1000) : null,
+            email: userResponse.data.email,
+            name: userResponse.data.name
+        };
+
+        // Create session token
+        const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
 
         // Redirect back to frontend with success flag
-        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Facebook`);
+        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Facebook&session=${sessionToken}`);
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error);
         res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Facebook`);
@@ -176,8 +197,22 @@ router.get('/auth/status', async (req, res) => {
                             };
                         }
                     }
+                } else if (decodedToken.startsWith('fb_')) {
+                    const userId = decodedToken.substring(3);
+                    
+                    if (facebookTokenStore[userId]) {
+                        const fbData = facebookTokenStore[userId];
+                        
+                        // Check if token is still valid
+                        if (!fbData.expires_at || Date.now() < fbData.expires_at) {
+                            authStatus.facebook = {
+                                connected: true,
+                                expires_at: fbData.expires_at ? new Date(fbData.expires_at).toISOString() : null,
+                                email: fbData.email
+                            };
+                        }
+                    }
                 }
-                // Add Facebook check if you implement Facebook token storage
             } catch (decodeError) {
                 console.error("Error decoding session token:", decodeError);
             }
@@ -187,6 +222,48 @@ router.get('/auth/status', async (req, res) => {
     } catch (error) {
         console.error("❌ Error checking auth status:", error);
         res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Disconnect Google OAuth
+router.post('/auth/google/disconnect', async (req, res) => {
+    try {
+        const authorization = req.headers.authorization;
+        const sessionToken = authorization ? authorization.split(' ')[1] : null;
+        
+        if (!sessionToken) {
+            return res.status(401).json({ error: "No session token provided" });
+        }
+        
+        const decodedToken = Buffer.from(sessionToken, 'base64').toString();
+        
+        if (!decodedToken.startsWith('google_')) {
+            return res.status(400).json({ error: "Invalid session token for Google" });
+        }
+        
+        const userId = decodedToken.substring(7);
+        
+        if (userId && googleTokenStore[userId]) {
+            // Optionally revoke the token with Google
+            const token = googleTokenStore[userId].access_token;
+            
+            try {
+                await axios.post(`https://oauth2.googleapis.com/revoke?token=${token}`);
+                console.log("✅ Google token revoked successfully");
+            } catch (revokeError) {
+                console.error("⚠️ Token revoke failed (might already be invalid):", revokeError.message);
+            }
+            
+            // Remove from store
+            delete googleTokenStore[userId];
+            
+            res.json({ success: true, message: "Google account disconnected" });
+        } else {
+            res.status(404).json({ error: "Google account not found or already disconnected" });
+        }
+    } catch (error) {
+        console.error("❌ Error disconnecting Google account:", error);
+        res.status(500).json({ error: "Failed to disconnect Google account" });
     }
 });
 
