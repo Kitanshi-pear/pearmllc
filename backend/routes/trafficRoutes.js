@@ -16,12 +16,13 @@ const CONFIG_ID = process.env.FB_CONFIG_ID || '958823683130260';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'https://pearmllc.onrender.com/traffic-channels/auth/google/callback';
 
 // Set redirect URIs based on environment
 const isProduction = process.env.NODE_ENV === "production";
 const BACKEND_URL = isProduction ? process.env.BACKEND_URL : "https://pearmllc.onrender.com";
 const FRONTEND_URL = isProduction ? process.env.FRONTEND_URL : "https://pearmllc.onrender.com";
-const GOOGLE_REDIRECT_URI = `${BACKEND_URL}/traffic-channels/auth/google/callback`;
+
 
 // Store tokens in memory (replace with database storage in production)
 let googleTokenStore = {};
