@@ -1,6 +1,6 @@
 // src/components/TrafficChannels.js
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import InfoIcon from "@mui/icons-material/Info";
@@ -107,6 +107,65 @@ const TrafficChannels = () => {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for OAuth callback parameters in URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const success = searchParams.get('success');
+    const platform = searchParams.get('platform');
+    const code = searchParams.get('code');
+    const scope = searchParams.get('scope');
+    
+    if ((success === 'true' || code) && platform) {
+      // Check if there's stored state in localStorage
+      const storedState = localStorage.getItem('oauthState');
+      
+      if (storedState) {
+        try {
+          const state = JSON.parse(storedState);
+          
+          // Show success message
+          setSnackbar({
+            open: true,
+            message: `Successfully connected to ${platform}!`,
+            severity: 'success'
+          });
+          
+          // Restore the modal state
+          if (state.editingChannelId) {
+            // Find the channel and open it for editing
+            const channelToEdit = rows.find(row => row.id === state.editingChannelId);
+            if (channelToEdit) {
+              setFormData({
+                ...channelToEdit,
+                ...state.formData
+              });
+              setSelectedChannel(channelToEdit.aliasChannel);
+              setEditMode(true);
+              setSelectedRow(channelToEdit);
+              setOpenSecondModal(true);
+            }
+          }
+          
+          // Update auth status
+          setAuthStatus(prev => ({
+            ...prev,
+            [platform.toLowerCase()]: true
+          }));
+          
+          // Clear localStorage
+          localStorage.removeItem('oauthState');
+        } catch (error) {
+          console.error('Error parsing oauthState:', error);
+        }
+      }
+      
+      // Clear URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [location, rows]);
 
   // Define the table columns
   const columns = [
@@ -296,30 +355,33 @@ const TrafficChannels = () => {
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
       // Updated API endpoint to match your specified endpoint
-      const response = await axios.get(`${API_URL}/api/traffic`, {
+      const response = await axios.get(`${API_URL}/traffic-channels`, {
         params: {
           start_date: formattedStartDate,
           end_date: formattedEndDate
         }
       });
       
-      // Ensure that all rows have the expected properties, even if they're null
+      // Process the data
       const processedData = response.data.map(row => ({
         ...row,
-        clicks: row.clicks ?? 0,
-        conversions: row.conversions ?? 0,
-        revenue: row.revenue ?? 0,
-        cost: row.cost ?? 0,
-        profit: row.profit ?? 0,
-        roi: row.roi ?? 0
+        clicks: row.metrics?.clicks ?? 0,
+        conversions: row.metrics?.conversions ?? 0,
+        revenue: row.metrics?.revenue ?? 0,
+        cost: row.metrics?.cost ?? 0,
+        profit: row.metrics?.profit ?? 0,
+        roi: row.metrics?.roi ?? 0
       }));
       
-      // Set the rows with metrics data already included from the backend
       setRows(processedData);
       
-      // Check auth status - keeping the original endpoint structure for this call
-      const authResponse = await axios.get(`${API_URL}/trafficChannels/authStatus`);
-      setAuthStatus(authResponse.data);
+      // Check auth status
+      try {
+        const authResponse = await axios.get(`${API_URL}/traffic-channels/auth/status`);
+        setAuthStatus(authResponse.data);
+      } catch (error) {
+        console.error("Error checking auth status:", error);
+      }
     } catch (error) {
       console.error("Error fetching channels:", error);
       setSnackbar({
@@ -351,12 +413,21 @@ const TrafficChannels = () => {
     setLoading(prev => ({ ...prev, [platform]: true }));
     
     try {
-      // Updated API endpoints to match your specified endpoint
-      const authUrl = platform === "google" 
-        ? `${API_URL}/api/traffic/auth/google` 
-        : `${API_URL}/api/traffic/auth/facebook`;
+      // Save current state before redirecting
+      const stateToSave = {
+        editingChannelId: selectedRow?.id,
+        formData: formData,
+        selectedChannel: selectedChannel,
+        editMode: editMode
+      };
       
-      // Open auth URL
+      localStorage.setItem('oauthState', JSON.stringify(stateToSave));
+      
+      // Redirect to OAuth
+      const authUrl = platform === "google" 
+        ? `${API_URL}/traffic-channels/auth/google` 
+        : `${API_URL}/traffic-channels/auth/facebook`;
+      
       window.location.href = authUrl;
     } catch (err) {
       console.error(`${platform} OAuth Error:`, err);
@@ -365,7 +436,6 @@ const TrafficChannels = () => {
         message: `Failed to connect to ${platform}. Please try again.`,
         severity: "error"
       });
-    } finally {
       setLoading(prev => ({ ...prev, [platform]: false }));
     }
   };
@@ -395,7 +465,7 @@ const TrafficChannels = () => {
     }));
   };
 
-  // Validate form
+  // Validate form - Modified to only require basic fields
   const validateForm = () => {
     const errors = {};
     const requiredFields = ['channelName', 'aliasChannel', 'costUpdateDepth', 'costUpdateFrequency', 'currency'];
@@ -407,19 +477,7 @@ const TrafficChannels = () => {
       }
     });
     
-    // Channel specific validation
-    if (selectedChannel === 'Facebook') {
-      if (!formData.pixelId) errors.pixelId = 'Pixel ID is required';
-      if (!formData.apiAccessToken) errors.apiAccessToken = 'API Access Token is required';
-    }
-    
-    if (selectedChannel === 'Google') {
-      if (!formData.googleAdsAccountId) errors.googleAdsAccountId = 'Google Ads Account ID is required';
-      if (!formData.conversionType) errors.conversionType = 'Conversion Type is required';
-      if (!formData.conversionName) errors.conversionName = 'Conversion Name is required';
-      if (!formData.conversionCategory) errors.conversionCategory = 'Category is required';
-      if (!formData.includeInConversions) errors.includeInConversions = 'This field is required';
-    }
+    // Don't require platform-specific fields - they can be filled later after OAuth
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -463,8 +521,7 @@ const TrafficChannels = () => {
     if (window.confirm("Are you sure you want to delete this channel?")) {
       try {
         setLoading(prev => ({ ...prev, delete: true }));
-        // Updated API endpoint to match your specified endpoint
-        const response = await axios.delete(`${API_URL}/api/traffic/${channelId}`);
+        const response = await axios.delete(`${API_URL}/traffic-channels/${channelId}`);
         
         if (response.data.deactivated) {
           // Channel was not deleted but marked as inactive
@@ -502,7 +559,7 @@ const TrafficChannels = () => {
     }
   };
 
-  // Form submission
+  // Form submission - Modified to allow saving without platform-specific fields
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -521,9 +578,9 @@ const TrafficChannels = () => {
       
       let response;
       if (editMode) {
-        // Update existing channel - updated API endpoint
+        // Update existing channel
         response = await axios.put(
-          `${API_URL}/api/traffic/${selectedRow.id}`, 
+          `${API_URL}/traffic-channels/${selectedRow.id}`, 
           formData
         );
         
@@ -540,8 +597,8 @@ const TrafficChannels = () => {
           severity: "success"
         });
       } else {
-        // Create new channel - updated API endpoint
-        response = await axios.post(`${API_URL}/api/traffic`, formData);
+        // Create new channel
+        response = await axios.post(`${API_URL}/traffic-channels`, formData);
         
         // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);
@@ -692,9 +749,6 @@ const TrafficChannels = () => {
                     startDate: newStartDate,
                     endDate: new Date()
                   });
-                  
-                  // Refresh data with new date range
-                  fetchChannels();
                 }}
               >
                 Last 30 Days
@@ -1139,7 +1193,7 @@ const TrafficChannels = () => {
                   </CardContent>
                 </Card>
 
-                {/* Channel-specific API integrations */}
+                {/* Channel-specific API integrations - Only show in edit mode */}
                 {selectedChannel === "Facebook" && (
                   <Card sx={{ mt: 2, p: 2, boxShadow: 1, borderRadius: 2 }}>
                     <CardContent>
@@ -1181,7 +1235,7 @@ const TrafficChannels = () => {
                         </Grid>
                       </Box>
 
-                      {/* Facebook Pixel Data Section */}
+                      {/* Facebook Pixel Data Section - Optional fields */}
                       <Box
                         sx={{
                           border: "1px solid #e0e0e0",
@@ -1202,17 +1256,14 @@ const TrafficChannels = () => {
                             </Typography>
                           </Grid>
 
-                          {/* Pixel ID */}
+                          {/* Pixel ID - Optional */}
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
-                              label="Pixel ID"
+                              label="Pixel ID (Optional)"
                               name="pixelId"
                               value={formData.pixelId}
                               onChange={handleFormChange}
-                              required
-                              error={!!formErrors.pixelId}
-                              helperText={formErrors.pixelId}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
@@ -1225,17 +1276,14 @@ const TrafficChannels = () => {
                             />
                           </Grid>
 
-                          {/* Conversions API Access Token */}
+                          {/* Conversions API Access Token - Optional */}
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
-                              label="Conversions API Access token"
+                              label="Conversions API Access token (Optional)"
                               name="apiAccessToken"
                               value={formData.apiAccessToken}
                               onChange={handleFormChange}
-                              required
-                              error={!!formErrors.apiAccessToken}
-                              helperText={formErrors.apiAccessToken}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
@@ -1344,16 +1392,14 @@ const TrafficChannels = () => {
                         }}
                       >
                         <Grid container spacing={2}>
+                          {/* Google Ads Account ID - Optional */}
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
-                              label="Google Ads Account ID"
+                              label="Google Ads Account ID (Optional)"
                               name="googleAdsAccountId"
                               value={formData.googleAdsAccountId}
                               onChange={handleFormChange}
-                              required
-                              error={!!formErrors.googleAdsAccountId}
-                              helperText={formErrors.googleAdsAccountId}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
@@ -1391,24 +1437,19 @@ const TrafficChannels = () => {
                             </Typography>
                           </Grid>
 
-                          {/* Conversion Matching Section */}
+                          {/* Conversion Matching Section - Optional */}
                           <Grid item xs={12}>
-                            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Conversion Matching</Typography>
+                            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Conversion Matching (Optional)</Typography>
                             <Box sx={{ border: "1px solid #e0e0e0", borderRadius: 1, p: 2 }}>
                               <Grid container spacing={2}>
                                 <Grid item xs={12} sm={6} md={3}>
-                                  <Typography variant="body2" color="textSecondary">Conversion Type *</Typography>
-                                  <FormControl 
-                                    fullWidth 
-                                    sx={{ mt: 1 }}
-                                    error={!!formErrors.conversionType}
-                                  >
+                                  <Typography variant="body2" color="textSecondary">Conversion Type</Typography>
+                                  <FormControl fullWidth sx={{ mt: 1 }}>
                                     <Select
                                       name="conversionType"
                                       value={formData.conversionType || ""}
                                       onChange={handleFormChange}
                                       displayEmpty
-                                      required
                                     >
                                       <MenuItem value="">Select type</MenuItem>
                                       <MenuItem value="Purchase">Purchase</MenuItem>
@@ -1417,15 +1458,10 @@ const TrafficChannels = () => {
                                       <MenuItem value="PageView">Page View</MenuItem>
                                       <MenuItem value="AddToCart">Add To Cart</MenuItem>
                                     </Select>
-                                    {formErrors.conversionType && (
-                                      <Typography variant="caption" color="error">
-                                        {formErrors.conversionType}
-                                      </Typography>
-                                    )}
                                   </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
-                                  <Typography variant="body2" color="textSecondary">Conversion Name *</Typography>
+                                  <Typography variant="body2" color="textSecondary">Conversion Name</Typography>
                                   <TextField
                                     fullWidth
                                     name="conversionName"
@@ -1433,60 +1469,37 @@ const TrafficChannels = () => {
                                     value={formData.conversionName || ""}
                                     onChange={handleFormChange}
                                     sx={{ mt: 1 }}
-                                    required
-                                    error={!!formErrors.conversionName}
-                                    helperText={formErrors.conversionName}
                                   />
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
-                                  <Typography variant="body2" color="textSecondary">Category *</Typography>
-                                  <FormControl 
-                                    fullWidth 
-                                    sx={{ mt: 1 }}
-                                    error={!!formErrors.conversionCategory}
-                                  >
+                                  <Typography variant="body2" color="textSecondary">Category</Typography>
+                                  <FormControl fullWidth sx={{ mt: 1 }}>
                                     <Select
                                       name="conversionCategory"
                                       value={formData.conversionCategory || ""}
                                       onChange={handleFormChange}
                                       displayEmpty
-                                      required
                                     >
                                       <MenuItem value="">Select category</MenuItem>
                                       <MenuItem value="Default">Default</MenuItem>
                                       <MenuItem value="Purchase">Purchase</MenuItem>
                                       <MenuItem value="Other">Other</MenuItem>
                                     </Select>
-                                    {formErrors.conversionCategory && (
-                                      <Typography variant="caption" color="error">
-                                        {formErrors.conversionCategory}
-                                      </Typography>
-                                    )}
                                   </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
-                                  <Typography variant="body2" color="textSecondary">Include in conversions *</Typography>
-                                  <FormControl 
-                                    fullWidth 
-                                    sx={{ mt: 1 }}
-                                    error={!!formErrors.includeInConversions}
-                                  >
+                                  <Typography variant="body2" color="textSecondary">Include in conversions</Typography>
+                                  <FormControl fullWidth sx={{ mt: 1 }}>
                                     <Select
                                       name="includeInConversions"
                                       value={formData.includeInConversions || ""}
                                       onChange={handleFormChange}
                                       displayEmpty
-                                      required
                                     >
                                       <MenuItem value="">Select option</MenuItem>
                                       <MenuItem value="Yes">Yes</MenuItem>
                                       <MenuItem value="No">No</MenuItem>
                                     </Select>
-                                    {formErrors.includeInConversions && (
-                                      <Typography variant="caption" color="error">
-                                        {formErrors.includeInConversions}
-                                      </Typography>
-                                    )}
                                   </FormControl>
                                 </Grid>
                               </Grid>
