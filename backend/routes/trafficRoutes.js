@@ -15,18 +15,10 @@ const CONFIG_ID = process.env.FB_CONFIG_ID || '958823683130260';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'https://pearmllc.onrender.com/traffic-channels/auth/google/callback';
-
-// Set redirect URIs based on environment
-const isProduction = process.env.NODE_ENV === "production";
-const BACKEND_URL = isProduction ? process.env.BACKEND_URL : "https://pearmllc.onrender.com";
-const FRONTEND_URL = isProduction ? process.env.FRONTEND_URL : "https://pearmllc.onrender.com";
-
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
 // Store tokens in memory (replace with database storage in production)
 let googleTokenStore = {};
-let facebookTokenStore = {};
 
 // ----- OAuth Endpoints -----
 
@@ -55,63 +47,45 @@ router.get('/auth/facebook/callback', async (req, res) => {
         });
 
         console.log("✅ Facebook Access Token Response:", tokenResponse.data);
-        
-        // Get user info
-        const userResponse = await axios.get('https://graph.facebook.com/me', {
-            params: {
-                access_token: tokenResponse.data.access_token,
-                fields: 'id,name,email'
-            }
-        });
-
-        // Store token
-        const userId = userResponse.data.id;
-        facebookTokenStore[userId] = {
-            access_token: tokenResponse.data.access_token,
-            expires_at: tokenResponse.data.expires_in ? Date.now() + (tokenResponse.data.expires_in * 1000) : null,
-            email: userResponse.data.email,
-            name: userResponse.data.name
-        };
-
-        // Create session token
-        const sessionToken = Buffer.from(userId).toString('base64');
 
         // Redirect back to frontend with success flag
-        res.redirect(`${FRONTEND_URL}?success=true&platform=Facebook&session=${sessionToken}`);
+        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Facebook`);
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error);
-        res.redirect(`${FRONTEND_URL}?error=true&platform=Facebook`);
+        res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Facebook`);
     }
 });
 
 // Google OAuth Login Redirect
 router.get('/auth/google', (req, res) => {
     console.log("✅ Redirecting to Google OAuth...");
-    
-    // Generate state for security
-    const state = Math.random().toString(36).substring(7);
+    console.log("📍 Using redirect URI:", GOOGLE_REDIRECT_URI);
     
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${GOOGLE_CLIENT_ID}` +
         `&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT_URI)}` +
         `&response_type=code` +
-        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/adwords profile email')}` +
+        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/adwords email profile')}` +
         `&access_type=offline` +
-        `&prompt=consent` +
-        `&state=${state}`;
+        `&prompt=consent`;
     
-    console.log("🔹 Redirecting user to:", googleAuthUrl);
+    console.log("🔹 Full Google Auth URL:", googleAuthUrl);
     res.redirect(googleAuthUrl);
 });
 
 // Google OAuth Callback
 router.get('/auth/google/callback', async (req, res) => {
     console.log("🔹 Google OAuth Callback Triggered");
-    const { code, state } = req.query;
+    const { code, error } = req.query;
+    
+    if (error) {
+        console.error("❌ OAuth error:", error);
+        return res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=${encodeURIComponent(error)}`);
+    }
     
     if (!code) {
         console.error("❌ No authorization code received.");
-        return res.redirect(`${FRONTEND_URL}?error=true&platform=Google&message=No authorization code provided`);
+        return res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=No authorization code provided`);
     }
 
     try {
@@ -142,6 +116,12 @@ router.get('/auth/google/callback', async (req, res) => {
             { headers: { Authorization: `Bearer ${access_token}` } }
         );
         
+        console.log("✅ Google User Info:", {
+            id: userInfo.data.id,
+            email: userInfo.data.email,
+            name: userInfo.data.name
+        });
+        
         const userId = userInfo.data.id;
         
         // Store tokens with expiration
@@ -154,230 +134,61 @@ router.get('/auth/google/callback', async (req, res) => {
         };
 
         // Create a session token
-        const sessionToken = Buffer.from(userId).toString('base64');
+        const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
 
         // Redirect back to frontend with success flag and session token
-        res.redirect(`${FRONTEND_URL}?success=true&platform=Google&session=${sessionToken}`);
+        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Google&session=${sessionToken}`);
     } catch (error) {
         console.error("❌ Google OAuth Error:", error.response?.data || error);
-        res.redirect(`${FRONTEND_URL}?error=true&platform=Google&message=${encodeURIComponent(error.message)}`);
+        const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
+        res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=${encodeURIComponent(errorMessage)}`);
     }
 });
 
 // Check OAuth connection status
 router.get('/auth/status', async (req, res) => {
     try {
-        const sessionToken = req.headers.authorization?.split(' ')[1];
-        const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
+        const authorization = req.headers.authorization;
+        const sessionToken = authorization ? authorization.split(' ')[1] : null;
         
-        // Check Facebook status
-        let facebookStatus = {
-            connected: false,
-            expires_at: null,
-            email: null
+        // Default response
+        const authStatus = {
+            facebook: { connected: false, expires_at: null },
+            google: { connected: false, expires_at: null }
         };
         
-        if (userId && facebookTokenStore[userId]) {
-            const fbData = facebookTokenStore[userId];
-            if (!fbData.expires_at || Date.now() < fbData.expires_at) {
-                facebookStatus = {
-                    connected: true,
-                    expires_at: fbData.expires_at ? new Date(fbData.expires_at).toISOString() : null,
-                    email: fbData.email
-                };
-            }
-        }
-        
-        // Check Google status
-        let googleStatus = {
-            connected: false,
-            expires_at: null,
-            email: null
-        };
-        
-        if (userId && googleTokenStore[userId]) {
-            const googleData = googleTokenStore[userId];
-            
-            // Check if token is expired
-            if (Date.now() < googleData.expires_at) {
-                googleStatus = {
-                    connected: true,
-                    expires_at: new Date(googleData.expires_at).toISOString(),
-                    email: googleData.email
-                };
-            } else if (googleData.refresh_token) {
-                // Try to refresh the token
-                try {
-                    const refreshResponse = await axios.post('https://oauth2.googleapis.com/token', {
-                        client_id: GOOGLE_CLIENT_ID,
-                        client_secret: GOOGLE_CLIENT_SECRET,
-                        refresh_token: googleData.refresh_token,
-                        grant_type: 'refresh_token'
-                    });
+        if (sessionToken) {
+            try {
+                const decodedToken = Buffer.from(sessionToken, 'base64').toString();
+                
+                if (decodedToken.startsWith('google_')) {
+                    const userId = decodedToken.substring(7);
                     
-                    // Update stored token
-                    googleTokenStore[userId] = {
-                        ...googleData,
-                        access_token: refreshResponse.data.access_token,
-                        expires_at: Date.now() + (refreshResponse.data.expires_in * 1000)
-                    };
-                    
-                    googleStatus = {
-                        connected: true,
-                        expires_at: new Date(googleTokenStore[userId].expires_at).toISOString(),
-                        email: googleData.email
-                    };
-                } catch (refreshError) {
-                    console.error("❌ Token refresh failed:", refreshError);
+                    if (googleTokenStore[userId]) {
+                        const userData = googleTokenStore[userId];
+                        
+                        // Check if token is still valid
+                        if (Date.now() < userData.expires_at) {
+                            authStatus.google = {
+                                connected: true,
+                                expires_at: new Date(userData.expires_at).toISOString(),
+                                email: userData.email
+                            };
+                        }
+                    }
                 }
+                // Add Facebook check if you implement Facebook token storage
+            } catch (decodeError) {
+                console.error("Error decoding session token:", decodeError);
             }
         }
         
-        res.json({
-            facebook: facebookStatus,
-            google: googleStatus
-        });
+        res.json(authStatus);
     } catch (error) {
         console.error("❌ Error checking auth status:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
-
-// Disconnect Google OAuth
-router.post('/auth/google/disconnect', async (req, res) => {
-    try {
-        const sessionToken = req.headers.authorization?.split(' ')[1];
-        const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
-        
-        if (userId && googleTokenStore[userId]) {
-            // Revoke access token
-            const token = googleTokenStore[userId].access_token;
-            
-            try {
-                await axios.post(`https://oauth2.googleapis.com/revoke?token=${token}`);
-                console.log("✅ Google token revoked successfully");
-            } catch (revokeError) {
-                console.error("⚠️ Token revoke failed (token might already be invalid):", revokeError.message);
-            }
-            
-            // Remove from store
-            delete googleTokenStore[userId];
-            
-            res.json({ success: true, message: "Google account disconnected" });
-        } else {
-            res.status(404).json({ error: "Google account not found or already disconnected" });
-        }
-    } catch (error) {
-        console.error("❌ Error disconnecting Google account:", error);
-        res.status(500).json({ error: "Failed to disconnect Google account" });
-    }
-});
-
-// Disconnect Facebook OAuth
-router.post('/auth/facebook/disconnect', async (req, res) => {
-    try {
-        const sessionToken = req.headers.authorization?.split(' ')[1];
-        const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
-        
-        if (userId && facebookTokenStore[userId]) {
-            // Remove from store
-            delete facebookTokenStore[userId];
-            
-            res.json({ success: true, message: "Facebook account disconnected" });
-        } else {
-            res.status(404).json({ error: "Facebook account not found or already disconnected" });
-        }
-    } catch (error) {
-        console.error("❌ Error disconnecting Facebook account:", error);
-        res.status(500).json({ error: "Failed to disconnect Facebook account" });
-    }
-});
-
-// Get Google Ads accounts
-router.get('/auth/google/accounts', async (req, res) => {
-    try {
-        const sessionToken = req.headers.authorization?.split(' ')[1];
-        const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
-        
-        if (!userId || !googleTokenStore[userId]) {
-            return res.status(401).json({ error: "Not authenticated with Google" });
-        }
-        
-        const { access_token } = googleTokenStore[userId];
-        
-        // This is a simplified example. For real Google Ads API access,
-        // you need to use the Google Ads API client library
-        try {
-            // Example of fetching Google Ads customer IDs
-            const response = await axios.get(
-                'https://googleads.googleapis.com/v14/customers:listAccessibleCustomers',
-                {
-                    headers: {
-                        'Authorization': `Bearer ${access_token}`,
-                        'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN
-                    }
-                }
-            );
-            
-            res.json({
-                accounts: response.data.resourceNames
-            });
-        } catch (apiError) {
-            console.error("❌ Google Ads API Error:", apiError.response?.data || apiError);
-            res.status(500).json({ 
-                error: "Failed to fetch Google Ads accounts",
-                details: apiError.response?.data
-            });
-        }
-    } catch (error) {
-        console.error("❌ Error fetching Google Ads accounts:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-
-// Refresh Google token middleware
-const refreshGoogleToken = async (req, res, next) => {
-    try {
-        const sessionToken = req.headers.authorization?.split(' ')[1];
-        const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
-        
-        if (!userId || !googleTokenStore[userId]) {
-            return next();
-        }
-        
-        const googleData = googleTokenStore[userId];
-        
-        // Check if token needs refresh (expires in less than 5 minutes)
-        if (googleData.expires_at - Date.now() < 300000 && googleData.refresh_token) {
-            console.log("🔄 Refreshing Google token...");
-            
-            const refreshResponse = await axios.post('https://oauth2.googleapis.com/token', {
-                client_id: GOOGLE_CLIENT_ID,
-                client_secret: GOOGLE_CLIENT_SECRET,
-                refresh_token: googleData.refresh_token,
-                grant_type: 'refresh_token'
-            });
-            
-            // Update stored token
-            googleTokenStore[userId] = {
-                ...googleData,
-                access_token: refreshResponse.data.access_token,
-                expires_at: Date.now() + (refreshResponse.data.expires_in * 1000)
-            };
-            
-            console.log("✅ Token refreshed successfully");
-        }
-        
-        next();
-    } catch (error) {
-        console.error("❌ Token refresh failed:", error);
-        next(error);
-    }
-};
-
-// Apply middleware to routes that need fresh tokens
-router.use('/auth/google/accounts', refreshGoogleToken);
-router.use('/external-metrics', refreshGoogleToken);
 
 // ----- CRUD Endpoints -----
 
@@ -859,38 +670,20 @@ router.get('/:id/external-metrics', async (req, res) => {
                 }
                 
             case 'google':
-                // Get session token to find user's Google token
-                const sessionToken = req.headers.authorization?.split(' ')[1];
-                const userId = sessionToken ? Buffer.from(sessionToken, 'base64').toString() : null;
-                
-                if (!userId || !googleTokenStore[userId]) {
-                    return res.status(401).json({ 
-                        error: "Not authenticated with Google"
+                // Call Google Ads API to get metrics
+                if (!channel.googleAdsAccountId) {
+                    return res.status(400).json({ 
+                        error: "Google Ads account ID not configured for this channel"
                     });
                 }
                 
-                const { access_token } = googleTokenStore[userId];
-                
-                // Example Google Ads API call
-                try {
-                    const response = await axios.get(
-                        'https://googleads.googleapis.com/v14/customers:listAccessibleCustomers',
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${access_token}`,
-                                'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN
-                            }
-                        }
-                    );
-                    
-                    return res.json(response.data);
-                } catch (googleError) {
-                    console.error("❌ Google Ads API Error:", googleError.response?.data || googleError);
-                    return res.status(500).json({ 
-                        error: "Failed to fetch Google Ads metrics",
-                        details: googleError.response?.data
-                    });
-                }
+                // Example mock response (replace with actual API call)
+                return res.json({
+                    campaigns: [
+                        { id: '123456789', name: 'Search Campaign 1', status: 'ENABLED' },
+                        { id: '987654321', name: 'Display Campaign 2', status: 'PAUSED' }
+                    ]
+                });
                 
             default:
                 return res.status(400).json({ 
