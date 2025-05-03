@@ -15,6 +15,7 @@ const CONFIG_ID = process.env.FB_CONFIG_ID || '958823683130260';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
 // Set redirect URIs based on environment
 const isProduction = process.env.NODE_ENV === "production";
@@ -60,7 +61,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
 // Google OAuth Login Redirect
 router.get('/auth/google', (req, res) => {
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=https://www.googleapis.com/auth/adwords`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&response_type=code&scope=https://www.googleapis.com/auth/adwords`;
     console.log("🔹 Redirecting user to:", googleAuthUrl);
     res.redirect(googleAuthUrl);
 });
