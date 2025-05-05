@@ -13,7 +13,7 @@ import ClickLogs from "./components/ClickLogs";
 import ConversionLogs from "./components/ConversionLogs";
 import Logout from "./components/Logout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./components/AuthContext";
 
 const App = () => {
   return (
