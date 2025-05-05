@@ -11,8 +11,9 @@ import CampaignsPage from "./components/Campaigns";
 import AdminPanelPage from "./components/AdminPanelPage";
 import ClickLogs from "./components/ClickLogs";
 import ConversionLogs from "./components/ConversionLogs";
+import Logout from "./components/Logout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider } from "./components/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const App = () => {
   return (

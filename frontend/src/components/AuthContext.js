@@ -85,13 +85,26 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = () => {
+    // Clear all authentication data from localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("userEmail");
     
+    // Clear any additional data related to the user session
+    // Example: localStorage.removeItem("user_preferences");
+    
+    // Optional: Clear all localStorage if you want a complete cleanup
+    // localStorage.clear();
+    
+    // Reset auth state
     setIsAuthenticated(false);
     setCurrentUser(null);
     setUserRole(null);
+    
+    // You could also dispatch a global event to notify other components
+    window.dispatchEvent(new Event("logout"));
+    
+    console.log("User logged out successfully");
   };
 
   // Check if token is valid (you could add a function to verify with backend)
