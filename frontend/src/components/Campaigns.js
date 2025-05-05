@@ -342,7 +342,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                   >
                     {Array.isArray(trafficChannels) && trafficChannels.map((channel) => (
                       <MenuItem key={channel.id} value={channel.id}>
-                        {channel.channelName} ({channel.aliasChannel || "N/A"})
+                        {channel.channelName} ({channel.aliasChannel})
                       </MenuItem>
                     ))}
                   </Select>
@@ -678,10 +678,10 @@ export default function CampaignsPage() {
         try {
           // Try multiple possible field names for campaign name
           return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
-                params?.row?.campaignName || "Unnamed Campaign"; 
+                params?.row?.campaignName; 
         } catch (e) {
           console.warn("Error getting name value:", e);
-          return "Unnamed Campaign";
+          return ;
         }
       }
     },
@@ -743,10 +743,10 @@ export default function CampaignsPage() {
             return `Source #${params.row.traffic_channel_id}`;
           }
           
-          return "N/A";
+          return `Source #${params.row.traffic_channel_id}`;
         } catch (e) {
           console.warn("Error getting traffic channel value:", e);
-          return "N/A";
+          return `Source #${params.row.traffic_channel_id}`;
         }
       }
     },
@@ -756,10 +756,10 @@ export default function CampaignsPage() {
       width: 100,
       valueGetter: (params) => {
         try {
-          return params?.row?.costType || "N/A";
+          return params?.row?.costType;
         } catch (e) {
           console.warn("Error getting cost type value:", e);
-          return "N/A";
+          return "";
         }
       }
     },
@@ -898,7 +898,7 @@ export default function CampaignsPage() {
       width: 120,
       valueGetter: (params) => {
         try {
-          if (!params?.row?.offer_id) return "N/A";
+          if (!params?.row?.offer_id) return ;
           // Find offer name from the offers list if available
           const offerItem = offersList.find(
             offer => offer.Serial_No === params.row.offer_id
@@ -907,11 +907,11 @@ export default function CampaignsPage() {
           if (offerItem) {
             return offerItem.Offer_name;
           } else {
-            return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+            return params.row.offer_id ? `Offer #${params.row.offer_id}` : '';
           }
         } catch (e) {
           console.warn("Error getting offer value:", e);
-          return "N/A";
+          return "";
         }
       }
     },
@@ -1023,7 +1023,7 @@ export default function CampaignsPage() {
             
             // Ensure name field exists - map from possible alternative field names
             name: campaign.name || campaign.campaign_name || campaign.title || 
-                  campaign.campaignName || "Unnamed Campaign",
+                  campaign.campaignName ,
                   
             // Ensure traffic channel info is normalized
             traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
@@ -1112,7 +1112,7 @@ export default function CampaignsPage() {
         
         // Ensure name field exists - map from possible alternative field names
         name: campaign.name || campaign.campaign_name || campaign.title || 
-              campaign.campaignName || "Unnamed Campaign",
+              campaign.campaignName ,
               
         // Ensure traffic channel info is normalized
         traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
