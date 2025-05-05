@@ -93,6 +93,8 @@ const TrafficChannels = () => {
   const [editMode, setEditMode] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
+  // Added state to track individual channel connection status
+  const [channelConnectionStatus, setChannelConnectionStatus] = useState({});
   
   // Enhanced form data with all potential platform-specific fields
   const [formData, setFormData] = useState({
@@ -134,6 +136,7 @@ const TrafficChannels = () => {
     
     // Connection status
     connectionComplete: false,
+    isConnected: false, // Add a specific field to track if this channel is connected
     status: "Active"
   });
 
@@ -167,10 +170,17 @@ const TrafficChannels = () => {
             // Find the channel and open it for editing
             const channelToEdit = rows.find(row => row.id === state.editingChannelId);
             if (channelToEdit) {
+              // Update the channel connection status in our state
+              setChannelConnectionStatus(prev => ({
+                ...prev,
+                [channelToEdit.id]: true
+              }));
+              
               setFormData({
                 ...channelToEdit,
                 ...state.formData,
-                connectionComplete: true
+                connectionComplete: true,
+                isConnected: true // Mark as connected
               });
               setSelectedChannel(channelToEdit.aliasChannel);
               setEditMode(true);
@@ -187,7 +197,8 @@ const TrafficChannels = () => {
             // For new channel creation
             setFormData({
               ...state.formData,
-              connectionComplete: true
+              connectionComplete: true,
+              isConnected: true // Mark as connected
             });
             setSelectedChannel(state.selectedChannel);
             setOpenSecondModal(true);
@@ -199,7 +210,7 @@ const TrafficChannels = () => {
             }
           }
           
-          // Update auth status
+          // Update global auth status
           setAuthStatus(prev => ({
             ...prev,
             [platform.toLowerCase()]: true
@@ -234,8 +245,8 @@ const TrafficChannels = () => {
           {isPlatformConnectable(params.row.aliasChannel) && (
             <Chip 
               size="small" 
-              label={authStatus[params.row.aliasChannel.toLowerCase()] ? "Connected" : "Not Connected"} 
-              color={authStatus[params.row.aliasChannel.toLowerCase()] ? "success" : "warning"} 
+              label={channelConnectionStatus[params.row.id] ? "Connected" : "Not Connected"} 
+              color={channelConnectionStatus[params.row.id] ? "success" : "warning"} 
             />
           )}
         </Box>
@@ -348,6 +359,7 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
+      isConnected: false, // Always start as not connected
       customParameters: Array(20).fill().map((_, index) => {
         if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
         if (index === 1) return { name: "sub2", macro: "{{adset.id}}", description: "adset_id", role: "Gid" };
@@ -370,6 +382,7 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
+      isConnected: false, // Always start as not connected
       customParameters: Array(20).fill().map((_, index) => {
         if (index === 0) return { name: "sub1", macro: "{{creative.id}}", description: "creative_id", role: "Aid" };
         if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
@@ -392,6 +405,7 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
+      isConnected: false, // Always start as not connected
       customParameters: Array(20).fill().map((_, index) => {
         if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
         if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
@@ -414,6 +428,7 @@ const TrafficChannels = () => {
       s2sPostbackUrl: "",
       clickRefId: "",
       externalId: "",
+      isConnected: false, // Always start as not connected
       customParameters: Array(20).fill().map((_, index) => (
         { name: `sub${index + 1}`, macro: "", description: "hint", role: "" }
       )),
@@ -471,6 +486,18 @@ const TrafficChannels = () => {
       try {
         const authResponse = await axios.get(`${API_URL}/api/traffic/auth/status`);
         setAuthStatus(authResponse.data);
+        
+        // Check individual channel connection statuses
+        // This should be an API call that returns connection status for each channel by ID
+        const connectionStatusResponse = await axios.get(`${API_URL}/api/traffic/connection/status`);
+        
+        // Update channel connection status map
+        const newConnectionStatus = {};
+        connectionStatusResponse.data.forEach(item => {
+          newConnectionStatus[item.channelId] = item.isConnected;
+        });
+        
+        setChannelConnectionStatus(newConnectionStatus);
       } catch (error) {
         console.error("Error checking auth status:", error);
       }
@@ -611,12 +638,16 @@ const TrafficChannels = () => {
       setFormData({
         ...formData,
         ...template,
-        aliasChannel: channelType
+        aliasChannel: channelType,
+        isConnected: false // Always start as not connected for new channel
       });
       setSelectedChannel(channelType);
     } else {
       // Reset form for custom channel
-      setFormData(channelTemplates.Custom);
+      setFormData({
+        ...channelTemplates.Custom,
+        isConnected: false // Always start as not connected for new channel
+      });
       setSelectedChannel(null);
     }
     
@@ -629,10 +660,16 @@ const TrafficChannels = () => {
   // Edit channel
   const handleEditChannel = (channel) => {
     setSelectedRow(channel);
+    
+    // Check if this channel is connected
+    const isChannelConnected = channelConnectionStatus[channel.id] || false;
+    
     setFormData({
       ...channelTemplates.Custom,
-      ...channel
+      ...channel,
+      isConnected: isChannelConnected // Set the connection status based on our tracked state
     });
+    
     setSelectedChannel(channel.aliasChannel);
     setEditMode(true);
     setCurrentTab(0); // Start at first tab when editing
@@ -662,6 +699,13 @@ const TrafficChannels = () => {
         } else {
           // Channel was deleted
           setRows(prevRows => prevRows.filter(row => row.id !== channelId));
+          
+          // Also remove from connection status tracking
+          setChannelConnectionStatus(prev => {
+            const updated = { ...prev };
+            delete updated[channelId];
+            return updated;
+          });
           
           setSnackbar({
             open: true,
@@ -707,10 +751,19 @@ const TrafficChannels = () => {
           formData
         );
         
+        // Get the updated channel with connection status
+        const updatedChannel = response.data;
+        
+        // Update our connection status tracking
+        setChannelConnectionStatus(prev => ({
+          ...prev,
+          [updatedChannel.id]: updatedChannel.isConnected || false
+        }));
+        
         // Update local state
         setRows(prevRows => 
           prevRows.map(row => 
-            row.id === selectedRow.id ? { ...row, ...response.data } : row
+            row.id === selectedRow.id ? { ...row, ...updatedChannel } : row
           )
         );
         
@@ -723,8 +776,17 @@ const TrafficChannels = () => {
         // Create new channel
         response = await axios.post(`${API_URL}/api/traffic`, formData);
         
+        // Get the newly created channel with its ID
+        const newChannel = response.data;
+        
+        // Update our connection status tracking
+        setChannelConnectionStatus(prev => ({
+          ...prev,
+          [newChannel.id]: newChannel.isConnected || false
+        }));
+        
         // Update local state with the newly created channel
-        setRows(prevRows => [...prevRows, response.data]);
+        setRows(prevRows => [...prevRows, newChannel]);
         
         setSnackbar({
           open: true,
@@ -733,7 +795,7 @@ const TrafficChannels = () => {
         });
         
         // Set selected row to newly created channel
-        setSelectedRow(response.data);
+        setSelectedRow(newChannel);
         setEditMode(true);
       }
       
@@ -762,7 +824,10 @@ const TrafficChannels = () => {
   
   const handleCloseSecondModal = () => {
     setOpenSecondModal(false);
-    setFormData(channelTemplates.Custom);
+    setFormData({
+      ...channelTemplates.Custom,
+      isConnected: false // Reset connection status
+    });
     setSelectedChannel(null);
     setSelectedRow(null);
     setFormErrors({});
@@ -782,7 +847,10 @@ const TrafficChannels = () => {
 
   // Render Facebook connection section
   const renderFacebookConnection = () => {
-    const isConnected = authStatus.facebook;
+    // Check if the current channel is connected
+    const isConnected = editMode 
+      ? channelConnectionStatus[selectedRow?.id] || false 
+      : false;
     
     return (
       <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
@@ -813,7 +881,7 @@ const TrafficChannels = () => {
           disabled={loading.facebook}
           sx={{ mb: 2, bgcolor: '#1877F2', '&:hover': { bgcolor: '#166FE5' } }}
         >
-          {loading.facebook ? <CircularProgress size={24} /> : "Connect Facebook"}
+          {loading.facebook ? <CircularProgress size={24} /> : isConnected ? "Reconnect Facebook" : "Connect Facebook"}
         </Button>
         
         <Box sx={{ mt: 2, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -925,7 +993,10 @@ const TrafficChannels = () => {
 
   // Render Google connection section
   const renderGoogleConnection = () => {
-    const isConnected = authStatus.google;
+    // Check if the current channel is connected
+    const isConnected = editMode 
+      ? channelConnectionStatus[selectedRow?.id] || false 
+      : false;
     
     return (
       <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
@@ -971,7 +1042,7 @@ const TrafficChannels = () => {
               fullWidth
               sx={{ mb: 0.5 }}
             >
-              {loading.google ? <CircularProgress size={24} /> : "Sign in with Google"}
+              {loading.google ? <CircularProgress size={24} /> : isConnected ? "Reconnect Google" : "Sign in with Google"}
             </Button>
           </Grid>
         </Grid>
@@ -1497,7 +1568,7 @@ const TrafficChannels = () => {
                 InputProps={{
                   endAdornment: filterText && (
                     <InputAdornment position="end">
-                      <IconButton
+                                              <IconButton
                         size="small"
                         onClick={() => setFilterText("")}
                       >
