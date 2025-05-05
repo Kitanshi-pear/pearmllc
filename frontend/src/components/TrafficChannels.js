@@ -7,6 +7,9 @@ import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DateRangeIcon from "@mui/icons-material/DateRange";
+import CancelIcon from "@mui/icons-material/Cancel";
+import SaveIcon from "@mui/icons-material/Save";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   Button,
   IconButton,
@@ -29,7 +32,8 @@ import {
   Alert,
   Divider,
   Chip,
-  Paper
+  Paper,
+  Link
 } from "@mui/material";
 import Layout from "./Layout";
 import axios from "axios";
@@ -86,11 +90,12 @@ const TrafficChannels = () => {
   });
   const [editMode, setEditMode] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [showAdditionalParams, setShowAdditionalParams] = useState(true);
   const [formData, setFormData] = useState({
     channelName: "",
     aliasChannel: "",
     costUpdateDepth: "",
-    costUpdateFrequency: "5 Minutes",
+    costUpdateFrequency: "5 minutes",
     currency: "USD",
     s2sPostbackUrl: "",
     clickRefId: "",
@@ -99,12 +104,43 @@ const TrafficChannels = () => {
     apiAccessToken: "",
     defaultEventName: "Purchase",
     customConversionMatching: false,
+    payoutType: "",
+    payoutValue: "",
     googleAdsAccountId: "",
     googleMccAccountId: "",
     conversionType: "",
     conversionName: "",
     conversionCategory: "",
-    includeInConversions: ""
+    includeInConversions: "",
+    // Additional parameters (up to 21 params)
+    additionalParams: [
+      { parameter: "sub1", macroToken: "{ad.id}", nameDescription: "ad_id", selectRole: "Aid" },
+      { parameter: "sub2", macroToken: "{adset.id}", nameDescription: "adset_id", selectRole: "Gid" },
+      { parameter: "sub3", macroToken: "{campaign.id}", nameDescription: "campaign_id", selectRole: "Gid" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "", macroToken: "", nameDescription: "", selectRole: "" },
+      { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" }
+    ],
+    // Google specific parameters
+    googleParams: [
+      { parameter: "utm_campaign", macroToken: "{replace}", nameDescription: "Campaign name", selectRole: "Rt campaign" },
+      { parameter: "sub2", macroToken: "{keyword}", nameDescription: "Bidded keyword", selectRole: "Rt keyword" },
+      { parameter: "sub3", macroToken: "{matchtype}", nameDescription: "Keyword match type", selectRole: "Rt match type" }
+    ]
   });
 
   const navigate = useNavigate();
@@ -290,26 +326,27 @@ const TrafficChannels = () => {
   // Template options with predefined settings
   const channelTemplates = {
     Facebook: {
-      channelName: "Facebook Ads",
-      aliasChannel: "Facebook",
-      costUpdateDepth: "Ad Level",
-      costUpdateFrequency: "15 Minutes",
+      channelName: "Facebook",
+      aliasChannel: "facebook",
+      costUpdateDepth: "Ad level",
+      costUpdateFrequency: "5 minutes",
       currency: "USD",
       defaultEventName: "Purchase"
     },
     Google: {
-      channelName: "Google Ads",
-      aliasChannel: "Google",
-      costUpdateDepth: "Ad Level",
-      costUpdateFrequency: "15 Minutes",
+      channelName: "Google Ads (No-redirect tracking)",
+      aliasChannel: "google",
+      costUpdateDepth: "Ad level",
+      costUpdateFrequency: "5 minutes",
       currency: "USD",
-      defaultEventName: "Purchase"
+      defaultEventName: "Purchase",
+      clickRefId: "{gclid}"
     },
     TikTok: {
       channelName: "TikTok Ads",
-      aliasChannel: "TikTok",
-      costUpdateDepth: "Ad Level",
-      costUpdateFrequency: "15 Minutes",
+      aliasChannel: "tiktok",
+      costUpdateDepth: "Ad level",
+      costUpdateFrequency: "5 minutes",
       currency: "USD",
       defaultEventName: "Purchase"
     },
@@ -317,7 +354,7 @@ const TrafficChannels = () => {
       channelName: "",
       aliasChannel: "",
       costUpdateDepth: "",
-      costUpdateFrequency: "5 Minutes",
+      costUpdateFrequency: "5 minutes",
       currency: "USD",
       s2sPostbackUrl: "",
       clickRefId: "",
@@ -463,6 +500,23 @@ const TrafficChannels = () => {
     setFormData(prev => ({ ...prev, [name]: newValue }));
   };
 
+  // Handle additional parameter change
+  const handleParamChange = (index, field, value) => {
+    const selectedParams = selectedChannel?.toLowerCase() === 'google' ? 'googleParams' : 'additionalParams';
+    
+    setFormData(prev => {
+      const updatedParams = [...prev[selectedParams]];
+      updatedParams[index] = {
+        ...updatedParams[index],
+        [field]: value
+      };
+      return {
+        ...prev,
+        [selectedParams]: updatedParams
+      };
+    });
+  };
+
   // Date range change handler
   const handleDateRangeChange = (field, date) => {
     setDateRange(prev => ({
@@ -483,8 +537,6 @@ const TrafficChannels = () => {
       }
     });
     
-    // Don't require platform-specific fields - they can be filled later after OAuth
-    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -496,7 +548,7 @@ const TrafficChannels = () => {
       setFormData({
         ...formData,
         ...template,
-        aliasChannel: channelType
+        aliasChannel: template.aliasChannel
       });
       setSelectedChannel(channelType);
     } else {
@@ -615,17 +667,16 @@ const TrafficChannels = () => {
           severity: "success"
         });
         
-        // Immediately open edit mode for newly created channel if it's a platform that needs connection
-        if (["Facebook", "Google"].includes(formData.aliasChannel)) {
+        // For platforms that need connection, immediately go to edit mode after save
+        if (["Facebook", "Google"].includes(selectedChannel)) {
           setSelectedRow(response.data);
           setEditMode(true);
+          // Don't close the modal in this case
+        } else {
+          // If it's not a platform that needs connection, reset and close
+          resetForm();
+          setOpenSecondModal(false);
         }
-      }
-      
-      // Close modal only if not immediately going to edit mode
-      if (!["Facebook", "Google"].includes(formData.aliasChannel) || editMode) {
-        resetForm();
-        setOpenSecondModal(false);
       }
       
       // Refresh the data to ensure we have the latest from the server
@@ -675,375 +726,451 @@ const TrafficChannels = () => {
     return ["Facebook", "Google"].includes(platformName);
   };
 
-  // Helper to render connection section based on platform
-  const renderConnectionSection = (platformName) => {
-    if (!isPlatformConnectable(platformName)) {
-      return null;
-    }
+  // Render Facebook API integration section - Only shown in edit mode
+  const renderFacebookApiSection = () => {
+    if (selectedChannel?.toLowerCase() !== 'facebook' || !editMode) return null;
 
-    const platform = platformName.toLowerCase();
-    
     return (
-      <Box
-        sx={{
-          border: "1px solid #e0e0e0",
-          borderRadius: 2,
-          p: 3,
-          mb: 3,
-          backgroundColor: "#f8f9fa",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
-        }}
-      >
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={7}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {getChannelIcon(platformName)}
-              <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                {platformName} API Integration
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Connect your {platformName} account to enable:
-              <Box component="ul" sx={{ pl: 2, mt: 1, mb: 1 }}>
-                <Box component="li">Automatic cost updates</Box>
-                <Box component="li">Campaign management</Box>
-                <Box component="li">Conversion tracking</Box>
-              </Box>
+      <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" fontWeight="medium">
+              Facebook API integration
             </Typography>
-          </Grid>
-          <Grid item xs={12} sm={5} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
-            <Button
-              variant={authStatus[platform] ? "contained" : "outlined"}
-              color={authStatus[platform] ? "success" : "primary"}
-              sx={{ 
-                textTransform: "none", 
-                py: 1.2,
-                px: 3,
-                borderRadius: 2,
-                boxShadow: authStatus[platform] ? 3 : 0
-              }}
-              onClick={() => handleAuth(platform)}
-              disabled={loading[platform]}
-              startIcon={authStatus[platform] ? <CheckIcon /> : getChannelIcon(platformName)}
-            >
-              {loading[platform] ? 
-                <CircularProgress size={24} /> : 
-                authStatus[platform] ? "Connected" : `Connect ${platformName}`
-              }
-            </Button>
-          </Grid>
-        </Grid>
+            <HelpOutlineIcon fontSize="small" sx={{ color: '#757575', cursor: 'pointer' }} />
+          </Box>
+          <Box sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            bgcolor: authStatus.facebook ? 'success.main' : 'error.main',
+            color: 'white',
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 10,
+            fontSize: '0.75rem',
+            fontWeight: 'medium'
+          }}>
+            {authStatus.facebook ? 'Connected' : 'Not connected'} 
+            {!authStatus.facebook && <CancelIcon fontSize="small" sx={{ ml: 0.5 }} />}
+          </Box>
+        </Box>
+
+        <Box sx={{ p: 3 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ 
+              bgcolor: '#3b5998', 
+              '&:hover': { bgcolor: '#344e86' },
+              borderRadius: 1,
+              textTransform: 'none',
+              mb: 2
+            }}
+            startIcon={<Box component="span" sx={{ fontSize: '1.2rem', fontWeight: 'bold' }}>f</Box>}
+            onClick={() => handleAuth("facebook")}
+            disabled={loading.facebook || authStatus.facebook}
+          >
+            {loading.facebook ? <CircularProgress size={24} /> : 'Connect Facebook'}
+          </Button>
+
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ display: 'flex', alignItems: 'center' }}>
+              <InfoIcon fontSize="small" sx={{ mr: 1, color: '#757575' }} />
+              Please allow RedTrack.io access to your Facebook profile to activate integrations:
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+              #1 Click on "Connect" and accept integration permissions
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+              #2 Once accepted, fill in all the mandatory fields and save the changes.
+            </Typography>
+          </Box>
+        </Box>
       </Box>
     );
   };
 
-  // Render platform-specific settings
-  const renderPlatformSettings = () => {
-    if (selectedChannel === "Facebook") {
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon("Facebook")}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              Facebook Settings
+  // Render Facebook Pixel section
+  const renderFacebookPixelSection = () => {
+    if (selectedChannel?.toLowerCase() !== 'facebook') return null;
+
+    return (
+      <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center' }}>
+          <Typography variant="subtitle1" fontWeight="medium">
+            Facebook default data source (pixel)
+          </Typography>
+          <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: '#757575', cursor: 'pointer' }} />
+        </Box>
+
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Pixel ID
             </Typography>
+            <TextField
+              fullWidth
+              placeholder="Pixel ID"
+              name="pixelId"
+              value={formData.pixelId}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
           </Box>
 
-          <CardContent sx={{ p: 3 }}>
-            {/* Always show connection section first in the channel settings */}
-            {renderConnectionSection("Facebook")}
-
-            {/* Facebook Pixel Data Section - Optional fields */}
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2, mb: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                      Facebook Default Data Source (Pixel)
-                    </Typography>
-                    <Tooltip title="The Facebook pixel helps you track conversions from Facebook ads, optimize ads based on collected data, build targeted audiences for future ads, and remarket to people who have already taken some action on your website.">
-                      <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                    </Tooltip>
-                  </Box>
-                </Grid>
-
-                {/* Pixel ID - Optional */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Pixel ID"
-                    name="pixelId"
-                    value={formData.pixelId}
-                    onChange={handleFormChange}
-                    placeholder="Enter your Facebook Pixel ID"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Facebook Pixel ID">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Conversions API Access Token - Optional */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Conversions API Access Token"
-                    name="apiAccessToken"
-                    value={formData.apiAccessToken}
-                    onChange={handleFormChange}
-                    placeholder="Enter your Facebook API Access Token"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Facebook API Access Token">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Default Event Name */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Default Event Name"
-                    name="defaultEventName"
-                    value={formData.defaultEventName}
-                    onChange={handleFormChange}
-                    placeholder="e.g., Purchase, Lead"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Custom Conversion Matching */}
-                <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
-                  <FormControl component="fieldset" sx={{ width: '100%' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <Switch
-                        checked={formData.customConversionMatching}
-                        onChange={(e) =>
-                          setFormData((prevState) => ({
-                            ...prevState,
-                            customConversionMatching: e.target.checked,
-                          }))
-                        }
-                        name="customConversionMatching"
-                        color="primary"
-                      />
-                      <Typography variant="body1" sx={{ ml: 1 }}>
-                        Custom Conversion Matching
-                      </Typography>
-                      <Tooltip title="Enable to use custom matching parameters for improved conversion tracking">
-                        <HelpOutlineIcon fontSize="small" sx={{ ml: 1, cursor: "pointer", color: "#6b7280" }} />
-                      </Tooltip>
-                    </Box>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Paper>
-          </CardContent>
-        </Card>
-      );
-    } else if (selectedChannel === "Google") {
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon("Google")}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              Google Settings
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Conversions API Access token
             </Typography>
+            <TextField
+              fullWidth
+              placeholder="Conversions API Access token"
+              name="apiAccessToken"
+              value={formData.apiAccessToken}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
           </Box>
 
-          <CardContent sx={{ p: 3 }}>
-            {/* Always show connection section first in the channel settings */}
-            {renderConnectionSection("Google")}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Default Event name
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Default Event name"
+              name="defaultEventName"
+              value={formData.defaultEventName}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
 
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2, mb: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                      Google Ads Account Details
-                    </Typography>
-                    <Tooltip title="Enter your Google Ads account information to enable tracking and automation">
-                      <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                    </Tooltip>
-                  </Box>
-                </Grid>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Payout type
+            </Typography>
+            <FormControl fullWidth size="small">
+              <Select
+                name="payoutType"
+                value={formData.payoutType || ""}
+                onChange={handleFormChange}
+                displayEmpty
+                variant="outlined"
+                sx={{ textAlign: 'left' }}
+              >
+                <MenuItem value="">Select type</MenuItem>
+                <MenuItem value="Fixed">Fixed</MenuItem>
+                <MenuItem value="Percentage">Percentage</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
 
-                {/* Google Ads Account ID */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Google Ads Account ID"
-                    name="googleAdsAccountId"
-                    value={formData.googleAdsAccountId}
-                    onChange={handleFormChange}
-                    placeholder="e.g., 123-456-7890"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Google Ads Account ID (e.g., 123-456-7890)">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Value
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Value"
+              name="payoutValue"
+              value={formData.payoutValue || ""}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
 
-                {/* Google MCC Account ID */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Google MCC Account ID"
-                    name="googleMccAccountId"
-                    value={formData.googleMccAccountId}
-                    onChange={handleFormChange}
-                    placeholder="Optional"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Google MCC Account ID if applicable">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Switch
+              checked={formData.customConversionMatching}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                customConversionMatching: e.target.checked
+              }))}
+              name="customConversionMatching"
+              size="small"
+            />
+            <Typography variant="body2" color="textSecondary">
+              Custom Conversion Matching
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
 
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary">
-                    Add MCC account ID to send conversions to it and not the ad account (optional).
-                    Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
+  // Render Google API integration section - Only shown in edit mode
+  const renderGoogleApiSection = () => {
+    if (selectedChannel?.toLowerCase() !== 'google' || !editMode) return null;
 
-            {/* Conversion Matching Section */}
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2 }}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                  Conversion Matching Settings
+    return (
+      <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="subtitle1" fontWeight="medium">
+            Google API integration
+          </Typography>
+          <Box sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            bgcolor: authStatus.google ? 'success.main' : 'error.main',
+            color: 'white',
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 10,
+            fontSize: '0.75rem',
+            fontWeight: 'medium'
+          }}>
+            {authStatus.google ? 'Connected' : 'Not connected'} 
+            {!authStatus.google && <CancelIcon fontSize="small" sx={{ ml: 0.5 }} />}
+          </Box>
+        </Box>
+
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              fullWidth
+              label="Google Ads Account ID *"
+              name="googleAdsAccountId"
+              value={formData.googleAdsAccountId}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="body2" color="textSecondary">
+              RedTrack will update costs via API and send conversions for the connected ad account
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<img src="https://developers.google.com/static/ads/images/ads_192px_clr.svg" alt="Google" style={{ width: 16, height: 16 }} />}
+              sx={{ 
+                textTransform: 'none',
+                borderRadius: 1,
+                ml: 2
+              }}
+              onClick={() => handleAuth("google")}
+              disabled={loading.google || authStatus.google}
+            >
+              {loading.google ? <CircularProgress size={20} /> : 'Sign in with Google'}
+            </Button>
+          </Box>
+
+          <Box sx={{ mt: 3, mb: 2 }}>
+            <TextField
+              fullWidth
+              label="Google MCC Account ID (optional)"
+              name="googleMccAccountId"
+              value={formData.googleMccAccountId}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+            Add MCC account id to send conversions to it and not ad account (optional).<br />
+            Please make sure you have access to ad account and MCC with the e-mail you used for integration.
+          </Typography>
+
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 2 }}>
+              Conversion Matching
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Conversion Type *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
                 </Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                  Configure how conversions are tracked and matched in Google Ads
-                </Typography>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Type</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="conversionType"
-                      value={formData.conversionType || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select type</MenuItem>
-                      <MenuItem value="Purchase">Purchase</MenuItem>
-                      <MenuItem value="Lead">Lead</MenuItem>
-                      <MenuItem value="SignUp">Sign Up</MenuItem>
-                      <MenuItem value="PageView">Page View</MenuItem>
-                      <MenuItem value="AddToCart">Add To Cart</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Name</Typography>
-                  <TextField
-                    fullWidth
-                    name="conversionName"
-                    placeholder="Enter name"
-                    value={formData.conversionName || ""}
-                    onChange={handleFormChange}
+                <Box component="div" sx={{ opacity: 0.4 }}>
+                  <Button 
                     variant="outlined"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Category</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="conversionCategory"
-                      value={formData.conversionCategory || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select category</MenuItem>
-                      <MenuItem value="Default">Default</MenuItem>
-                      <MenuItem value="Purchase">Purchase</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Include in Conversions</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="includeInConversions"
-                      value={formData.includeInConversions || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select option</MenuItem>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
+                    disabled
+                    startIcon={<img src="https://cdn-icons-png.flaticon.com/512/2891/2891413.png" alt="Lock" style={{ width: 14, height: 14 }} />}
+                    sx={{ width: '100%', textTransform: 'none', borderRadius: 1 }}
+                  >
+                    ADD MORE
+                  </Button>
+                </Box>
               </Grid>
-            </Paper>
-          </CardContent>
-        </Card>
-      );
-    }
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Conversion name *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Category *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Include in "conversions" *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 2 }}>
+              Campaign Manager 360
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Conversion Type *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+                <Box component="div" sx={{ opacity: 0.4 }}>
+                  <Button 
+                    variant="outlined"
+                    disabled
+                    startIcon={<img src="https://cdn-icons-png.flaticon.com/512/2891/2891413.png" alt="Lock" style={{ width: 14, height: 14 }} />}
+                    sx={{ width: '100%', textTransform: 'none', borderRadius: 1 }}
+                  >
+                    ADD MORE
+                  </Button>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Profile ID *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  Floodlight activity ID *
+                  <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, color: '#757575', cursor: 'pointer' }} />
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ display: 'flex', alignItems: 'center' }}>
+              <InfoIcon fontSize="small" sx={{ mr: 1, color: '#757575' }} />
+              Please allow RedTrack.io access to your GoogleAds account to activate integrations:
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+              #1 Click on "Connect" and accept integration permissions
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+              #2 Once accepted, fill in all the mandatory fields and save the changes.
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render additional parameters section
+  const renderAdditionalParameters = () => {
+    const params = selectedChannel?.toLowerCase() === 'google' ? 
+      formData.googleParams : 
+      formData.additionalParams;
     
-    return null;
+    // Show only the first 5 parameters plus any that are filled in
+    const displayParams = params.filter((param, index) => 
+      index < 5 || 
+      param.parameter || 
+      param.macroToken || 
+      param.nameDescription || 
+      param.selectRole
+    );
+    
+    return (
+      <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: '1px solid #e0e0e0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          cursor: 'pointer'
+        }}
+        onClick={() => setShowAdditionalParams(!showAdditionalParams)}
+        >
+          <Typography variant="subtitle1" fontWeight="medium">
+            Additional parameters
+          </Typography>
+        </Box>
+
+        {showAdditionalParams && (
+          <Box sx={{ p: 3 }}>
+            {displayParams.map((param, index) => (
+              <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                <Grid item xs={12} sm={3}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Parameter *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={param.parameter || ""}
+                    onChange={(e) => handleParamChange(index, 'parameter', e.target.value)}
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Macro/token *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={param.macroToken || ""}
+                    onChange={(e) => handleParamChange(index, 'macroToken', e.target.value)}
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Name / Description *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={param.nameDescription || ""}
+                    onChange={(e) => handleParamChange(index, 'nameDescription', e.target.value)}
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Select role
+                  </Typography>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={param.selectRole || ""}
+                      onChange={(e) => handleParamChange(index, 'selectRole', e.target.value)}
+                      displayEmpty
+                      variant="outlined"
+                    >
+                      <MenuItem value="">Select role</MenuItem>
+                      <MenuItem value="Aid">Aid</MenuItem>
+                      <MenuItem value="Gid">Gid</MenuItem>
+                      <MenuItem value="Rt campaign">Rt campaign</MenuItem>
+                      <MenuItem value="Rt keyword">Rt keyword</MenuItem>
+                      <MenuItem value="Rt match type">Rt match type</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            ))}
+          </Box>
+        )}
+      </Box>
+    );
   };
 
   return (
@@ -1418,288 +1545,278 @@ const TrafficChannels = () => {
               left: "50%",
               transform: "translate(-50%, -50%)",
               bgcolor: "white",
-              borderRadius: 2,
-              boxShadow: 3,
+              borderRadius: 0,
+              boxShadow: 1,
               maxHeight: "90vh",
               overflowY: "auto",
-              width: "85%",
-              maxWidth: "1000px"
+              width: "100%",
+              maxWidth: "1200px"
             }}
           >
-            <form onSubmit={handleSubmit}>
-              {/* Sticky header */}
-              <Box
-                sx={{
-                  position: "sticky",
-                  top: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  p: 3,
-                  boxShadow: 2,
-                  zIndex: 10,
-                  backgroundColor: "white",
-                  borderTopLeftRadius: 2,
-                  borderTopRightRadius: 2,
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {selectedChannel && getChannelIcon(selectedChannel)}
-                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                    {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
-                    {selectedChannel && (
-                      <Chip 
-                        label={selectedChannel} 
-                        size="small" 
-                        color="primary" 
-                        sx={{ ml: 1 }}
-                      />
-                    )}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                  <Button 
-                    variant="outlined" 
-                    onClick={handleCloseSecondModal}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    type="submit"
-                    disabled={loading.save}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    {loading.save ? <CircularProgress size={24} /> : editMode ? 'Update' : 'Save'}
-                  </Button>
-                </Box>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                p: 2,
+                borderBottom: "1px solid #e0e0e0",
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                backgroundColor: "white",
+              }}
+            >
+              <Typography variant="h6">
+                New Traffic Channel
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSubmit}
+                  disabled={loading.save}
+                  sx={{ 
+                    bgcolor: '#4285F4',
+                    '&:hover': { bgcolor: '#3367D6' },
+                    borderRadius: 1,
+                    textTransform: 'none',
+                    px: 3
+                  }}
+                >
+                  {loading.save ? <CircularProgress size={20} color="inherit" /> : 'SAVE'}
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={handleCloseSecondModal}
+                  sx={{ 
+                    color: '#666',
+                    fontWeight: 'bold',
+                    '&:hover': { bgcolor: 'transparent', color: '#333' }
+                  }}
+                >
+                  CLOSE
+                </Button>
               </Box>
+            </Box>
 
-              {/* Main form content */}
-              <Box sx={{ p: 3 }}>
-                {/* Basic settings */}
-                <Card sx={{ p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-                  <Box sx={{ bgcolor: "#f8f9fa", p: 2, borderBottom: "1px solid #e0e0e0" }}>
-                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>Basic Settings</Typography>
-                  </Box>
+            <Box sx={{ p: 3 }}>
+              {/* Basic settings */}
+              <Box sx={{ mb: 3, border: '1px solid #e0e0e0', borderRadius: 0 }}>
+                <Grid container spacing={3} sx={{ p: 3 }}>
+                  {/* Channel Name */}
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Channel name *
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="channelName"
+                      value={formData.channelName}
+                      onChange={handleFormChange}
+                      variant="outlined"
+                      size="small"
+                      error={!!formErrors.channelName}
+                      helperText={formErrors.channelName}
+                    />
+                  </Grid>
                   
-                  <CardContent sx={{ p: 3 }}>
-                    <Grid container spacing={3}>
-                      {/* Channel Name & Alias Channel in one row */}
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Channel Name"
-                          name="channelName"
-                          value={formData.channelName}
-                          onChange={handleFormChange}
-                          required
-                          error={!!formErrors.channelName}
-                          helperText={formErrors.channelName}
-                          variant="outlined"
-                          placeholder="e.g., Facebook Ads"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Alias Channel"
-                          name="aliasChannel"
-                          value={formData.aliasChannel}
-                          onChange={handleFormChange}
-                          required
-                          error={!!formErrors.aliasChannel}
-                          helperText={formErrors.aliasChannel}
-                          variant="outlined"
-                          placeholder="e.g., Facebook"
-                        />
-                      </Grid>
+                  {/* Alias Channel */}
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Alias channel
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="aliasChannel"
+                      value={formData.aliasChannel}
+                      onChange={handleFormChange}
+                      variant="outlined"
+                      size="small"
+                      error={!!formErrors.aliasChannel}
+                      helperText={formErrors.aliasChannel}
+                    />
+                  </Grid>
 
-                      {/* Cost Update Depth with description */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Cost Update Depth
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.costUpdateDepth}>
-                          <Select
-                            name="costUpdateDepth"
-                            value={formData.costUpdateDepth}
-                            onChange={handleFormChange}
-                            displayEmpty
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="">Select depth</MenuItem>
-                            <MenuItem value="None">None</MenuItem>
-                            <MenuItem value="Campaign Level">Campaign Level</MenuItem>
-                            <MenuItem value="Adset Level">Adset Level</MenuItem>
-                            <MenuItem value="Ad Level">Ad Level</MenuItem>
-                          </Select>
-                          {formErrors.costUpdateDepth && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.costUpdateDepth}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          Please select the cost update depth from the available options.
-                          The default setting is the maximum depth available for your account plan.
-                        </Typography>
-                      </Grid>
+                  {/* Cost Update Depth */}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Cost update depth:
+                    </Typography>
+                    <FormControl fullWidth error={!!formErrors.costUpdateDepth} size="small">
+                      <Select
+                        name="costUpdateDepth"
+                        value={formData.costUpdateDepth}
+                        onChange={handleFormChange}
+                        displayEmpty
+                        required
+                        variant="outlined"
+                        sx={{ textAlign: 'left' }}
+                      >
+                        <MenuItem value="">Select depth</MenuItem>
+                        <MenuItem value="None">None</MenuItem>
+                        <MenuItem value="Campaign Level">Campaign Level</MenuItem>
+                        <MenuItem value="Adset Level">Adset Level</MenuItem>
+                        <MenuItem value="Ad level">Ad level</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      Please select the cost update depth from the available ones from the drop-down list. The default setting is the maximum depth available for your account plan.
+                    </Typography>
+                  </Grid>
 
-                      {/* Cost Update Frequency */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Cost Update Frequency
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.costUpdateFrequency}>
-                          <Select
-                            name="costUpdateFrequency"
-                            value={formData.costUpdateFrequency}
-                            onChange={handleFormChange}
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="None">None</MenuItem>
-                            <MenuItem value="60 Minutes">60 Minutes</MenuItem>
-                            <MenuItem value="30 Minutes">30 Minutes</MenuItem>
-                            <MenuItem value="15 Minutes">15 Minutes</MenuItem>
-                            <MenuItem value="5 Minutes">5 Minutes</MenuItem>
-                          </Select>
-                          {formErrors.costUpdateFrequency && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.costUpdateFrequency}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          These are the current settings for your account. If you would like to change the frequency of
-                          cost updates - please contact support.
-                        </Typography>
-                      </Grid>
+                  {/* Cost Update Frequency */}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Cost update frequency:
+                    </Typography>
+                    <FormControl fullWidth error={!!formErrors.costUpdateFrequency} size="small">
+                      <Select
+                        name="costUpdateFrequency"
+                        value={formData.costUpdateFrequency}
+                        onChange={handleFormChange}
+                        displayEmpty
+                        required
+                        variant="outlined"
+                        sx={{ textAlign: 'left' }}
+                      >
+                        <MenuItem value="None">None</MenuItem>
+                        <MenuItem value="60 minutes">60 minutes</MenuItem>
+                        <MenuItem value="30 minutes">30 minutes</MenuItem>
+                        <MenuItem value="15 minutes">15 minutes</MenuItem>
+                        <MenuItem value="5 minutes">5 minutes</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      These are the current settings for your account. If you would like to change the frequency of cost updates - please contact <Link href="mailto:support@redtrack.io" color="primary">support@redtrack.io</Link>
+                    </Typography>
+                  </Grid>
 
-                      {/* Currency */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Currency
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.currency}>
-                          <Select
-                            name="currency"
-                            value={formData.currency}
-                            onChange={handleFormChange}
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="USD">USD</MenuItem>
-                            <MenuItem value="EUR">EUR</MenuItem>
-                            <MenuItem value="GBP">GBP</MenuItem>
-                            <MenuItem value="INR">INR</MenuItem>
-                            <MenuItem value="JPY">JPY</MenuItem>
-                            <MenuItem value="AUD">AUD</MenuItem>
-                            <MenuItem value="CAD">CAD</MenuItem>
-                            <MenuItem value="CHF">CHF</MenuItem>
-                            <MenuItem value="CNY">CNY</MenuItem>
-                            <MenuItem value="SEK">SEK</MenuItem>
-                            <MenuItem value="NZD">NZD</MenuItem>
-                            <MenuItem value="MXN">MXN</MenuItem>
-                            <MenuItem value="SGD">SGD</MenuItem>
-                            <MenuItem value="HKD">HKD</MenuItem>
-                            <MenuItem value="NOK">NOK</MenuItem>
-                            <MenuItem value="KRW">KRW</MenuItem>
-                            <MenuItem value="TRY">TRY</MenuItem>
-                            <MenuItem value="RUB">RUB</MenuItem>
-                            <MenuItem value="BRL">BRL</MenuItem>
-                            <MenuItem value="ZAR">ZAR</MenuItem>
-                          </Select>
-                          {formErrors.currency && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.currency}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          If no currency is selected, the value selected in the profile will be used.
-                        </Typography>
-                      </Grid>
+                  {/* Currency */}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Currency
+                    </Typography>
+                    <FormControl fullWidth error={!!formErrors.currency} size="small">
+                      <Select
+                        name="currency"
+                        value={formData.currency}
+                        onChange={handleFormChange}
+                        displayEmpty
+                        required
+                        variant="outlined"
+                        sx={{ textAlign: 'left' }}
+                      >
+                        <MenuItem value="USD">USD</MenuItem>
+                        <MenuItem value="EUR">EUR</MenuItem>
+                        <MenuItem value="GBP">GBP</MenuItem>
+                        <MenuItem value="INR">INR</MenuItem>
+                        <MenuItem value="JPY">JPY</MenuItem>
+                        <MenuItem value="AUD">AUD</MenuItem>
+                        <MenuItem value="CAD">CAD</MenuItem>
+                        <MenuItem value="CHF">CHF</MenuItem>
+                        <MenuItem value="CNY">CNY</MenuItem>
+                        <MenuItem value="SEK">SEK</MenuItem>
+                        <MenuItem value="NZD">NZD</MenuItem>
+                        <MenuItem value="MXN">MXN</MenuItem>
+                        <MenuItem value="SGD">SGD</MenuItem>
+                        <MenuItem value="HKD">HKD</MenuItem>
+                        <MenuItem value="NOK">NOK</MenuItem>
+                        <MenuItem value="KRW">KRW</MenuItem>
+                        <MenuItem value="TRY">TRY</MenuItem>
+                        <MenuItem value="RUB">RUB</MenuItem>
+                        <MenuItem value="BRL">BRL</MenuItem>
+                        <MenuItem value="ZAR">ZAR</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      If no currency is selected, the value selected in the profile will be used
+                    </Typography>
+                  </Grid>
 
-                      {/* S2S Postback URL */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            S2S Postback URL
-                          </Typography>
-                        </Box>
-                        <TextField
-                          fullWidth
-                          name="s2sPostbackUrl"
-                          value={formData.s2sPostbackUrl}
-                          onChange={handleFormChange}
-                          placeholder="https://your-domain.com/postback?click_id={click_id}"
-                          variant="outlined"
-                        />
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          Use if you need to send conversions back to your traffic source.
-                        </Typography>
-                      </Grid>
+                  {/* S2S Postback URL */}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      S2S Postback URL
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="s2sPostbackUrl"
+                      value={formData.s2sPostbackUrl}
+                      onChange={handleFormChange}
+                      placeholder="S2S Postback URL"
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
 
-                      {/* Click Ref ID & External ID in one row */}
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Click Ref ID"
-                          name="clickRefId"
-                          value={formData.clickRefId}
-                          onChange={handleFormChange}
-                          placeholder="Click Ref ID"
-                          variant="outlined"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="External ID"
-                          name="externalId"
-                          value={formData.externalId}
-                          onChange={handleFormChange}
-                          placeholder="External ID"
-                          variant="outlined"
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-
-                {/* Platform-specific settings */}
-                {renderPlatformSettings()}
-                
-                {/* Connection reminders for new channels that need connection */}
-                {!editMode && isPlatformConnectable(selectedChannel) && (
-                  <Card sx={{ mt: 3, p: 3, boxShadow: 2, borderRadius: 2, bgcolor: "#f0f7ff" }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <InfoIcon color="primary" />
-                      <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                          Set up {selectedChannel} Connection
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          After creating this channel, you'll need to connect your {selectedChannel} account to enable cost updates and conversion tracking.
-                          You'll be automatically taken to the connection page after saving.
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Card>
-                )}
+                  {/* Click Ref ID & External ID in one row */}
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      Click Ref ID
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="clickRefId"
+                      value={formData.clickRefId}
+                      onChange={handleFormChange}
+                      placeholder="Click Ref ID"
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                      External ID
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      name="externalId"
+                      value={formData.externalId}
+                      onChange={handleFormChange}
+                      placeholder="External ID"
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
               </Box>
-            </form>
+
+              {/* Platform-specific sections */}
+              {renderFacebookApiSection()}
+              {renderFacebookPixelSection()}
+              {renderGoogleApiSection()}
+              {renderAdditionalParameters()}
+
+              {/* Bottom Save/Close buttons */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 1.5 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSubmit}
+                  disabled={loading.save}
+                  sx={{ 
+                    bgcolor: '#4285F4',
+                    '&:hover': { bgcolor: '#3367D6' },
+                    borderRadius: 1,
+                    textTransform: 'none',
+                    px: 3
+                  }}
+                >
+                  {loading.save ? <CircularProgress size={20} color="inherit" /> : 'SAVE'}
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={handleCloseSecondModal}
+                  sx={{ 
+                    color: '#666',
+                    fontWeight: 'bold',
+                    '&:hover': { bgcolor: 'transparent', color: '#333' }
+                  }}
+                >
+                  CLOSE
+                </Button>
+              </Box>
+            </Box>
           </Box>
         </Modal>
 
