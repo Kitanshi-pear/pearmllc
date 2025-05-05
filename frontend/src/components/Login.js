@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./login.css";
 
@@ -7,7 +7,22 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if we have a message from the redirect
+    if (location.state?.message) {
+      setAuthMessage(location.state.message);
+    }
+    
+    // Check if user is already logged in
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/dashboard");
+    }
+  }, [location, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,13 +45,15 @@ const Login = () => {
         localStorage.setItem("role", res.data.role);
         localStorage.setItem("userEmail", email);
 
-        navigate("/dashboard");
+        // Redirect to the page the user was trying to access, or dashboard by default
+        const from = location.state?.from?.pathname || "/dashboard";
+        navigate(from);
       } else {
-        alert(res.data.error || "Login failed!");
+        setAuthMessage(res.data.error || "Login failed!");
       }
     } catch (err) {
       console.error("Login error:", err.response ? err.response.data : err.message);
-      alert("Login failed! Check API request.");
+      setAuthMessage("Login failed! Check your credentials and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -88,6 +105,13 @@ const Login = () => {
             <h2>Welcome Back</h2>
             <p>Sign in to your <span className="accent-text">PearM</span> dashboard</p>
           </div>
+
+          {/* Display auth message if any */}
+          {authMessage && (
+            <div className="auth-message">
+              {authMessage}
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="form-group">
