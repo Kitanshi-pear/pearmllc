@@ -11,7 +11,7 @@ import CampaignsPage from "./components/Campaigns";
 import AdminPanelPage from "./components/AdminPanelPage";
 import ClickLogs from "./components/ClickLogs";
 import ConversionLogs from "./components/ConversionLogs";
-import Logout from "./components/Logout";
+// Remove Logout import since we're handling logout in Layout component
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./components/AuthContext";
 

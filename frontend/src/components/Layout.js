@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../components/AuthContext"; // Add this import
 import {
   AppBar,
   Toolbar,
@@ -48,6 +49,15 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  
+  // Get the logout function from AuthContext
+  const { logout } = useAuth();
+  
+  // Handle logout function
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
   
   // Get current path for active state highlighting
   const currentPath = location.pathname;
@@ -464,12 +474,11 @@ const Layout = ({ children }) => {
         </ListItem>
       </List>
 
-      {/* Logout Button */}
+      {/* Logout Button - Updated to use handleLogout function */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
         <ListItem
           button
-          component={Link}
-          to="/logout"
+          onClick={handleLogout}
           sx={{
             borderRadius: 2,
             backgroundColor: elegantTheme.primary.main,
