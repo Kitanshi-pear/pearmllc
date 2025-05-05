@@ -1,28 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../components/AuthContext";
 
 const ProtectedRoute = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { isAuthenticated, validateToken } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    // Check if token exists in localStorage
-    const token = localStorage.getItem("token");
-    setIsAuthenticated(!!token);
-    setLoading(false);
-  }, []);
+  // Check token validity - this adds an extra layer of security
+  const isValidToken = validateToken();
 
-  if (loading) {
-    // You could return a loading spinner here
-    return <div className="loading-container">Loading...</div>;
+  // If user is not authenticated, redirect to login
+  if (!isAuthenticated || !isValidToken) {
+    // Force removal of any invalid tokens
+    if (!isValidToken) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("userEmail");
+    }
+    
+    // Redirect to login page with the return url and message
+    return (
+      <Navigate 
+        to="/" 
+        state={{ 
+          from: location, 
+          message: "Please login to access this page" 
+        }} 
+        replace 
+      />
+    );
   }
 
-  if (!isAuthenticated) {
-    // Redirect to login page with the return url
-    return <Navigate to="/" state={{ from: location, message: "Please login to access this page" }} replace />;
-  }
-
+  // If user is authenticated, render the protected component
   return children;
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import { useAuth } from "../components/AuthContext";
 import "./login.css";
 
 const Login = () => {
@@ -10,6 +10,7 @@ const Login = () => {
   const [authMessage, setAuthMessage] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const { login, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Check if we have a message from the redirect
@@ -17,43 +18,30 @@ const Login = () => {
       setAuthMessage(location.state.message);
     }
     
-    // Check if user is already logged in
-    const token = localStorage.getItem("token");
-    if (token) {
+    // If user is already authenticated, redirect to dashboard
+    if (isAuthenticated) {
       navigate("/dashboard");
     }
-  }, [location, navigate]);
+  }, [location, navigate, isAuthenticated]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const res = await axios.post(
-        "https://pearmllc.onrender.com/api/auth/login",
-        { email, password },
-        {
-          headers: { "Content-Type": "application/json" },
-          withCredentials: true,
-        }
-      );
+      // Use the login function from AuthContext
+      const result = await login(email, password);
 
-      console.log("Login Response:", res.data);
-
-      if (res.data.token) {
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("role", res.data.role);
-        localStorage.setItem("userEmail", email);
-
+      if (result.success) {
         // Redirect to the page the user was trying to access, or dashboard by default
         const from = location.state?.from?.pathname || "/dashboard";
         navigate(from);
       } else {
-        setAuthMessage(res.data.error || "Login failed!");
+        setAuthMessage(result.error || "Login failed!");
       }
     } catch (err) {
-      console.error("Login error:", err.response ? err.response.data : err.message);
-      setAuthMessage("Login failed! Check your credentials and try again.");
+      console.error("Login error:", err);
+      setAuthMessage("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
