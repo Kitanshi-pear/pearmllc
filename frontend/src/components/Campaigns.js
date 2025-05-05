@@ -342,7 +342,7 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
                   >
                     {Array.isArray(trafficChannels) && trafficChannels.map((channel) => (
                       <MenuItem key={channel.id} value={channel.id}>
-                        {channel.channelName} ({channel.aliasChannel})
+                        {channel.channelName} {channel.aliasChannel ? `(${channel.aliasChannel})` : ''}
                       </MenuItem>
                     ))}
                   </Select>
@@ -661,56 +661,28 @@ export default function CampaignsPage() {
       field: "id", 
       headerName: "ID", 
       width: 70,
-      valueGetter: (params) => {
-        try {
-          return params?.row?.id || "";
-        } catch (e) {
-          console.warn("Error getting ID value:", e);
-          return "";
-        }
-      }
+      valueGetter: (params) => params?.row?.id || ""
     },
     { 
       field: "name", 
       headerName: "Campaign Name", 
       flex: 1,
-      valueGetter: (params) => {
-        try {
-          // Try multiple possible field names for campaign name
-          return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
-                params?.row?.campaignName; 
-        } catch (e) {
-          console.warn("Error getting name value:", e);
-          return ;
-        }
-      }
+      // Do not provide default value so empty cells will just be empty
+      valueGetter: (params) => params?.row?.name || params?.row?.campaign_name || params?.row?.title || params?.row?.campaignName
     },
     {
       field: "status",
       headerName: "Status",
       width: 120,
       renderCell: (params) => {
-        try {
-          const value = params?.value || "INACTIVE";
-          return (
-            <Chip 
-              label={value} 
-              color={value === "ACTIVE" ? "success" : "default"} 
-              size="small"
-            />
-          );
-        } catch (e) {
-          console.warn("Error rendering status cell:", e);
-          return <Chip label="INACTIVE" color="default" size="small" />;
-        }
-      },
-      valueGetter: (params) => {
-        try {
-          return params?.row?.status || "INACTIVE";
-        } catch (e) {
-          console.warn("Error getting status value:", e);
-          return "INACTIVE";
-        }
+        const value = params?.row?.status || "INACTIVE";
+        return (
+          <Chip 
+            label={value} 
+            color={value === "ACTIVE" ? "success" : "default"} 
+            size="small"
+          />
+        );
       }
     },
     {
@@ -718,85 +690,54 @@ export default function CampaignsPage() {
       headerName: "Traffic Source",
       width: 150,
       valueGetter: (params) => {
-        try {
-          // First check if we have a traffic channel name in our normalized data
-          if (params?.row?.traffic_channel_name) {
-            return params.row.traffic_channel_name;
-          }
-          
-          // Check for nested TrafficChannel object
-          if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
-            return params.row.TrafficChannel.channelName;
-          }
-          
-          // Check lowercase variant
-          if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
-            return params.row.trafficChannel.channelName;
-          }
-          
-          // If we have the ID and our traffic channels list, look up the name
-          if (params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null) {
-            const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
-            if (channel) {
-              return channel.channelName || `Source #${params.row.traffic_channel_id}`;
-            }
-            return `Source #${params.row.traffic_channel_id}`;
-          }
-          
-          return `Source #${params.row.traffic_channel_id}`;
-        } catch (e) {
-          console.warn("Error getting traffic channel value:", e);
-          return `Source #${params.row.traffic_channel_id}`;
+        // Try multiple ways to get the channel name without default fallbacks
+        
+        // First check if we have a traffic channel name in our normalized data
+        if (params?.row?.traffic_channel_name) {
+          return params.row.traffic_channel_name;
         }
+        
+        // Check for nested TrafficChannel object (uppercase from Sequelize)
+        if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
+          return params.row.TrafficChannel.channelName;
+        }
+        
+        // Check lowercase variant
+        if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
+          return params.row.trafficChannel.channelName;
+        }
+        
+        // Look up from our local traffic channels list
+        if (params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null) {
+          const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
+          if (channel) {
+            return channel.channelName;
+          }
+        }
+        
+        // Last resort, just return the ID (no default text like "Source #")
+        return params?.row?.traffic_channel_id;
       }
     },
     { 
       field: "costType", 
       headerName: "Cost Type", 
-      width: 100,
-      valueGetter: (params) => {
-        try {
-          return params?.row?.costType;
-        } catch (e) {
-          console.warn("Error getting cost type value:", e);
-          return "";
-        }
-      }
+      width: 100 
     },
     { 
       field: "costValue", 
       headerName: "Cost", 
       width: 80,
-      valueGetter: (params) => {
-        try {
-          return params?.row?.costValue || 0;
-        } catch (e) {
-          console.warn("Error getting cost value:", e);
-          return 0;
-        }
-      },
-      valueFormatter: (params) => {
-        try {
-          return `$${parseFloat(params?.value || 0).toFixed(2)}`;
-        } catch (e) {
-          console.warn("Error formatting cost value:", e);
-          return "$0.00";
-        }
-      }
+      valueFormatter: (params) => `$${parseFloat(params?.value || 0).toFixed(2)}`
     },
     {
       field: "clicks",
       headerName: "Clicks",
       width: 80,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.id) return 0;
-          const campaignMetrics = metrics[params.row.id] || {};
-          return campaignMetrics.clicks || 0;
-        } catch (e) {
-          console.warn("Error getting clicks value:", e);
-          return 0;
-        }
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.clicks || 0;
       }
     },
     {
@@ -804,14 +745,9 @@ export default function CampaignsPage() {
       headerName: "Conversions",
       width: 110,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.id) return 0;
-          const campaignMetrics = metrics[params.row.id] || {};
-          return campaignMetrics.conversions || 0;
-        } catch (e) {
-          console.warn("Error getting conversions value:", e);
-          return 0;
-        }
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.conversions || 0;
       }
     },
     {
@@ -819,100 +755,66 @@ export default function CampaignsPage() {
       headerName: "CR%",
       width: 80,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.id) return "0.00";
-          const campaignMetrics = metrics[params.row.id] || {};
-          const clicks = campaignMetrics.clicks || 0;
-          const conversions = campaignMetrics.conversions || 0;
-          return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
-        } catch (e) {
-          console.warn("Error getting CR value:", e);
-          return "0.00";
-        }
+        if (!params?.row?.id) return "0.00";
+        const campaignMetrics = metrics[params.row.id] || {};
+        const clicks = campaignMetrics.clicks || 0;
+        const conversions = campaignMetrics.conversions || 0;
+        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
       },
-      valueFormatter: (params) => {
-        try {
-          return `${params?.value || "0.00"}%`;
-        } catch (e) {
-          console.warn("Error formatting CR value:", e);
-          return "0.00%";
-        }
-      }
+      valueFormatter: (params) => `${params?.value || "0.00"}%`
     },
     {
       field: "revenue",
       headerName: "Revenue",
       width: 100,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.id) return 0;
-          const campaignMetrics = metrics[params.row.id] || {};
-          return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-        } catch (e) {
-          console.warn("Error getting revenue value:", e);
-          return 0;
-        }
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
       },
-      valueFormatter: (params) => {
-        try {
-          return `$${Number(params?.value || 0).toFixed(2)}`;
-        } catch (e) {
-          console.warn("Error formatting revenue value:", e);
-          return "$0.00";
-        }
-      }
+      valueFormatter: (params) => `$${Number(params?.value || 0).toFixed(2)}`
     },
     {
       field: "profit",
       headerName: "Profit",
       width: 100,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.id) return 0;
-          const campaignMetrics = metrics[params.row.id] || {};
-          // Calculate profit if not directly available
-          if (campaignMetrics.profit !== undefined) {
-            return campaignMetrics.profit;
-          } else {
-            const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-            const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
-            return revenue - cost;
-          }
-        } catch (e) {
-          console.warn("Error getting profit value:", e);
-          return 0;
+        if (!params?.row?.id) return 0;
+        const campaignMetrics = metrics[params.row.id] || {};
+        // Calculate profit if not directly available
+        if (campaignMetrics.profit !== undefined) {
+          return campaignMetrics.profit;
+        } else {
+          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+          return revenue - cost;
         }
       },
-      valueFormatter: (params) => {
-        try {
-          return `$${Number(params?.value || 0).toFixed(2)}`;
-        } catch (e) {
-          console.warn("Error formatting profit value:", e);
-          return "$0.00";
-        }
-      }
+      valueFormatter: (params) => `$${Number(params?.value || 0).toFixed(2)}`
     },
     {
       field: "offer_id",
       headerName: "Offer",
       width: 120,
       valueGetter: (params) => {
-        try {
-          if (!params?.row?.offer_id) return ;
-          // Find offer name from the offers list if available
-          const offerItem = offersList.find(
-            offer => offer.Serial_No === params.row.offer_id
-          );
-          
-          if (offerItem) {
-            return offerItem.Offer_name;
-          } else {
-            return params.row.offer_id ? `Offer #${params.row.offer_id}` : '';
-          }
-        } catch (e) {
-          console.warn("Error getting offer value:", e);
-          return "";
+        if (!params?.row?.offer_id) return "";
+        // Find offer name from the offers list if available
+        const offerItem = offersList.find(
+          offer => offer.Serial_No === params.row.offer_id
+        );
+        
+        if (offerItem) {
+          return offerItem.Offer_name;
+        } else if (params.row.Offer && params.row.Offer.name) {
+          // Try to get from nested Offer object if available
+          return params.row.Offer.name;
+        } else if (params.row.offer && params.row.offer.name) {
+          // Try lowercase variant
+          return params.row.offer.name;
         }
+        
+        // Just return the ID without prefix text if nothing else works
+        return params.row.offer_id;
       }
     },
     {
@@ -920,59 +822,54 @@ export default function CampaignsPage() {
       headerName: "Actions",
       width: 120,
       renderCell: (params) => {
-        try {
-          if (!params?.row?.id) return null;
-          return (
-            <Box display="flex">
-              <IconButton
-                size="small"
-                onClick={() => handleEditClick(params.row)}
-                title="Edit Campaign"
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  try {
-                    // Function to copy tracking URL
-                    const domain = params.row.domain?.url || 
-                                  (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                                  "yourdomain.com";
-                    const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
-                    navigator.clipboard.writeText(trackingUrl);
-                    setSnackbarMessage("Tracking URL copied to clipboard!");
-                    setSnackbarOpen(true);
-                  } catch (err) {
-                    console.error("Error copying tracking URL:", err);
-                    setSnackbarMessage("Error copying URL. See console for details.");
-                    setSnackbarSeverity("error");
-                    setSnackbarOpen(true);
-                  }
-                }}
-                title="Copy Tracking URL"
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  try {
-                    window.open(`/campaigns/${params.row.id}`, '_blank');
-                  } catch (err) {
-                    console.error("Error opening campaign details:", err);
-                  }
-                }}
-                title="View Campaign Details"
-              >
-                <LaunchIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          );
-        } catch (e) {
-          console.warn("Error rendering actions cell:", e);
-          return null;
-        }
+        if (!params?.row?.id) return null;
+        return (
+          <Box display="flex">
+            <IconButton
+              size="small"
+              onClick={() => handleEditClick(params.row)}
+              title="Edit Campaign"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => {
+                try {
+                  // Function to copy tracking URL
+                  const domain = params.row.domain?.url || 
+                              (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                              "";
+                  const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
+                  navigator.clipboard.writeText(trackingUrl);
+                  setSnackbarMessage("Tracking URL copied to clipboard!");
+                  setSnackbarOpen(true);
+                } catch (err) {
+                  console.error("Error copying tracking URL:", err);
+                  setSnackbarMessage("Error copying URL. See console for details.");
+                  setSnackbarSeverity("error");
+                  setSnackbarOpen(true);
+                }
+              }}
+              title="Copy Tracking URL"
+            >
+              <ContentCopyIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => {
+                try {
+                  window.open(`/campaigns/${params.row.id}`, '_blank');
+                } catch (err) {
+                  console.error("Error opening campaign details:", err);
+                }
+              }}
+              title="View Campaign Details"
+            >
+              <LaunchIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        );
       }
     },
   ];
@@ -1010,40 +907,45 @@ export default function CampaignsPage() {
           }
         }
         
+        // Log the raw data for debugging
+        if (campaignsData.length > 0) {
+          console.log("Raw first campaign data:", JSON.stringify(campaignsData[0], null, 2));
+        }
+        
         // Add proper field mapping before setting state
         const campaignsWithIds = campaignsData.map((campaign) => {
           // Log original field names to help debug
           console.log("Original campaign fields:", Object.keys(campaign).join(", "));
           
-          // Standardize campaign fields
-          const normalizedCampaign = {
+          // Check for nested relationships
+          if (campaign.TrafficChannel) {
+            console.log("TrafficChannel data:", campaign.TrafficChannel);
+          }
+          
+          // Return a normalized object with all possible fields preserved
+          return {
             ...campaign,
             // Ensure ID field exists
-            id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+            id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
             
-            // Ensure name field exists - map from possible alternative field names
-            name: campaign.name || campaign.campaign_name || campaign.title || 
-                  campaign.campaignName ,
-                  
-            // Ensure traffic channel info is normalized
+            // Ensure all name variants are preserved
+            name: campaign.name || campaign.campaign_name || campaign.title || campaign.campaignName,
+            
+            // Capture all possible traffic channel data
             traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
-                                 (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
-                                 campaign.traffic_channel_name ||
-                                 (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
-                                 null,
-                                
-            // Ensure status field exists
-            status: campaign.status || "ACTIVE"  // Default to ACTIVE
+                               (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
+                               campaign.traffic_channel_name ||
+                               (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName),
+                              
+            // Status field with default
+            status: campaign.status || "ACTIVE"
           };
-          
-          // Log normalized campaign to verify
-          console.log("Normalized campaign:", normalizedCampaign);
-          
-          return normalizedCampaign;
         });
         
         // Debug logging of first campaign after normalization
-        console.log("First campaign example:", campaignsWithIds.length > 0 ? campaignsWithIds[0] : "No campaigns");
+        if (campaignsWithIds.length > 0) {
+          console.log("Normalized first campaign:", campaignsWithIds[0]);
+        }
         
         setCampaigns(campaignsWithIds);
         
@@ -1057,6 +959,11 @@ export default function CampaignsPage() {
       })
       .catch((err) => {
         console.error("Error fetching campaigns:", err);
+        // Log detailed error information
+        if (err.response) {
+          console.error("Response error data:", err.response.data);
+          console.error("Response status:", err.response.status);  
+        }
         
         // Try alternative endpoints
         tryAlternativeEndpoints();
@@ -1108,18 +1015,16 @@ export default function CampaignsPage() {
       return {
         ...campaign,
         // Ensure ID field exists
-        id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+        id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
         
         // Ensure name field exists - map from possible alternative field names
-        name: campaign.name || campaign.campaign_name || campaign.title || 
-              campaign.campaignName ,
+        name: campaign.name || campaign.campaign_name || campaign.title || campaign.campaignName,
               
         // Ensure traffic channel info is normalized
         traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
                              (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
                              campaign.traffic_channel_name ||
-                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
-                             null,
+                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName),
                             
         // Ensure status field exists
         status: campaign.status || "ACTIVE"
