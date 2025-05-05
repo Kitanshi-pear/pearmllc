@@ -50,7 +50,7 @@ const POSTBACK_MACROS = {
 
 // Generate postback URL format with simplified parameters
 const generatePostbackTemplate = (baseUrl = window.location.origin, sourceType = '') => {
-  const apiPostbackUrl = `${baseUrl}/api/postback/conversion?click_id=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}`;
+  const apiPostbackUrl = `${baseUrl}/api/postback?click_id=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}`;
   return apiPostbackUrl;
 };
 
