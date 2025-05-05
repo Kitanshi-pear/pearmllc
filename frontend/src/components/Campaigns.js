@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Menu, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Select, MenuItem, InputLabel, 
   FormControl, Button, ToggleButton, ToggleButtonGroup, Chip, Box, Typography, Tabs, Tab, Switch, Divider, 
-  Tooltip, Snackbar, Alert, Paper, Grid
+  Tooltip, Snackbar, Alert, Paper, Grid, CircularProgress
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
@@ -143,146 +143,144 @@ const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData
   }, [selectedDomain, trafficChannel, editMode, campaignData]);
 
   // Modified handleSubmit function to correctly save to the API
-  // Fix for the CampaignModal component to handle campaign creation correctly
-
-const handleSubmit = async () => {
-  setSubmitError("");
-  
-  // Validate required fields
-  if (!campaignName || !trafficChannel || !trackingDomain) {
-    setSubmitError("Campaign name, traffic channel, and tracking domain are required");
-    return;
-  }
-
-  // If not direct linking, require a lander
-  if (!isDirectLinking && !lander) {
-    setSubmitError("Please select a landing page or enable direct linking");
-    return;
-  }
-  
-  const campaignPayload = {
-    name: campaignName,
-    traffic_channel_id: trafficChannel,
-    domain_id: trackingDomain,
-    costType,
-    costValue: parseFloat(costValue) || 0,
-    tags,
-    offer_id: offerSelected, // Use the selected offer ID from state
-    offerWeight: parseInt(offerWeight) || 100,
-    autoOptimize,
-    isDirectLinking,
-    lander_id: isDirectLinking ? null : lander,
-    status: "ACTIVE"
-  };
-
-  try {
-    console.log("Submitting campaign with payload:", campaignPayload);
+  const handleSubmit = async () => {
+    setSubmitError("");
     
-    let res;
-    if (editMode) {
-      // For editing a campaign
-      const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
-      console.log("Making PUT request to:", editUrl);
-      res = await axios.put(editUrl, campaignPayload);
-      console.log("Successfully updated campaign:", res.data);
-      onClose(res.data);
-    } else {
-      // For creating a new campaign - use a consistent endpoint
-      console.log("Attempting to create a new campaign");
+    // Validate required fields
+    if (!campaignName || !trafficChannel || !trackingDomain) {
+      setSubmitError("Campaign name, traffic channel, and tracking domain are required");
+      return;
+    }
+
+    // If not direct linking, require a lander
+    if (!isDirectLinking && !lander) {
+      setSubmitError("Please select a landing page or enable direct linking");
+      return;
+    }
+    
+    const campaignPayload = {
+      name: campaignName,
+      traffic_channel_id: trafficChannel,
+      domain_id: trackingDomain,
+      costType,
+      costValue: parseFloat(costValue) || 0,
+      tags,
+      offer_id: offerSelected, // Use the selected offer ID from state
+      offerWeight: parseInt(offerWeight) || 100,
+      autoOptimize,
+      isDirectLinking,
+      lander_id: isDirectLinking ? null : lander,
+      status: "ACTIVE"
+    };
+
+    try {
+      console.log("Submitting campaign with payload:", campaignPayload);
       
-      try {
-        // Try the most likely endpoint first
-        const url = `${API_URL}/api/campaigns`;
-        console.log("Making POST request to:", url);
-        res = await axios.post(url, campaignPayload);
-        console.log("Successfully created campaign:", res.data);
-        onCreate(res.data);
-        onClose();
-      } catch (err) {
-        console.error("Error creating campaign:", err);
+      let res;
+      if (editMode) {
+        // For editing a campaign
+        const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+        console.log("Making PUT request to:", editUrl);
+        res = await axios.put(editUrl, campaignPayload);
+        console.log("Successfully updated campaign:", res.data);
+        onClose(res.data);
+      } else {
+        // For creating a new campaign - use a consistent endpoint
+        console.log("Attempting to create a new campaign");
         
-        // If we have a specific API error message, display it
-        if (err.response && err.response.data && err.response.data.error) {
-          setSubmitError(`API Error: ${err.response.data.error}`);
-        } else {
-          // Try secondary endpoint
-          try {
-            const altUrl = `${API_URL}/api/campaign`;
-            console.log("Trying alternate endpoint:", altUrl);
-            res = await axios.post(altUrl, campaignPayload);
-            console.log("Successfully created campaign with alternate endpoint:", res.data);
-            onCreate(res.data);
-            onClose();
-          } catch (altErr) {
-            console.error("Error with second attempt:", altErr);
-            
-            // Try the campaign controller endpoint as a last resort
+        try {
+          // Try the most likely endpoint first
+          const url = `${API_URL}/api/campaigns`;
+          console.log("Making POST request to:", url);
+          res = await axios.post(url, campaignPayload);
+          console.log("Successfully created campaign:", res.data);
+          onCreate(res.data);
+          onClose();
+        } catch (err) {
+          console.error("Error creating campaign:", err);
+          
+          // If we have a specific API error message, display it
+          if (err.response && err.response.data && err.response.data.error) {
+            setSubmitError(`API Error: ${err.response.data.error}`);
+          } else {
+            // Try secondary endpoint
             try {
-              const finalUrl = `${API_URL}/api/campaigns/create`;
-              console.log("Trying final endpoint:", finalUrl);
-              res = await axios.post(finalUrl, campaignPayload);
-              console.log("Successfully created campaign with final endpoint:", res.data);
+              const altUrl = `${API_URL}/api/campaign`;
+              console.log("Trying alternate endpoint:", altUrl);
+              res = await axios.post(altUrl, campaignPayload);
+              console.log("Successfully created campaign with alternate endpoint:", res.data);
               onCreate(res.data);
               onClose();
-            } catch (finalErr) {
-              console.error("All creation attempts failed:", finalErr);
+            } catch (altErr) {
+              console.error("Error with second attempt:", altErr);
               
-              // Provide clear error feedback
-              if (finalErr.response) {
-                setSubmitError(`API Error (${finalErr.response.status}): ${finalErr.response.data?.error || 
-                  finalErr.response.data?.message || "Campaign creation failed"}`);
-              } else {
-                setSubmitError("Network error: Could not connect to the API server");
+              // Try the campaign controller endpoint as a last resort
+              try {
+                const finalUrl = `${API_URL}/api/campaigns/create`;
+                console.log("Trying final endpoint:", finalUrl);
+                res = await axios.post(finalUrl, campaignPayload);
+                console.log("Successfully created campaign with final endpoint:", res.data);
+                onCreate(res.data);
+                onClose();
+              } catch (finalErr) {
+                console.error("All creation attempts failed:", finalErr);
+                
+                // Provide clear error feedback
+                if (finalErr.response) {
+                  setSubmitError(`API Error (${finalErr.response.status}): ${finalErr.response.data?.error || 
+                    finalErr.response.data?.message || "Campaign creation failed"}`);
+                } else {
+                  setSubmitError("Network error: Could not connect to the API server");
+                }
               }
             }
           }
         }
       }
-    }
 
-    // Reset form after successful submission if not in edit mode
-    if (!editMode && res) {
-      setCampaignName("");
-      setTrafficChannel("");
-      setTrackingDomain("");
-      setCostType("CPC");
-      setCostValue("0");
-      setTags([]);
-      setTagInput("");
-      setOffer("");
-      setOfferWeight("100");
-      setAutoOptimize(false);
-      setIsDirectLinking(false);
-      setLander("");
-      setOfferSelected("");
-    }
-  } catch (error) {
-    console.error("Error in submit handling:", error);
-    
-    // Enhanced error logging
-    if (error.response) {
-      console.error("Response data:", error.response.data);
-      console.error("Response status:", error.response.status);
-      
-      // Provide more helpful error messages based on status codes
-      if (error.response.status === 400) {
-        setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
-      } else if (error.response.status === 401 || error.response.status === 403) {
-        setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
-      } else if (error.response.status === 404) {
-        setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
-      } else {
-        setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+      // Reset form after successful submission if not in edit mode
+      if (!editMode && res) {
+        setCampaignName("");
+        setTrafficChannel("");
+        setTrackingDomain("");
+        setCostType("CPC");
+        setCostValue("0");
+        setTags([]);
+        setTagInput("");
+        setOffer("");
+        setOfferWeight("100");
+        setAutoOptimize(false);
+        setIsDirectLinking(false);
+        setLander("");
+        setOfferSelected("");
       }
-    } else if (error.request) {
-      console.error("Request made but no response received:", error.request);
-      setSubmitError("No response received from server. Please check your network connection.");
-    } else {
-      console.error("Error setting up request:", error.message);
-      setSubmitError(`Request error: ${error.message}`);
+    } catch (error) {
+      console.error("Error in submit handling:", error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        
+        // Provide more helpful error messages based on status codes
+        if (error.response.status === 400) {
+          setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
+        } else if (error.response.status === 401 || error.response.status === 403) {
+          setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
+        } else if (error.response.status === 404) {
+          setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
+        } else {
+          setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+        }
+      } else if (error.request) {
+        console.error("Request made but no response received:", error.request);
+        setSubmitError("No response received from server. Please check your network connection.");
+      } else {
+        console.error("Error setting up request:", error.message);
+        setSubmitError(`Request error: ${error.message}`);
+      }
     }
-  }
-};
+  };
 
 
   const handleAddTag = () => {
@@ -600,8 +598,9 @@ export default function CampaignsPage() {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [domains, setDomains] = useState([]);
   const [offersList, setOffersList] = useState([]); // Added offersList state
+  const [trafficChannels, setTrafficChannels] = useState([]); // Added to store traffic channels for lookup
 
-  // Fetch offers when component mounts
+  // Fetch offers and traffic channels when component mounts
   useEffect(() => {
     // Fetch offers
     fetch(`${API_URL}/api/offers`)
@@ -638,314 +637,347 @@ export default function CampaignsPage() {
         console.error('Error fetching domains:', err);
         setDomains([]);
       });
+      
+    // Fetch traffic channels for name lookup
+    fetch(`${API_URL}/api/traffic`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTrafficChannels(data);
+        } else {
+          console.error("Traffic channels data is not an array:", data);
+          setTrafficChannels([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching traffic channels:", err);
+        setTrafficChannels([]);
+      });
   }, []);
 
   // Enhanced columns with proper data mapping
- // Replace your entire columns definition with this updated version:
-
-// Replace your entire columns definition with this ultra-robust version:
-
-const columns = [
-  { 
-    field: "id", 
-    headerName: "ID", 
-    width: 70,
-    valueGetter: (params) => {
-      try {
-        return params?.row?.id || "";
-      } catch (e) {
-        console.warn("Error getting ID value:", e);
-        return "";
-      }
-    }
-  },
-  { 
-    field: "name", // Changed from "title" to match your data structure
-    headerName: "Campaign Name", 
-    flex: 1,
-    valueGetter: (params) => {
-      try {
-        // Try multiple possible field names for campaign name
-        return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
-               params?.row?.campaignName; 
-      } catch (e) {
-        console.warn("Error getting name value:", e);
-        return "Unnamed Campaign";
-      }
-    }
-  },
-  {
-    field: "status",
-    headerName: "Status",
-    width: 120,
-    renderCell: (params) => {
-      try {
-        const value = params?.value || "INACTIVE";
-        return (
-          <Chip 
-            label={value} 
-            color={value === "ACTIVE" ? "success" : "default"} 
-            size="small"
-          />
-        );
-      } catch (e) {
-        console.warn("Error rendering status cell:", e);
-        return <Chip label="INACTIVE" color="default" size="small" />;
-      }
-    },
-    valueGetter: (params) => {
-      try {
-        return params?.row?.status || "INACTIVE";
-      } catch (e) {
-        console.warn("Error getting status value:", e);
-        return "INACTIVE";
-      }
-    }
-  },
-  {
-    field: "traffic_channel_id",
-    headerName: "Traffic Source",
-    width: 150,
-    valueGetter: (params) => {
-      try {
-        // Your traffic_channel_id is a simple ID number, so format it consistently
-        return params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null
-          ? `Source #${params.row.traffic_channel_id}`
-          : "N/A";
-      } catch (e) {
-        console.warn("Error getting traffic channel value:", e);
-        return "N/A";
-      }
-    }
-  },
-  { 
-    field: "costType", 
-    headerName: "Cost Type", 
-    width: 100,
-    valueGetter: (params) => {
-      try {
-        return params?.row?.costType || "N/A";
-      } catch (e) {
-        console.warn("Error getting cost type value:", e);
-        return "N/A";
-      }
-    }
-  },
-  { 
-    field: "costValue", 
-    headerName: "Cost", 
-    width: 80,
-    valueGetter: (params) => {
-      try {
-        return params?.row?.costValue || 0;
-      } catch (e) {
-        console.warn("Error getting cost value:", e);
-        return 0;
-      }
-    },
-    valueFormatter: (params) => {
-      try {
-        return `$${parseFloat(params?.value || 0).toFixed(2)}`;
-      } catch (e) {
-        console.warn("Error formatting cost value:", e);
-        return "$0.00";
-      }
-    }
-  },
-  {
-    field: "clicks",
-    headerName: "Clicks",
-    width: 80,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.id) return 0;
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.clicks || 0;
-      } catch (e) {
-        console.warn("Error getting clicks value:", e);
-        return 0;
-      }
-    }
-  },
-  {
-    field: "conversions",
-    headerName: "Conversions",
-    width: 110,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.id) return 0;
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.conversions || 0;
-      } catch (e) {
-        console.warn("Error getting conversions value:", e);
-        return 0;
-      }
-    }
-  },
-  {
-    field: "cr",
-    headerName: "CR%",
-    width: 80,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.id) return "0.00";
-        const campaignMetrics = metrics[params.row.id] || {};
-        const clicks = campaignMetrics.clicks || 0;
-        const conversions = campaignMetrics.conversions || 0;
-        return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
-      } catch (e) {
-        console.warn("Error getting CR value:", e);
-        return "0.00";
-      }
-    },
-    valueFormatter: (params) => {
-      try {
-        return `${params?.value || "0.00"}%`;
-      } catch (e) {
-        console.warn("Error formatting CR value:", e);
-        return "0.00%";
-      }
-    }
-  },
-  {
-    field: "revenue",
-    headerName: "Revenue",
-    width: 100,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.id) return 0;
-        const campaignMetrics = metrics[params.row.id] || {};
-        return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-      } catch (e) {
-        console.warn("Error getting revenue value:", e);
-        return 0;
-      }
-    },
-    valueFormatter: (params) => {
-      try {
-        return `$${Number(params?.value || 0).toFixed(2)}`;
-      } catch (e) {
-        console.warn("Error formatting revenue value:", e);
-        return "$0.00";
-      }
-    }
-  },
-  {
-    field: "profit",
-    headerName: "Profit",
-    width: 100,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.id) return 0;
-        const campaignMetrics = metrics[params.row.id] || {};
-        // Calculate profit if not directly available
-        if (campaignMetrics.profit !== undefined) {
-          return campaignMetrics.profit;
-        } else {
-          const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
-          const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
-          return revenue - cost;
+  const columns = [
+    { 
+      field: "id", 
+      headerName: "ID", 
+      width: 70,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.id || "";
+        } catch (e) {
+          console.warn("Error getting ID value:", e);
+          return "";
         }
-      } catch (e) {
-        console.warn("Error getting profit value:", e);
-        return 0;
       }
     },
-    valueFormatter: (params) => {
-      try {
-        return `$${Number(params?.value || 0).toFixed(2)}`;
-      } catch (e) {
-        console.warn("Error formatting profit value:", e);
-        return "$0.00";
-      }
-    }
-  },
-  {
-    field: "offer_id",
-    headerName: "Offer",
-    width: 120,
-    valueGetter: (params) => {
-      try {
-        if (!params?.row?.offer_id) return "N/A";
-        // Find offer name from the offers list if available
-        const offerItem = offersList.find(
-          offer => offer.Serial_No === params.row.offer_id
-        );
-        
-        if (offerItem) {
-          return offerItem.Offer_name;
-        } else {
-          return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+    { 
+      field: "name", 
+      headerName: "Campaign Name", 
+      flex: 1,
+      valueGetter: (params) => {
+        try {
+          // Try multiple possible field names for campaign name
+          return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
+                params?.row?.campaignName || "Unnamed Campaign"; 
+        } catch (e) {
+          console.warn("Error getting name value:", e);
+          return "Unnamed Campaign";
         }
-      } catch (e) {
-        console.warn("Error getting offer value:", e);
-        return "N/A";
       }
-    }
-  },
-  {
-    field: "actions",
-    headerName: "Actions",
-    width: 120,
-    renderCell: (params) => {
-      try {
-        if (!params?.row?.id) return null;
-        return (
-          <Box display="flex">
-            <IconButton
+    },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 120,
+      renderCell: (params) => {
+        try {
+          const value = params?.value || "INACTIVE";
+          return (
+            <Chip 
+              label={value} 
+              color={value === "ACTIVE" ? "success" : "default"} 
               size="small"
-              onClick={() => handleEditClick(params.row)}
-              title="Edit Campaign"
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => {
-                try {
-                  // Function to copy tracking URL
-                  const domain = params.row.domain?.url || 
-                                (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                                "yourdomain.com";
-                  const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
-                  navigator.clipboard.writeText(trackingUrl);
-                  setSnackbarMessage("Tracking URL copied to clipboard!");
-                  setSnackbarOpen(true);
-                } catch (err) {
-                  console.error("Error copying tracking URL:", err);
-                  setSnackbarMessage("Error copying URL. See console for details.");
-                  setSnackbarSeverity("error");
-                  setSnackbarOpen(true);
-                }
-              }}
-              title="Copy Tracking URL"
-            >
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => {
-                try {
-                  window.open(`/campaigns/${params.row.id}`, '_blank');
-                } catch (err) {
-                  console.error("Error opening campaign details:", err);
-                }
-              }}
-              title="View Campaign Details"
-            >
-              <LaunchIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        );
-      } catch (e) {
-        console.warn("Error rendering actions cell:", e);
-        return null;
+            />
+          );
+        } catch (e) {
+          console.warn("Error rendering status cell:", e);
+          return <Chip label="INACTIVE" color="default" size="small" />;
+        }
+      },
+      valueGetter: (params) => {
+        try {
+          return params?.row?.status || "INACTIVE";
+        } catch (e) {
+          console.warn("Error getting status value:", e);
+          return "INACTIVE";
+        }
       }
-    }
-  },
-];
+    },
+    {
+      field: "traffic_channel_id",
+      headerName: "Traffic Source",
+      width: 150,
+      valueGetter: (params) => {
+        try {
+          // First check if we have a traffic channel name in our normalized data
+          if (params?.row?.traffic_channel_name) {
+            return params.row.traffic_channel_name;
+          }
+          
+          // Check for nested TrafficChannel object
+          if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
+            return params.row.TrafficChannel.channelName;
+          }
+          
+          // Check lowercase variant
+          if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
+            return params.row.trafficChannel.channelName;
+          }
+          
+          // If we have the ID and our traffic channels list, look up the name
+          if (params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null) {
+            const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
+            if (channel) {
+              return channel.channelName || `Source #${params.row.traffic_channel_id}`;
+            }
+            return `Source #${params.row.traffic_channel_id}`;
+          }
+          
+          return "N/A";
+        } catch (e) {
+          console.warn("Error getting traffic channel value:", e);
+          return "N/A";
+        }
+      }
+    },
+    { 
+      field: "costType", 
+      headerName: "Cost Type", 
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.costType || "N/A";
+        } catch (e) {
+          console.warn("Error getting cost type value:", e);
+          return "N/A";
+        }
+      }
+    },
+    { 
+      field: "costValue", 
+      headerName: "Cost", 
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.costValue || 0;
+        } catch (e) {
+          console.warn("Error getting cost value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${parseFloat(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting cost value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "clicks",
+      headerName: "Clicks",
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.clicks || 0;
+        } catch (e) {
+          console.warn("Error getting clicks value:", e);
+          return 0;
+        }
+      }
+    },
+    {
+      field: "conversions",
+      headerName: "Conversions",
+      width: 110,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.conversions || 0;
+        } catch (e) {
+          console.warn("Error getting conversions value:", e);
+          return 0;
+        }
+      }
+    },
+    {
+      field: "cr",
+      headerName: "CR%",
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return "0.00";
+          const campaignMetrics = metrics[params.row.id] || {};
+          const clicks = campaignMetrics.clicks || 0;
+          const conversions = campaignMetrics.conversions || 0;
+          return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+        } catch (e) {
+          console.warn("Error getting CR value:", e);
+          return "0.00";
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `${params?.value || "0.00"}%`;
+        } catch (e) {
+          console.warn("Error formatting CR value:", e);
+          return "0.00%";
+        }
+      }
+    },
+    {
+      field: "revenue",
+      headerName: "Revenue",
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+        } catch (e) {
+          console.warn("Error getting revenue value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${Number(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting revenue value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "profit",
+      headerName: "Profit",
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          // Calculate profit if not directly available
+          if (campaignMetrics.profit !== undefined) {
+            return campaignMetrics.profit;
+          } else {
+            const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+            const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+            return revenue - cost;
+          }
+        } catch (e) {
+          console.warn("Error getting profit value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${Number(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting profit value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "offer_id",
+      headerName: "Offer",
+      width: 120,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.offer_id) return "N/A";
+          // Find offer name from the offers list if available
+          const offerItem = offersList.find(
+            offer => offer.Serial_No === params.row.offer_id
+          );
+          
+          if (offerItem) {
+            return offerItem.Offer_name;
+          } else {
+            return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+          }
+        } catch (e) {
+          console.warn("Error getting offer value:", e);
+          return "N/A";
+        }
+      }
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      renderCell: (params) => {
+        try {
+          if (!params?.row?.id) return null;
+          return (
+            <Box display="flex">
+              <IconButton
+                size="small"
+                onClick={() => handleEditClick(params.row)}
+                title="Edit Campaign"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  try {
+                    // Function to copy tracking URL
+                    const domain = params.row.domain?.url || 
+                                  (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                                  "yourdomain.com";
+                    const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
+                    navigator.clipboard.writeText(trackingUrl);
+                    setSnackbarMessage("Tracking URL copied to clipboard!");
+                    setSnackbarOpen(true);
+                  } catch (err) {
+                    console.error("Error copying tracking URL:", err);
+                    setSnackbarMessage("Error copying URL. See console for details.");
+                    setSnackbarSeverity("error");
+                    setSnackbarOpen(true);
+                  }
+                }}
+                title="Copy Tracking URL"
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  try {
+                    window.open(`/campaigns/${params.row.id}`, '_blank');
+                  } catch (err) {
+                    console.error("Error opening campaign details:", err);
+                  }
+                }}
+                title="View Campaign Details"
+              >
+                <LaunchIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          );
+        } catch (e) {
+          console.warn("Error rendering actions cell:", e);
+          return null;
+        }
+      }
+    },
+  ];
 
-  // Improved campaign fetching with better endpoint targeting
+  // Improved campaign fetching with better endpoint targeting and data normalization
   const fetchCampaigns = () => {
     setLoading(true);
     
@@ -994,13 +1026,14 @@ const columns = [
                   campaign.campaignName || "Unnamed Campaign",
                   
             // Ensure traffic channel info is normalized
-            traffic_channel_name: campaign.traffic_channel_name || 
-                                (campaign.traffic_channel && campaign.traffic_channel.channelName) ||
-                                (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
-                                null,
+            traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
+                                 (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
+                                 campaign.traffic_channel_name ||
+                                 (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                                 null,
                                 
             // Ensure status field exists
-            status: campaign.status || "INACTIVE"
+            status: campaign.status || "ACTIVE"  // Default to ACTIVE
           };
           
           // Log normalized campaign to verify
@@ -1082,13 +1115,14 @@ const columns = [
               campaign.campaignName || "Unnamed Campaign",
               
         // Ensure traffic channel info is normalized
-        traffic_channel_name: campaign.traffic_channel_name || 
-                            (campaign.traffic_channel && campaign.traffic_channel.channelName) ||
-                            (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
-                            null,
+        traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
+                             (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
+                             campaign.traffic_channel_name ||
+                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                             null,
                             
         // Ensure status field exists
-        status: campaign.status || "INACTIVE"
+        status: campaign.status || "ACTIVE"
       };
     });
     
@@ -1104,95 +1138,94 @@ const columns = [
   };
   
   // Improved metrics fetching function
-  // Improved metrics fetching function for the CampaignsPage component
-const fetchMetrics = (campaignIds) => {
-  // Format date range for API
-  const startDate = format(dateRange[0], 'yyyy-MM-dd');
-  const endDate = format(dateRange[1], 'yyyy-MM-dd');
-  
-  console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
-  
-  // Create metrics object to store by campaign ID
-  const metricsData = {};
-  let completedRequests = 0;
-  
-  // Set default metrics values - prevents undefined errors in UI calculations
-  campaignIds.forEach(id => {
-    metricsData[id] = {
-      clicks: 0,
-      conversions: 0,
-      lpviews: 0,
-      lpclicks: 0,
-      impressions: 0,
-      total_revenue: 0,
-      total_cost: 0,
-      profit: 0,
-      ctr: 0,
-      cr: 0
-    };
-  });
-  
-  // If no campaign IDs, just finish early
-  if (campaignIds.length === 0) {
-    setMetrics(metricsData);
-    setLoading(false);
-    return;
-  }
-  
-  // Set loading state
-  setLoading(true);
-  
-  // Fetch metrics for each campaign
-  campaignIds.forEach(id => {
-    // Use campaign_id parameter as expected by the backend
-    const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
-    console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
+  const fetchMetrics = (campaignIds) => {
+    // Format date range for API
+    const startDate = format(dateRange[0], 'yyyy-MM-dd');
+    const endDate = format(dateRange[1], 'yyyy-MM-dd');
     
-    axios.get(metricsUrl)
-      .then(res => {
-        console.log(`Metrics data for campaign ${id}:`, res.data);
-        
-        // Check if res.data is an array before reducing
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          // Sum up metrics if multiple records are returned
-          const campaignMetrics = res.data.reduce((acc, curr) => {
-            Object.keys(curr).forEach(key => {
-              if (typeof curr[key] === 'number') {
-                acc[key] = (acc[key] || 0) + curr[key];
-              }
-            });
-            return acc;
-          }, {});
+    console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
+    
+    // Create metrics object to store by campaign ID
+    const metricsData = {};
+    let completedRequests = 0;
+    
+    // Set default metrics values - prevents undefined errors in UI calculations
+    campaignIds.forEach(id => {
+      metricsData[id] = {
+        clicks: 0,
+        conversions: 0,
+        lpviews: 0,
+        lpclicks: 0,
+        impressions: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        profit: 0,
+        ctr: 0,
+        cr: 0
+      };
+    });
+    
+    // If no campaign IDs, just finish early
+    if (campaignIds.length === 0) {
+      setMetrics(metricsData);
+      setLoading(false);
+      return;
+    }
+    
+    // Set loading state
+    setLoading(true);
+    
+    // Fetch metrics for each campaign
+    campaignIds.forEach(id => {
+      // Use campaign_id parameter as expected by the backend
+      const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
+      console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
+      
+      axios.get(metricsUrl)
+        .then(res => {
+          console.log(`Metrics data for campaign ${id}:`, res.data);
           
-          metricsData[id] = campaignMetrics;
-        } else if (typeof res.data === 'object') {
-          // If it's a single object, use it directly
-          metricsData[id] = res.data;
-        }
-      })
-      .catch(err => {
-        console.error(`Error fetching metrics for campaign ${id}:`, err);
-        
-        // Instead of showing the error, provide a more helpful message and 
-        // use default values (already set above)
-        console.log(`Using default metrics values for campaign ${id}`);
-        
-        // Optionally show a UI notification for persistent errors
-        if (err.response && err.response.status === 500) {
-          // You could set a state to show a notification or toast
-          // setErrorNotification(`There was a problem loading metrics for some campaigns. Default values are being shown.`);
-        }
-      })
-      .finally(() => {
-        completedRequests++;
-        if (completedRequests === campaignIds.length) {
-          console.log("All metrics fetching completed:", metricsData);
-          setMetrics(metricsData);
-          setLoading(false);
-        }
-      });
-  });
-};
+          // Check if res.data is an array before reducing
+          if (Array.isArray(res.data) && res.data.length > 0) {
+            // Sum up metrics if multiple records are returned
+            const campaignMetrics = res.data.reduce((acc, curr) => {
+              Object.keys(curr).forEach(key => {
+                if (typeof curr[key] === 'number') {
+                  acc[key] = (acc[key] || 0) + curr[key];
+                }
+              });
+              return acc;
+            }, {});
+            
+            metricsData[id] = campaignMetrics;
+          } else if (typeof res.data === 'object') {
+            // If it's a single object, use it directly
+            metricsData[id] = res.data;
+          }
+        })
+        .catch(err => {
+          console.error(`Error fetching metrics for campaign ${id}:`, err);
+          
+          // Instead of showing the error, provide a more helpful message and 
+          // use default values (already set above)
+          console.log(`Using default metrics values for campaign ${id}`);
+          
+          // Optionally show a UI notification for persistent errors
+          if (err.response && err.response.status === 500) {
+            // You could set a state to show a notification or toast
+            // setErrorNotification(`There was a problem loading metrics for some campaigns. Default values are being shown.`);
+          }
+        })
+        .finally(() => {
+          completedRequests++;
+          if (completedRequests === campaignIds.length) {
+            console.log("All metrics fetching completed:", metricsData);
+            setMetrics(metricsData);
+            setLoading(false);
+          }
+        });
+    });
+  };
 
   useEffect(() => {
     fetchCampaigns();
@@ -1285,19 +1318,28 @@ const fetchMetrics = (campaignIds) => {
       </Box>
 
       <Paper elevation={2}>
-        <DataGrid
-          rows={campaigns}
-          columns={columns}
-          pageSize={10}
-          loading={loading}
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          checkboxSelection
-          onSelectionModelChange={(ids) => setSelectedRows(ids)}
-          disableSelectionOnClick
-          autoHeight
-          sx={{ minHeight: 400 }}
-          getRowId={(row) => row.id}
-        />
+        {loading ? (
+          <Box display="flex" justifyContent="center" p={4}>
+            <CircularProgress />
+          </Box>
+        ) : campaigns.length === 0 ? (
+          <Box p={4} textAlign="center">
+            <Typography>No campaigns found. Create your first campaign!</Typography>
+          </Box>
+        ) : (
+          <DataGrid
+            rows={campaigns}
+            columns={columns}
+            pageSize={10}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            checkboxSelection
+            onSelectionModelChange={(ids) => setSelectedRows(ids)}
+            disableSelectionOnClick
+            autoHeight
+            sx={{ minHeight: 400 }}
+            getRowId={(row) => row.id}
+          />
+        )}
       </Paper>
 
       {/* Create Campaign Modal */}
