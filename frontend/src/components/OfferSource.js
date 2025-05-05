@@ -1,1766 +1,1375 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
 import {
-  Box,
-  Typography,
-  Modal,
-  Button,
-  Card,
-  CardContent,
-  Grid,
-  TextField,
-  Select,
-  MenuItem,
-  IconButton,
-  Divider,
-  Tooltip,
-  Tab,
-  Tabs,
-  Paper,
-  FormControl,
-  FormControlLabel,
-  Switch,
-  InputLabel,
-  CircularProgress,
-  Snackbar,
-  Alert,
+  Menu, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Select, MenuItem, InputLabel, 
+  FormControl, Button, ToggleButton, ToggleButtonGroup, Chip, Box, Typography, Tabs, Tab, Switch, Divider, 
+  Tooltip, Snackbar, Alert, Paper, Grid, CircularProgress
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
+import AddIcon from "@mui/icons-material/Add";
+import EastIcon from "@mui/icons-material/East";
+import WestIcon from "@mui/icons-material/West";
+import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import LaunchIcon from "@mui/icons-material/Launch";
+import axios from "axios";
 import Layout from "./Layout";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faCalendarAlt,
-  faChevronLeft,
-  faChevronRight,
-  faExchangeAlt,
-  faCaretDown,
-} from "@fortawesome/free-solid-svg-icons";
+import { startOfToday, subDays, startOfMonth, endOfMonth, format } from "date-fns";
 
-// Postback Macros
-const POSTBACK_MACROS = {
-  CLICKID: '{click_id}',
-  PAYOUT: '{payout}',
-  REVENUE: '{revenue}',
-  CONVERSION_ID: '{conversion_id}',
-  OFFER_ID: '{offer_id}',
-  OFFER_NAME: '{offer_name}',
-  CAMPAIGN_ID: '{campaign_id}',
-  CAMPAIGN_NAME: '{campaign_name}',
-  SOURCE: '{source}',
-  IP: '{ip}',
-  COUNTRY: '{country}',
-  DEVICE: '{device}',
-  BROWSER: '{browser}',
-  OS: '{os}',
-  DATE: '{date}',
-  TIME: '{time}',
-  AFFILIATE_ID: '{affiliate_id}',
-  STATUS: '{status}',
-  EVENT_NAME: '{event_name}',
-  GCLID: '{gclid}',
-  SUB1: '{sub1}',
-  SUB2: '{sub2}',
-  SUB3: '{sub3}',
-  SUB4: '{sub4}',
-  SUB5: '{sub5}',
-  CUSTOM1: '{custom1}',
-  CUSTOM2: '{custom2}',
-  CUSTOM3: '{custom3}',
-};
+// Ensure API_URL is correctly set - adjust this according to your backend configuration
+// If the server might be running locally during development or on a different URL in production
+const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
 
-// Generate postback URL format based on traffic source
-const generatePostbackTemplate = (baseUrl = window.location.origin, sourceType = '') => {
-  const apiPostbackUrl = `${baseUrl}/api/postback/conversion?click_id=${POSTBACK_MACROS.CLICKID}`;
-  
-  if (sourceType.toLowerCase() === 'facebook') {
-    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}&sub2=${POSTBACK_MACROS.SUB2}`;
-  } else if (sourceType.toLowerCase() === 'google') {
-    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.GCLID}`;
-  } else if (sourceType.toLowerCase() === 'tiktok') {
-    return `${apiPostbackUrl}&event_name=${POSTBACK_MACROS.EVENT_NAME}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub1=${POSTBACK_MACROS.SUB1}`;
-  } else if (sourceType.toLowerCase() === 'taboola') {
-    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub_id=${POSTBACK_MACROS.SUB1}`;
-  } else if (sourceType.toLowerCase() === 'outbrain') {
-    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&offer_id=${POSTBACK_MACROS.OFFER_ID}&sub_id=${POSTBACK_MACROS.SUB1}`;
-  } else {
-    return `${apiPostbackUrl}&payout=${POSTBACK_MACROS.PAYOUT}&revenue=${POSTBACK_MACROS.REVENUE}&offer_id=${POSTBACK_MACROS.OFFER_ID}&status=1`;
-  }
-};
+// For debugging purposes - log what API URL is being used
+console.log("Using API URL:", API_URL);
 
-// Parse a postback URL template and replace macros with test values
-const parsePostbackUrl = (template, data) => {
-  if (!template) return '';
-  
-  let url = template;
-  
-  // Replace all macros with test values
-  Object.entries(POSTBACK_MACROS).forEach(([key, macro]) => {
-    const valueKey = key.toLowerCase();
-    const value = data[valueKey] || '';
-    url = url.replace(new RegExp(macro.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), encodeURIComponent(value));
-  });
-  
-  return url;
-};
+const CampaignModal = ({ open, onClose, onCreate, editMode = false, campaignData = {} }) => {
+  const [tabIndex, setTabIndex] = useState(0);
+  const [campaignName, setCampaignName] = useState(editMode ? campaignData.name || "" : "");
+  const [trafficChannel, setTrafficChannel] = useState(editMode ? campaignData.traffic_channel_id || "" : "");
+  const [trackingDomain, setTrackingDomain] = useState(editMode ? campaignData.domain_id || "" : "");
+  const [costType, setCostType] = useState(editMode ? campaignData.costType || "CPC" : "CPC");
+  const [costValue, setCostValue] = useState(editMode ? campaignData.costValue || "0" : "0");
+  const [tags, setTags] = useState(editMode ? campaignData.tags || [] : []);
+  const [tagInput, setTagInput] = useState("");
+  const [offer, setOffer] = useState(editMode ? campaignData.offer || "" : "");
+  const [offerWeight, setOfferWeight] = useState(editMode ? campaignData.offerWeight || "100" : "100");
+  const [autoOptimize, setAutoOptimize] = useState(editMode ? campaignData.autoOptimize || false : false);
+  const [trafficChannels, setTrafficChannels] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [isDirectLinking, setIsDirectLinking] = useState(editMode ? campaignData.isDirectLinking || false : false);
+  const [lander, setLander] = useState(editMode ? campaignData.lander_id || "" : "");
+  const [landers, setLanders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [offersList, setOffersList] = useState([]);
+  const [offerSelected, setOfferSelected] = useState(editMode ? campaignData.offer_id || "" : "");
 
-const OfferSourcePage = () => {
-  const [openTemplateModal, setOpenTemplateModal] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [selectedRowId, setSelectedRowId] = useState(null);
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [filterText, setFilterText] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [titleText, setTitle] = useState("");
-  const [tabValue, setTabValue] = useState(0);
-  const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
-  const [selectedSource, setSelectedSource] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
-  
-  // Postback testing state
-  const [testPostbackData, setTestPostbackData] = useState({
-    click_id: 'test_' + Math.random().toString(36).substring(2, 10),
-    payout: '10.00',
-    revenue: '10.00',
-    conversion_id: 'conv_' + Date.now(),
-    offer_id: '12345',
-    offer_name: 'Test Offer',
-    campaign_id: 'camp_1',
-    campaign_name: 'Test Campaign',
-    ip: '192.168.0.1',
-    country: 'US',
-    device: 'desktop',
-    browser: 'Chrome',
-    os: 'Windows',
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toISOString().split('T')[1].split('.')[0],
-    event_name: 'purchase',
-    gclid: 'gclid_123456',
-    sub1: 'custom_value_1',
-    sub2: 'user@example.com', // email for Facebook
-    sub3: '15555555555', // phone for Facebook
-    sub4: 'order_'+Date.now(),
-    sub5: 'additional_data',
-    status: '1'
-  });
-  const [processedUrl, setProcessedUrl] = useState('');
-  const [testResult, setTestResult] = useState(null);
-  const [isTesting, setIsTesting] = useState(false);
-
-  const currencies = ["USD", "EUR", "INR", "GBP", "CAD", "AUD", "JPY", "CNY"];
-  const roles = [
-    "Event ID",
-    "First Name",
-    "Last Name",
-    "Phone",
-    "Gender",
-    "Email",
-    "Zip Code",
-    "Birthday",
-    "Content IDs",
-    "Contents",
-    "Product Name",
-    "Content Category",
-    "Consent User data",
-    "Consent Personalization",
-    "None",
-  ];
-  
-  const source_types = [
-    "Facebook",
-    "Google",
-    "TikTok",
-    "Taboola",
-    "Outbrain",
-    "Snapchat",
-    "Pinterest",
-    "Twitter",
-    "LinkedIn",
-    "Reddit",
-    "Other"
-  ];
-
-  const [newTemplate, setNewTemplate] = useState({
-    name: "",
-    alias: "",
-    postbackUrl: "",
-    sourceType: "",
-    currency: "USD",
-    offerUrl: "",
-    clickid: "",
-    sum: "",
-    parameter: "",
-    token: "",
-    description: "",
-    role: "",
-    // API connection parameters
-    pixel_id: "",    // Facebook pixel ID
-    api_key: "",     // Facebook API token
-    google_ads_id: "", // Google Ads account ID
-    conversion_id: "", // Google conversion ID
-    conversion_label: "", // Google conversion label
-    default_event_name: "purchase", // Default event name
-    is_active: true,  // Active status
-    // Conversion API settings
-    forward_to_facebook: false,
-    forward_to_google: false
-  });
-
-  const handleDateChange = (e) => {
-    setDate(e.target.value);
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  const fetchOfferSources = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        "https://pearmllc.onrender.com/offersource/list"
-      );
-      const data = response.data;
-
-      const formatted = data.map((item, index) => ({
-        id: item.id,
-        serial_no: index + 1,
-        source_name: item.name,
-        source_type: item.sourceType || "Other",
-        timestamp: item.createdAt,
-        postback: item.postback_url,
-        pixel_id: item.pixel_id || "",
-        api_key: item.api_key || "",
-        google_ads_id: item.google_ads_id || "",
-        conversion_id: item.conversion_id || "",
-        conversion_label: item.conversion_label || "",
-        default_event_name: item.default_event_name || "purchase",
-        currency: item.currency,
-        offer_url: item.offer_url,
-        clickid: item.clickid,
-        sum: item.sum,
-        parameter: item.parameter,
-        token: item.token,
-        description: item.description,
-        role: item.role,
-        is_active: item.is_active !== false, // Default to true if not specified
-        forward_to_facebook: item.forward_to_facebook || false,
-        forward_to_google: item.forward_to_google || false,
-        clicks: item.clicks || 0,
-        lp_clicks: item.lp_clicks || 0,
-        conversion: item.conversions || 0,
-        total_cpa: item.total_cpa || 0,
-        epc: item.epc || 0,
-        total_revenue: item.total_revenue || 0,
-        cost: item.cost || 0,
-        profit: item.profit || 0,
-        total_roi: item.total_roi || 0,
-        lp_views: item.lp_views || 0,
-      }));
-
-      setRows(formatted);
-      setSnackbar({
-        open: true,
-        message: 'Sources loaded successfully',
-        severity: 'success'
-      });
-    } catch (err) {
-      console.error("Failed to fetch offer sources:", err.message);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load sources: ' + (err.response?.data?.message || err.message),
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const selectedDomain = domains.find(d => d.id === trackingDomain);
 
   useEffect(() => {
-    fetchOfferSources();
-  }, []);
+    if (open) {
+      setLoading(true);
+      
+      // Fetch traffic channels
+      fetch(`${API_URL}/api/traffic`)
+        .then((res) => res.json())
+        .then((data) => {
+          // Ensure data is an array
+          if (Array.isArray(data)) {
+            setTrafficChannels(data);
+          } else {
+            console.error("Traffic channels data is not an array:", data);
+            setTrafficChannels([]);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching traffic channels:", err);
+          setTrafficChannels([]);
+        });
 
-  const handleEditClick = (row) => {
-    setSelectedRowId(row.id);
-    setEditMode(true);
-    setNewTemplate({
-      name: row.source_name,
-      alias: row.source_name.toLowerCase().replace(/\s+/g, "-"),
-      postbackUrl: row.postback || "",
-      sourceType: row.source_type || "Other",
-      currency: row.currency || "USD",
-      offerUrl: row.offer_url || "",
-      clickid: row.clickid || "",
-      sum: row.sum || "",
-      parameter: row.parameter || "",
-      token: row.token || "",
-      description: row.description || "",
-      role: row.role || "",
-      pixel_id: row.pixel_id || "",
-      api_key: row.api_key || "",
-      google_ads_id: row.google_ads_id || "",
-      conversion_id: row.conversion_id || "",
-      conversion_label: row.conversion_label || "",
-      default_event_name: row.default_event_name || "purchase",
-      is_active: row.is_active !== false, // Default to true if not specified
-      forward_to_facebook: row.forward_to_facebook || false,
-      forward_to_google: row.forward_to_google || false
+      // Fetch domains
+      fetch(`${API_URL}/api/domains`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const cleaned = data.map(domain => ({
+              id: domain.id,
+              url: domain.url.replace(/^https?:\/\//, '')
+            }));
+            setDomains(cleaned);
+          } else {
+            console.error("Domains data is not an array:", data);
+            setDomains([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching domains:', err);
+          setDomains([]);
+        });
+        
+      // Fetch offers
+      fetch(`${API_URL}/api/offers`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setOffersList(data);
+        } else {
+          console.error("Offers data is not an array:", data);
+          setOffersList([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching offers:', err);
+        setOffersList([]);
     });
-    setOpenTemplateModal(true);
-  };
-
-  const handleDeleteClick = (row) => {
-    setSelectedRowId(row.id);
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    try {
-      await axios.delete(
-        `https://pearmllc.onrender.com/offersource/delete/${selectedRowId}`
-      );
-      
-      setSnackbar({
-        open: true,
-        message: 'Source deleted successfully',
-        severity: 'success'
-      });
-      
-      fetchOfferSources();
-      setDeleteConfirmOpen(false);
-      setSelectedRowId(null);
-    } catch (error) {
-      console.error("Error deleting source:", error.message);
-      setSnackbar({
-        open: true,
-        message: 'Failed to delete source: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
+        
+      // Fetch landers
+      fetch(`${API_URL}/api/landers`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setLanders(data);
+          } else {
+            console.error("Landers data is not an array:", data);
+            setLanders([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching landers:', err);
+          setLanders([]);
+        });
+        
+      setLoading(false);
     }
-  };
+  }, [open]);
 
-  const handleSaveTemplate = async () => {
+  // Generate tracking URL when relevant fields change
+  useEffect(() => {
+    if (selectedDomain && trafficChannel) {
+      let url = `https://${selectedDomain?.url}/api/track/click?campaign_id=${editMode ? campaignData.id : 'CAMPAIGN_ID'}&tc=${trafficChannel}`;
+      
+      // Add placeholder macros
+      url += '&sub1={sub1}&sub2={sub2}&sub3={sub3}';
+      
+      setTrackingUrl(url);
+    } else {
+      setTrackingUrl("");
+    }
+  }, [selectedDomain, trafficChannel, editMode, campaignData]);
+
+  // Modified handleSubmit function to correctly save to the API
+  const handleSubmit = async () => {
+    setSubmitError("");
+    
+    // Validate required fields
+    if (!campaignName || !trafficChannel || !trackingDomain) {
+      setSubmitError("Campaign name, traffic channel, and tracking domain are required");
+      return;
+    }
+
+    // If not direct linking, require a lander
+    if (!isDirectLinking && !lander) {
+      setSubmitError("Please select a landing page or enable direct linking");
+      return;
+    }
+    
+    const campaignPayload = {
+      name: campaignName,
+      traffic_channel_id: trafficChannel,
+      domain_id: trackingDomain,
+      costType,
+      costValue: parseFloat(costValue) || 0,
+      tags,
+      offer_id: offerSelected, // Use the selected offer ID from state
+      offerWeight: parseInt(offerWeight) || 100,
+      autoOptimize,
+      isDirectLinking,
+      lander_id: isDirectLinking ? null : lander,
+      status: "ACTIVE"
+    };
+
     try {
-      const payload = {
-        name: newTemplate.name,
-        alias: newTemplate.alias,
-        sourceType: newTemplate.sourceType,
-        postback_url: newTemplate.postbackUrl,
-        currency: newTemplate.currency,
-        offer_url: newTemplate.offerUrl,
-        clickid: newTemplate.clickid,
-        sum: newTemplate.sum,
-        parameter: newTemplate.parameter,
-        token: newTemplate.token,
-        description: newTemplate.description,
-        role: newTemplate.role,
-        // API connection parameters
-        pixel_id: newTemplate.pixel_id,
-        api_key: newTemplate.api_key,
-        google_ads_id: newTemplate.google_ads_id,
-        conversion_id: newTemplate.conversion_id,
-        conversion_label: newTemplate.conversion_label,
-        default_event_name: newTemplate.default_event_name,
-        is_active: newTemplate.is_active,
-        // Conversion API settings
-        forward_to_facebook: newTemplate.forward_to_facebook,
-        forward_to_google: newTemplate.forward_to_google
-      };
-
-      if (editMode && selectedRowId) {
-        await axios.put(
-          `https://pearmllc.onrender.com/offersource/update/${selectedRowId}`,
-          payload
-        );
-        setSnackbar({
-          open: true,
-          message: 'Source updated successfully',
-          severity: 'success'
-        });
+      console.log("Submitting campaign with payload:", campaignPayload);
+      
+      let res;
+      if (editMode) {
+        // For editing a campaign
+        const editUrl = `${API_URL}/api/campaigns/${campaignData.id}`;
+        console.log("Making PUT request to:", editUrl);
+        res = await axios.put(editUrl, campaignPayload);
+        console.log("Successfully updated campaign:", res.data);
+        onClose(res.data);
       } else {
-        await axios.post(
-          "https://pearmllc.onrender.com/offersource/create",
-          payload
-        );
-        setSnackbar({
-          open: true,
-          message: 'Source created successfully',
-          severity: 'success'
-        });
+        // For creating a new campaign - use a consistent endpoint
+        console.log("Attempting to create a new campaign");
+        
+        try {
+          // Try the most likely endpoint first
+          const url = `${API_URL}/api/campaigns`;
+          console.log("Making POST request to:", url);
+          res = await axios.post(url, campaignPayload);
+          console.log("Successfully created campaign:", res.data);
+          onCreate(res.data);
+          onClose();
+        } catch (err) {
+          console.error("Error creating campaign:", err);
+          
+          // If we have a specific API error message, display it
+          if (err.response && err.response.data && err.response.data.error) {
+            setSubmitError(`API Error: ${err.response.data.error}`);
+          } else {
+            // Try secondary endpoint
+            try {
+              const altUrl = `${API_URL}/api/campaign`;
+              console.log("Trying alternate endpoint:", altUrl);
+              res = await axios.post(altUrl, campaignPayload);
+              console.log("Successfully created campaign with alternate endpoint:", res.data);
+              onCreate(res.data);
+              onClose();
+            } catch (altErr) {
+              console.error("Error with second attempt:", altErr);
+              
+              // Try the campaign controller endpoint as a last resort
+              try {
+                const finalUrl = `${API_URL}/api/campaigns/create`;
+                console.log("Trying final endpoint:", finalUrl);
+                res = await axios.post(finalUrl, campaignPayload);
+                console.log("Successfully created campaign with final endpoint:", res.data);
+                onCreate(res.data);
+                onClose();
+              } catch (finalErr) {
+                console.error("All creation attempts failed:", finalErr);
+                
+                // Provide clear error feedback
+                if (finalErr.response) {
+                  setSubmitError(`API Error (${finalErr.response.status}): ${finalErr.response.data?.error || 
+                    finalErr.response.data?.message || "Campaign creation failed"}`);
+                } else {
+                  setSubmitError("Network error: Could not connect to the API server");
+                }
+              }
+            }
+          }
+        }
       }
 
-      fetchOfferSources();
-      setOpenTemplateModal(false);
-      setEditMode(false);
-      setSelectedRowId(null);
-      setNewTemplate({
-        name: "",
-        alias: "",
-        postbackUrl: "",
-        sourceType: "",
-        currency: "USD",
-        offerUrl: "",
-        clickid: "",
-        sum: "",
-        parameter: "",
-        token: "",
-        description: "",
-        role: "",
-        pixel_id: "",
-        api_key: "",
-        google_ads_id: "",
-        conversion_id: "",
-        conversion_label: "",
-        default_event_name: "purchase",
-        is_active: true,
-        forward_to_facebook: false,
-        forward_to_google: false
-      });
+      // Reset form after successful submission if not in edit mode
+      if (!editMode && res) {
+        setCampaignName("");
+        setTrafficChannel("");
+        setTrackingDomain("");
+        setCostType("CPC");
+        setCostValue("0");
+        setTags([]);
+        setTagInput("");
+        setOffer("");
+        setOfferWeight("100");
+        setAutoOptimize(false);
+        setIsDirectLinking(false);
+        setLander("");
+        setOfferSelected("");
+      }
     } catch (error) {
-      console.error("Error saving template:", error.message);
-      setSnackbar({
-        open: true,
-        message: 'Failed to save source: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
+      console.error("Error in submit handling:", error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        
+        // Provide more helpful error messages based on status codes
+        if (error.response.status === 400) {
+          setSubmitError(`Validation Error: ${error.response.data?.error || "Please check your input values"}`);
+        } else if (error.response.status === 401 || error.response.status === 403) {
+          setSubmitError("Authorization Error: You don't have permission to create/edit campaigns");
+        } else if (error.response.status === 404) {
+          setSubmitError("API Error: The campaign creation endpoint could not be found. Please contact administrator.");
+        } else {
+          setSubmitError(`API Error (${error.response.status}): ${error.response.data?.error || error.response.data?.message || "Unknown error"}`);
+        }
+      } else if (error.request) {
+        console.error("Request made but no response received:", error.request);
+        setSubmitError("No response received from server. Please check your network connection.");
+      } else {
+        console.error("Error setting up request:", error.message);
+        setSubmitError(`Request error: ${error.message}`);
+      }
     }
   };
 
-  const handleSourceTypeChange = (e) => {
-    const sourceType = e.target.value;
-    setNewTemplate({
-      ...newTemplate,
-      sourceType,
-      postbackUrl: generatePostbackTemplate(window.location.origin, sourceType)
-    });
-  };
 
-  const handleCopyPostback = () => {
-    navigator.clipboard.writeText(newTemplate.postbackUrl);
-    setSnackbar({
-      open: true,
-      message: 'Postback URL copied to clipboard',
-      severity: 'success'
-    });
-  };
-
-  const handleGeneratePostbackTemplate = () => {
-    const template = generatePostbackTemplate(window.location.origin, newTemplate.sourceType);
-    setNewTemplate({
-      ...newTemplate,
-      postbackUrl: template
-    });
-  };
-
-  const handleInsertMacro = (macro) => {
-    setNewTemplate({
-      ...newTemplate,
-      postbackUrl: newTemplate.postbackUrl + macro
-    });
-  };
-
-  const handleOpenPostbackTest = (source) => {
-    setSelectedSource(source);
-    setTestPostbackData(prev => ({
-      ...prev,
-      source: source.source_name || ''
-    }));
-    setPostbackTestDialogOpen(true);
-  };
-
-  const handleClosePostbackTest = () => {
-    setPostbackTestDialogOpen(false);
-    setProcessedUrl('');
-    setTestResult(null);
-  };
-
-  // Postback testing functions
-  const handleTestDataChange = (e) => {
-    const { name, value } = e.target;
-    setTestPostbackData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleGenerateTestUrl = () => {
-    if (!selectedSource) return '';
-    
-    const url = parsePostbackUrl(selectedSource.postback, testPostbackData);
-    setProcessedUrl(url);
-    return url;
-  };
-
-  const handleTestPostback = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    
-    try {
-      const url = handleGenerateTestUrl();
-      
-      // Actually send the test postback request
-      const response = await axios.get(url);
-      
-      setTestResult({
-        success: true,
-        message: 'Postback test completed successfully! Response: ' + JSON.stringify(response.data),
-        data: response.data
-      });
-      
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: `Error: ${error.response?.data?.error || error.message}`
-      });
-    } finally {
-      setIsTesting(false);
+  const handleAddTag = () => {
+    if (tagInput && !tags.includes(tagInput)) {
+      setTags([...tags, tagInput]);
+      setTagInput("");
     }
   };
+  
+  const handleDeleteTag = (tagToDelete) => {
+    setTags(tags.filter(tag => tag !== tagToDelete));
+  };
+  
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setSnackbarMessage("Copied to clipboard!");
+    setSnackbarOpen(true);
+  };
 
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between" }}>
+          {editMode ? "Edit Campaign" : "Create Campaign"}
+          <IconButton onClick={onClose}><CloseIcon /></IconButton>
+        </DialogTitle>
+
+        <Tabs value={tabIndex} onChange={(_, i) => setTabIndex(i)} sx={{ px: 3 }}>
+          <Tab label="Campaign Details" />
+          <Tab label="Tracking & Routing" />
+        </Tabs>
+
+        <DialogContent dividers>
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+          
+          {tabIndex === 0 && (
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>General</Typography>
+              <Divider />
+              <TextField 
+                label="Campaign Name" 
+                fullWidth 
+                value={campaignName} 
+                onChange={(e) => setCampaignName(e.target.value)} 
+                required
+              />
+              
+              <Box display="flex" gap={2}>
+                <FormControl fullWidth required>
+                  <InputLabel>Traffic Channel</InputLabel>
+                  <Select 
+                    value={trafficChannel} 
+                    onChange={(e) => setTrafficChannel(e.target.value)} 
+                    label="Traffic Channel"
+                  >
+                    {Array.isArray(trafficChannels) && trafficChannels.map((channel) => (
+                      <MenuItem key={channel.id} value={channel.id}>
+                        {channel.channelName} ({channel.aliasChannel || "N/A"})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <FormControl fullWidth required>
+                  <InputLabel>Tracking Domain</InputLabel>
+                  <Select 
+                    value={trackingDomain} 
+                    onChange={(e) => setTrackingDomain(e.target.value)} 
+                    label="Tracking Domain"
+                  >
+                    {Array.isArray(domains) && domains.map((domain) => (
+                      <MenuItem key={domain.id} value={domain.id}>{domain.url}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              <Typography variant="subtitle2" gutterBottom display="flex" alignItems="center">
+                Campaign Cost
+                <Tooltip title="Choose how cost will be tracked.">
+                  <span style={{ marginLeft: 8, cursor: "pointer" }}>❓</span>
+                </Tooltip>
+              </Typography>
+              
+              <ToggleButtonGroup
+                value={costType}
+                exclusive
+                onChange={(e, value) => value && setCostType(value)}
+                sx={{ mb: 2, display: 'flex', flexWrap: 'wrap' }}
+              >
+                {["CPC", "CPA", "CPM", "POPCPM", "REVSHARE", "DONOTTRACK"].map((val) => (
+                  <ToggleButton key={val} value={val}>{val}</ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              
+              <TextField 
+                label="Cost Value" 
+                type="number" 
+                value={costValue} 
+                onChange={(e) => setCostValue(e.target.value)} 
+                InputProps={{ endAdornment: "$" }} 
+              />
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Tags</Typography>
+              <Box display="flex" flexWrap="wrap" gap={1}>
+                {tags.map((tag, i) => (
+                  <Chip 
+                    key={i} 
+                    label={tag} 
+                    onDelete={() => handleDeleteTag(tag)}
+                  />
+                ))}
+              </Box>
+              
+              <Box display="flex" gap={1}>
+                <TextField 
+                  label="Add Tag" 
+                  value={tagInput} 
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddTag();
+                      e.preventDefault();
+                    }
+                  }}
+                />
+                <Button variant="outlined" onClick={handleAddTag}>Add</Button>
+              </Box>
+            </Box>
+          )}
+          
+          {tabIndex === 1 && (
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Traffic Routing</Typography>
+              <Divider />
+              
+              <Box display="flex" alignItems="center" gap={1}>
+                <Switch 
+                  checked={isDirectLinking} 
+                  onChange={(e) => setIsDirectLinking(e.target.checked)} 
+                />
+                <Typography>Direct Linking (Skip Lander)</Typography>
+              </Box>
+              
+              {!isDirectLinking && (
+                <FormControl fullWidth required={!isDirectLinking}>
+                  <InputLabel>Landing Page</InputLabel>
+                  <Select 
+                    value={lander} 
+                    onChange={(e) => setLander(e.target.value)} 
+                    label="Landing Page"
+                    disabled={isDirectLinking}
+                  >
+                    {Array.isArray(landers) && landers.map((landerItem) => (
+                      <MenuItem key={landerItem.id} value={landerItem.id}>
+                        {landerItem.name} ({landerItem.url})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              
+              
+              <FormControl fullWidth required>
+                <InputLabel>Offer</InputLabel>
+                <Select 
+                  value={offerSelected}
+                  onChange={(e) => setOfferSelected(e.target.value)}
+                  label="Offer"
+                >
+                  {offersList.map((offerItem) => (
+                    <MenuItem key={offerItem.Serial_No} value={offerItem.Serial_No}>
+                      {offerItem.Offer_name} (${offerItem.revenue})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              
+              <TextField 
+                label="Offer Weight" 
+                type="number" 
+                value={offerWeight} 
+                onChange={(e) => setOfferWeight(e.target.value)}
+                InputProps={{ endAdornment: "%" }}
+                helperText="For offer rotations (if applicable)"
+              />
+              
+              <Box display="flex" alignItems="center" gap={1}>
+                <Switch 
+                  checked={autoOptimize} 
+                  onChange={(e) => setAutoOptimize(e.target.checked)} 
+                />
+                <Typography>Auto-Optimize Offers</Typography>
+              </Box>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>Tracking Links</Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Campaign Tracking URL</Typography>
+                  <IconButton onClick={() => copyToClipboard(trackingUrl)} size="small">
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <TextField
+                  fullWidth
+                  value={trackingUrl}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                  This URL will track clicks to your campaign. Append additional sub parameters as needed.
+                </Typography>
+              </Paper>
+              
+              {!isDirectLinking && (
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="subtitle2">Lander View Tracking Code</Typography>
+                    <IconButton 
+                      onClick={() => copyToClipboard(`<img src="${API_URL}/api/track/lander?click_id={CLICK_ID}" style="position:absolute; visibility:hidden;" height="1" width="1" />`)} 
+                      size="small"
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  <TextField
+                    fullWidth
+                    value={`<img src="${API_URL}/api/track/lander?click_id={CLICK_ID}" style="position:absolute; visibility:hidden;" height="1" width="1" />`}
+                    variant="outlined"
+                    size="small"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                    Add this invisible pixel to your landing page to track views. Replace {'{CLICK_ID}'} with the actual click_id parameter.
+                  </Typography>
+                </Paper>
+              )}
+              
+              <Paper elevation={1} sx={{ p: 2, borderRadius: 1, bgcolor: '#f5f5f5' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Conversion Tracking URL</Typography>
+                  <IconButton 
+                    onClick={() => copyToClipboard(`${API_URL}/api/track/conversion?click_id={CLICK_ID}&payout={PAYOUT}`)} 
+                    size="small"
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <TextField
+                  fullWidth
+                  value={`${API_URL}/api/track/conversion?click_id={CLICK_ID}&payout={PAYOUT}`}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                  Use this URL for server-to-server conversion tracking. Replace {'{CLICK_ID}'} with the actual click_id and {'{PAYOUT}'} with the conversion amount.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {editMode ? "Update Campaign" : "Create Campaign"}
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+      
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity="success">
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </>
+  );
+};
+
+export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [dateRange, setDateRange] = useState([startOfToday(), startOfToday()]);
+  const [metrics, setMetrics] = useState({});
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [domains, setDomains] = useState([]);
+  const [offersList, setOffersList] = useState([]); // Added offersList state
+  const [trafficChannels, setTrafficChannels] = useState([]); // Added to store traffic channels for lookup
+
+  // Fetch offers and traffic channels when component mounts
+  useEffect(() => {
+    // Fetch offers
+    fetch(`${API_URL}/api/offers`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setOffersList(data);
+        } else {
+          console.error("Offers data is not an array:", data);
+          setOffersList([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching offers:', err);
+        setOffersList([]);
+      });
+      
+    // Fetch domains for tracking URL generation
+    fetch(`${API_URL}/api/domains`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const cleaned = data.map(domain => ({
+            id: domain.id,
+            url: domain.url.replace(/^https?:\/\//, '')
+          }));
+          setDomains(cleaned);
+        } else {
+          console.error("Domains data is not an array:", data);
+          setDomains([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching domains:', err);
+        setDomains([]);
+      });
+      
+    // Fetch traffic channels for name lookup
+    fetch(`${API_URL}/api/traffic`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTrafficChannels(data);
+        } else {
+          console.error("Traffic channels data is not an array:", data);
+          setTrafficChannels([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching traffic channels:", err);
+        setTrafficChannels([]);
+      });
+  }, []);
+
+  // Enhanced columns with proper data mapping
   const columns = [
-    { field: "serial_no", headerName: "Serial No", width: 100, align: "center" },
-    {
-      field: "source_name",
-      headerName: "Source Name",
-      width: 200,
-      renderCell: (params) => (
-        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-          <Typography sx={{ flexGrow: 1 }}>{params.value}</Typography>
-          <IconButton
-            size="small"
-            onClick={() => handleEditClick(params.row)}
-            title="Edit"
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleDeleteClick(params.row)}
-            title="Delete"
-            color="error"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      ),
+    { 
+      field: "id", 
+      headerName: "ID", 
+      width: 70,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.id || "";
+        } catch (e) {
+          console.warn("Error getting ID value:", e);
+          return "";
+        }
+      }
     },
     { 
-      field: "source_type", 
-      headerName: "Type", 
-      width: 120,
-      renderCell: (params) => (
-        <Tooltip title={`${params.value} source`}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            width: '100%'
-          }}>
-            <Typography>{params.value}</Typography>
-          </Box>
-        </Tooltip>
-      )
+      field: "name", 
+      headerName: "Campaign Name", 
+      flex: 1,
+      valueGetter: (params) => {
+        try {
+          // Try multiple possible field names for campaign name
+          return params?.row?.name || params?.row?.campaign_name || params?.row?.title || 
+                params?.row?.campaignName || "Unnamed Campaign"; 
+        } catch (e) {
+          console.warn("Error getting name value:", e);
+          return "Unnamed Campaign";
+        }
+      }
     },
     {
-      field: "is_active",
+      field: "status",
       headerName: "Status",
       width: 120,
-      renderCell: (params) => (
-        <Box
-          sx={{
-            backgroundColor: params.value ? "#e6f7e7" : "#ffebee",
-            color: params.value ? "#2e7d32" : "#d32f2f",
-            borderRadius: 1,
-            px: 1,
-            py: 0.5,
-          }}
-        >
-          {params.value ? "Active" : "Inactive"}
-        </Box>
-      ),
+      renderCell: (params) => {
+        try {
+          const value = params?.value || "INACTIVE";
+          return (
+            <Chip 
+              label={value} 
+              color={value === "ACTIVE" ? "success" : "default"} 
+              size="small"
+            />
+          );
+        } catch (e) {
+          console.warn("Error rendering status cell:", e);
+          return <Chip label="INACTIVE" color="default" size="small" />;
+        }
+      },
+      valueGetter: (params) => {
+        try {
+          return params?.row?.status || "INACTIVE";
+        } catch (e) {
+          console.warn("Error getting status value:", e);
+          return "INACTIVE";
+        }
+      }
     },
     {
-      field: "timestamp",
-      headerName: "Timestamp",
-      width: 200,
-      valueGetter: (params) =>
-        params?.value ? new Date(params?.value).toLocaleString() : "N/A",
+      field: "traffic_channel_id",
+      headerName: "Traffic Source",
+      width: 150,
+      valueGetter: (params) => {
+        try {
+          // First check if we have a traffic channel name in our normalized data
+          if (params?.row?.traffic_channel_name) {
+            return params.row.traffic_channel_name;
+          }
+          
+          // Check for nested TrafficChannel object
+          if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
+            return params.row.TrafficChannel.channelName;
+          }
+          
+          // Check lowercase variant
+          if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
+            return params.row.trafficChannel.channelName;
+          }
+          
+          // If we have the ID and our traffic channels list, look up the name
+          if (params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null) {
+            const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
+            if (channel) {
+              return channel.channelName || `Source #${params.row.traffic_channel_id}`;
+            }
+            return `Source #${params.row.traffic_channel_id}`;
+          }
+          
+          return "N/A";
+        } catch (e) {
+          console.warn("Error getting traffic channel value:", e);
+          return "N/A";
+        }
+      }
     },
     { 
-      field: "postback", 
-      headerName: "Postback", 
-      width: 180,
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Tooltip title={params.value || "No postback URL"}>
-            <Typography sx={{ 
-              overflow: "hidden", 
-              textOverflow: "ellipsis", 
-              whiteSpace: "nowrap",
-              flexGrow: 1 
-            }}>
-              {params.value || "—"}
-            </Typography>
-          </Tooltip>
-          {params.value && (
-            <>
-              <IconButton 
-                size="small" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(params.value);
-                  setSnackbar({
-                    open: true,
-                    message: 'Postback URL copied to clipboard',
-                    severity: 'success'
-                  });
+      field: "costType", 
+      headerName: "Cost Type", 
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.costType || "N/A";
+        } catch (e) {
+          console.warn("Error getting cost type value:", e);
+          return "N/A";
+        }
+      }
+    },
+    { 
+      field: "costValue", 
+      headerName: "Cost", 
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          return params?.row?.costValue || 0;
+        } catch (e) {
+          console.warn("Error getting cost value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${parseFloat(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting cost value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "clicks",
+      headerName: "Clicks",
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.clicks || 0;
+        } catch (e) {
+          console.warn("Error getting clicks value:", e);
+          return 0;
+        }
+      }
+    },
+    {
+      field: "conversions",
+      headerName: "Conversions",
+      width: 110,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.conversions || 0;
+        } catch (e) {
+          console.warn("Error getting conversions value:", e);
+          return 0;
+        }
+      }
+    },
+    {
+      field: "cr",
+      headerName: "CR%",
+      width: 80,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return "0.00";
+          const campaignMetrics = metrics[params.row.id] || {};
+          const clicks = campaignMetrics.clicks || 0;
+          const conversions = campaignMetrics.conversions || 0;
+          return clicks > 0 ? ((conversions / clicks) * 100).toFixed(2) : "0.00";
+        } catch (e) {
+          console.warn("Error getting CR value:", e);
+          return "0.00";
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `${params?.value || "0.00"}%`;
+        } catch (e) {
+          console.warn("Error formatting CR value:", e);
+          return "0.00%";
+        }
+      }
+    },
+    {
+      field: "revenue",
+      headerName: "Revenue",
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          return campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+        } catch (e) {
+          console.warn("Error getting revenue value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${Number(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting revenue value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "profit",
+      headerName: "Profit",
+      width: 100,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.id) return 0;
+          const campaignMetrics = metrics[params.row.id] || {};
+          // Calculate profit if not directly available
+          if (campaignMetrics.profit !== undefined) {
+            return campaignMetrics.profit;
+          } else {
+            const revenue = campaignMetrics.total_revenue || campaignMetrics.revenue || 0;
+            const cost = campaignMetrics.total_cost || campaignMetrics.cost || 0;
+            return revenue - cost;
+          }
+        } catch (e) {
+          console.warn("Error getting profit value:", e);
+          return 0;
+        }
+      },
+      valueFormatter: (params) => {
+        try {
+          return `$${Number(params?.value || 0).toFixed(2)}`;
+        } catch (e) {
+          console.warn("Error formatting profit value:", e);
+          return "$0.00";
+        }
+      }
+    },
+    {
+      field: "offer_id",
+      headerName: "Offer",
+      width: 120,
+      valueGetter: (params) => {
+        try {
+          if (!params?.row?.offer_id) return "N/A";
+          // Find offer name from the offers list if available
+          const offerItem = offersList.find(
+            offer => offer.Serial_No === params.row.offer_id
+          );
+          
+          if (offerItem) {
+            return offerItem.Offer_name;
+          } else {
+            return params.row.offer_id ? `Offer #${params.row.offer_id}` : 'N/A';
+          }
+        } catch (e) {
+          console.warn("Error getting offer value:", e);
+          return "N/A";
+        }
+      }
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      renderCell: (params) => {
+        try {
+          if (!params?.row?.id) return null;
+          return (
+            <Box display="flex">
+              <IconButton
+                size="small"
+                onClick={() => handleEditClick(params.row)}
+                title="Edit Campaign"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  try {
+                    // Function to copy tracking URL
+                    const domain = params.row.domain?.url || 
+                                  (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                                  "yourdomain.com";
+                    const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
+                    navigator.clipboard.writeText(trackingUrl);
+                    setSnackbarMessage("Tracking URL copied to clipboard!");
+                    setSnackbarOpen(true);
+                  } catch (err) {
+                    console.error("Error copying tracking URL:", err);
+                    setSnackbarMessage("Error copying URL. See console for details.");
+                    setSnackbarSeverity("error");
+                    setSnackbarOpen(true);
+                  }
                 }}
-                title="Copy Postback"
+                title="Copy Tracking URL"
               >
                 <ContentCopyIcon fontSize="small" />
               </IconButton>
-              <IconButton 
-                size="small" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenPostbackTest(params.row);
+              <IconButton
+                size="small"
+                onClick={() => {
+                  try {
+                    window.open(`/campaigns/${params.row.id}`, '_blank');
+                  } catch (err) {
+                    console.error("Error opening campaign details:", err);
+                  }
                 }}
-                title="Test Postback"
+                title="View Campaign Details"
               >
-                <VisibilityIcon fontSize="small" />
+                <LaunchIcon fontSize="small" />
               </IconButton>
-            </>
-          )}
-        </Box>
-      )
-    },
-    { 
-      field: "conversion_api", 
-      headerName: "Conversion API", 
-      width: 150,
-      renderCell: (params) => {
-        const hasFacebook = params.row.forward_to_facebook && params.row.pixel_id;
-        const hasGoogle = params.row.forward_to_google && params.row.google_ads_id;
-        
-        return (
-          <Box
-            sx={{
-              backgroundColor: (hasFacebook || hasGoogle) ? "#e6f7e7" : "#f5f5f5",
-              color: (hasFacebook || hasGoogle) ? "#2e7d32" : "#757575",
-              borderRadius: 1,
-              px: 1,
-              py: 0.5,
-            }}
-          >
-            {hasFacebook && hasGoogle ? "FB + Google" : 
-             hasFacebook ? "Facebook" : 
-             hasGoogle ? "Google" : "Not Configured"}
-          </Box>
-        );
-      }
-    },
-    { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
-    { field: "lp_clicks", headerName: "LP Clicks", width: 120, type: "number" },
-    { field: "conversion", headerName: "Conversions", width: 150, type: "number" },
-    { 
-      field: "total_cpa", 
-      headerName: "Total CPA ($)", 
-      width: 150, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
+            </Box>
+          );
+        } catch (e) {
+          console.warn("Error rendering actions cell:", e);
+          return null;
         }
-        return params.value.toFixed(2);
       }
     },
-    { 
-      field: "epc", 
-      headerName: "EPC ($)", 
-      width: 120, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
-      }
-    },
-    {
-      field: "total_revenue",
-      headerName: "Total Revenue ($)",
-      width: 180,
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
-      }
-    },
-    { 
-      field: "cost", 
-      headerName: "Cost ($)", 
-      width: 150, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
-      }
-    },
-    { 
-      field: "profit", 
-      headerName: "Profit ($)", 
-      width: 150, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
-      }
-    },
-    { 
-      field: "total_roi", 
-      headerName: "Total ROI (%)", 
-      width: 150, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2) + '%';
-      }
-    },
-    { field: "lp_views", headerName: "LP Views", width: 150, type: "number" },
   ];
 
-  // Date grid component from the image, converted to React + MUI + Tailwind style
-  const DateGrid = () => {
-    return (
-      <Box className="max-w-full p-4 bg-white font-sans text-gray-800">
-        <Box className="flex space-x-2 mb-6 flex-wrap">
-          <Button
-            variant="outlined"
-            className="flex items-center w-48 justify-start"
-            sx={{ borderColor: "#d1d5db", textTransform: "none" }}
-          >
-            <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-              <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-                Date {new Date().toISOString().split('T')[0]}
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: "400" }}>
-                Today
-              </Typography>
-            </Box>
-            <FontAwesomeIcon
-              icon={faCalendarAlt}
-              style={{ marginLeft: "auto", color: "#374151", fontSize: "1.125rem" }}
-            />
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1 }}
-            aria-label="Previous"
-          >
-            <FontAwesomeIcon icon={faChevronLeft} style={{ color: "#374151" }} />
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1 }}
-            aria-label="Next"
-          >
-            <FontAwesomeIcon icon={faChevronRight} style={{ color: "#374151" }} />
-          </Button>
-          <Button
-            sx={{
-              bgcolor: "#d1d5db",
-              "&:hover": { bgcolor: "#9ca3af" },
-              minWidth: 40,
-              width: 40,
-              height: 40,
-              borderRadius: "9999px",
-              ml: 2,
-            }}
-            aria-label="Swap Dates"
-          >
-            <FontAwesomeIcon icon={faExchangeAlt} style={{ color: "#374151" }} />
-          </Button>
-          <Box
-            sx={{
-              border: "1px solid #d1d5db",
-              borderRadius: 1,
-              px: 2,
-              py: 1,
-              width: 240,
-              ml: 4,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-            }}
-          >
-            <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-              Time zone
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: "600" }}>
-              America/New_York
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    );
+  // Improved campaign fetching with better endpoint targeting and data normalization
+  const fetchCampaigns = () => {
+    setLoading(true);
+    
+    // Use the proper API endpoint for campaigns
+    console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
+    
+    axios.get(`${API_URL}/api/campaigns`)
+      .then((res) => {
+        console.log("Campaign data received:", res.data);
+        
+        // Check if res.data is an array, if not, try to convert it
+        let campaignsData = res.data;
+        if (!Array.isArray(campaignsData)) {
+          // If it's an object with a data property that's an array
+          if (res.data && Array.isArray(res.data.data)) {
+            campaignsData = res.data.data;
+          } 
+          // If it's an object with a campaigns property that's an array
+          else if (res.data && Array.isArray(res.data.campaigns)) {
+            campaignsData = res.data.campaigns;
+          }
+          // If it's just a single object
+          else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+            campaignsData = [res.data];
+          } 
+          // Last resort, create an empty array
+          else {
+            campaignsData = [];
+            console.warn("Received unexpected data structure:", res.data);
+          }
+        }
+        
+        // Add proper field mapping before setting state
+        const campaignsWithIds = campaignsData.map((campaign) => {
+          // Log original field names to help debug
+          console.log("Original campaign fields:", Object.keys(campaign).join(", "));
+          
+          // Standardize campaign fields
+          const normalizedCampaign = {
+            ...campaign,
+            // Ensure ID field exists
+            id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+            
+            // Ensure name field exists - map from possible alternative field names
+            name: campaign.name || campaign.campaign_name || campaign.title || 
+                  campaign.campaignName || "Unnamed Campaign",
+                  
+            // Ensure traffic channel info is normalized
+            traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
+                                 (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
+                                 campaign.traffic_channel_name ||
+                                 (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                                 null,
+                                
+            // Ensure status field exists
+            status: campaign.status || "ACTIVE"  // Default to ACTIVE
+          };
+          
+          // Log normalized campaign to verify
+          console.log("Normalized campaign:", normalizedCampaign);
+          
+          return normalizedCampaign;
+        });
+        
+        // Debug logging of first campaign after normalization
+        console.log("First campaign example:", campaignsWithIds.length > 0 ? campaignsWithIds[0] : "No campaigns");
+        
+        setCampaigns(campaignsWithIds);
+        
+        // Fetch metrics for these campaigns
+        if (campaignsWithIds.length > 0) {
+          console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
+          fetchMetrics(campaignsWithIds.map(c => c.id));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching campaigns:", err);
+        
+        // Try alternative endpoints
+        tryAlternativeEndpoints();
+      });
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+  // Function to try alternative API endpoints
+  const tryAlternativeEndpoints = () => {
+    console.log("Trying alternative endpoint:", `${API_URL}/api/campaign`);
+    
+    axios.get(`${API_URL}/api/campaign`)
+      .then((res) => handleSuccessfulResponse(res, "Alternative endpoint successful"))
+      .catch((err) => {
+        console.log("Trying another alternative endpoint:", `${API_URL}/api/campaigns/list`);
+        
+        axios.get(`${API_URL}/api/campaigns/list`)
+          .then((res) => handleSuccessfulResponse(res, "Second alternative endpoint successful"))
+          .catch((altErr) => {
+            console.error("All campaign fetching attempts failed");
+            setLoading(false);
+            setSnackbarMessage("Failed to load campaigns. Please check API configuration.");
+            setSnackbarSeverity("error");
+            setSnackbarOpen(true);
+          });
+      });
+  };
+    
+  // Handle successful API response
+  const handleSuccessfulResponse = (res, logMessage) => {
+    console.log(logMessage, res.data);
+    
+    let campaignsData = res.data;
+    if (!Array.isArray(campaignsData)) {
+      if (res.data && Array.isArray(res.data.data)) {
+        campaignsData = res.data.data;
+      } else if (res.data && Array.isArray(res.data.campaigns)) {
+        campaignsData = res.data.campaigns;
+      } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+        campaignsData = [res.data];
+      } else {
+        campaignsData = [];
+        console.warn("Received unexpected data structure:", res.data);
+      }
+    }
+    
+    // Add proper field mapping before setting state
+    const campaignsWithIds = campaignsData.map((campaign) => {
+      // Standardize campaign fields
+      return {
+        ...campaign,
+        // Ensure ID field exists
+        id: campaign.id || campaign._id || campaign.campaign_id || Math.random().toString(36).substr(2, 9),
+        
+        // Ensure name field exists - map from possible alternative field names
+        name: campaign.name || campaign.campaign_name || campaign.title || 
+              campaign.campaignName || "Unnamed Campaign",
+              
+        // Ensure traffic channel info is normalized
+        traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
+                             (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
+                             campaign.traffic_channel_name ||
+                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName) ||
+                             null,
+                            
+        // Ensure status field exists
+        status: campaign.status || "ACTIVE"
+      };
+    });
+    
+    setCampaigns(campaignsWithIds);
+    
+    // Fetch metrics for these campaigns
+    if (campaignsWithIds.length > 0) {
+      console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
+      fetchMetrics(campaignsWithIds.map(c => c.id));
+    } else {
+      setLoading(false);
+    }
+  };
+  
+  // Improved metrics fetching function
+  const fetchMetrics = (campaignIds) => {
+    // Format date range for API
+    const startDate = format(dateRange[0], 'yyyy-MM-dd');
+    const endDate = format(dateRange[1], 'yyyy-MM-dd');
+    
+    console.log(`Fetching metrics from ${startDate} to ${endDate} for campaigns:`, campaignIds);
+    
+    // Create metrics object to store by campaign ID
+    const metricsData = {};
+    let completedRequests = 0;
+    
+    // Set default metrics values - prevents undefined errors in UI calculations
+    campaignIds.forEach(id => {
+      metricsData[id] = {
+        clicks: 0,
+        conversions: 0,
+        lpviews: 0,
+        lpclicks: 0,
+        impressions: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        profit: 0,
+        ctr: 0,
+        cr: 0
+      };
+    });
+    
+    // If no campaign IDs, just finish early
+    if (campaignIds.length === 0) {
+      setMetrics(metricsData);
+      setLoading(false);
+      return;
+    }
+    
+    // Set loading state
+    setLoading(true);
+    
+    // Fetch metrics for each campaign
+    campaignIds.forEach(id => {
+      // Use campaign_id parameter as expected by the backend
+      const metricsUrl = `${API_URL}/api/track/metrics?campaign_id=${id}&start_date=${startDate}&end_date=${endDate}`;
+      console.log(`Fetching metrics for campaign ${id} from: ${metricsUrl}`);
+      
+      axios.get(metricsUrl)
+        .then(res => {
+          console.log(`Metrics data for campaign ${id}:`, res.data);
+          
+          // Check if res.data is an array before reducing
+          if (Array.isArray(res.data) && res.data.length > 0) {
+            // Sum up metrics if multiple records are returned
+            const campaignMetrics = res.data.reduce((acc, curr) => {
+              Object.keys(curr).forEach(key => {
+                if (typeof curr[key] === 'number') {
+                  acc[key] = (acc[key] || 0) + curr[key];
+                }
+              });
+              return acc;
+            }, {});
+            
+            metricsData[id] = campaignMetrics;
+          } else if (typeof res.data === 'object') {
+            // If it's a single object, use it directly
+            metricsData[id] = res.data;
+          }
+        })
+        .catch(err => {
+          console.error(`Error fetching metrics for campaign ${id}:`, err);
+          
+          // Instead of showing the error, provide a more helpful message and 
+          // use default values (already set above)
+          console.log(`Using default metrics values for campaign ${id}`);
+          
+          // Optionally show a UI notification for persistent errors
+          if (err.response && err.response.status === 500) {
+            // You could set a state to show a notification or toast
+            // setErrorNotification(`There was a problem loading metrics for some campaigns. Default values are being shown.`);
+          }
+        })
+        .finally(() => {
+          completedRequests++;
+          if (completedRequests === campaignIds.length) {
+            console.log("All metrics fetching completed:", metricsData);
+            setMetrics(metricsData);
+            setLoading(false);
+          }
+        });
+    });
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+  
+  useEffect(() => {
+    if (campaigns.length > 0) {
+      fetchMetrics(campaigns.map(c => c.id));
+    }
+  }, [dateRange]);
+
+  // The rest of the component functions
+  const handleCreateClick = () => {
+    setCreateOpen(true);
+  };
+
+  const handleCreateClose = () => {
+    setCreateOpen(false);
+    fetchCampaigns(); // Refresh the campaigns list
+  };
+
+  const handleEditClick = (campaign) => {
+    setSelectedCampaign(campaign);
+    setEditOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setEditOpen(false);
+    setSelectedCampaign(null);
+    fetchCampaigns(); // Refresh the campaigns list
+  };
+
+  const handleCreate = (newCampaign) => {
+    fetchCampaigns(); // Refresh to get the updated list
+    setSnackbarMessage("Campaign created successfully!");
+    setSnackbarSeverity("success");
+    setSnackbarOpen(true);
+  };
+  
+  const predefinedRanges = {
+    Today: [startOfToday(), startOfToday()],
+    Yesterday: [subDays(new Date(), 1), subDays(new Date(), 1)],
+    "Last 7 Days": [subDays(new Date(), 6), new Date()],
+    "Last 30 Days": [subDays(new Date(), 29), new Date()],
+    "This Month": [startOfMonth(new Date()), new Date()],
+    "Last Month": [startOfMonth(subDays(new Date(), 30)), endOfMonth(subDays(new Date(), 30))],
   };
 
   return (
     <Layout>
-      <Box>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 2 }}
-        >
-          <Typography variant="h4">Offer Source</Typography>
-          <Box display="flex" gap={2}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchOfferSources}
-              disabled={loading}
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
+      <Box mb={3}>
+        <Typography variant="h4" gutterBottom>Campaigns</Typography>
+        
+        <Grid container spacing={2} alignItems="center" mb={2}>
+          <Grid item>
             <Button
               variant="contained"
               color="primary"
-              onClick={() => {
-                setOpenTemplateModal(true);
-                setEditMode(false);
-                setSelectedRowId(null);
-                setNewTemplate({
-                  name: "",
-                  alias: "",
-                  postbackUrl: "",
-                  sourceType: "",
-                  currency: "USD",
-                  offerUrl: "",
-                  clickid: "",
-                  sum: "",
-                  parameter: "",
-                  token: "",
-                  description: "",
-                  role: "",
-                  pixel_id: "",
-                  api_key: "",
-                  google_ads_id: "",
-                  conversion_id: "",
-                  conversion_label: "",
-                  default_event_name: "purchase",
-                  is_active: true,
-                  forward_to_facebook: false,
-                  forward_to_google: false
-                });
-              }}
+              onClick={handleCreateClick}
+              startIcon={<AddIcon />}
             >
-              Add New Source
+              Create Campaign
             </Button>
-          </Box>
-        </Box>
-
-        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid item xs={6} sm={2}>
-            <TextField
-              label="Date"
-              type="date"
-              value={date}
-              onChange={handleDateChange}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
           </Grid>
-          <Grid item xs={6} sm={2}>
-            <TextField
-              label="Title"
-              value={titleText}
-              onChange={(e) => setTitle(e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={4} sm={2}>
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={() => setFilterText("")}
-            >
-              Apply
-            </Button>
+          
+          <Grid item flexGrow={1}>
+            <Box display="flex" justifyContent="flex-end">
+              <ToggleButtonGroup
+                value={null} // This needs to be fixed to match the format used in the onChange
+                exclusive
+                onChange={(e, newValue) => {
+                  if (newValue && predefinedRanges[newValue]) {
+                    setDateRange(predefinedRanges[newValue]);
+                  }
+                }}
+                size="small"
+              >
+                {Object.keys(predefinedRanges).map((label) => (
+                  <ToggleButton 
+                    key={label} 
+                    value={label}
+                  >
+                    {label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
           </Grid>
         </Grid>
-
-        {/* DateGrid component */}
-        <DateGrid />
-
-        <Box
-          sx={{
-            height: 700,
-            width: "100%",
-            mt: 3,
-            bgcolor: "white",
-            boxShadow: 2,
-            p: 2,
-          }}
-        >
-          {loading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <CircularProgress />
-            </Box>
-          ) : (
-            <DataGrid
-              rows={rows}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[5, 10, 15, 20, 50]}
-              disableSelectionOnClick
-              components={{
-                NoRowsOverlay: () => (
-                  <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                    <Typography variant="h6" color="text.secondary">No Sources Found</Typography>
-                    <Typography variant="body2" color="text.secondary">Add your first traffic source to get started</Typography>
-                  </Box>
-                ),
-              }}
-            />
-          )}
-        </Box>
-
-        {/* Enhanced Modal Component with Tabs */}
-        <Modal open={openTemplateModal} onClose={() => setOpenTemplateModal(false)}>
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "900px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflow: "auto",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              {editMode ? "Edit Offer Source" : "Add New Source"}
-            </Typography>
-
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-              <Tabs value={tabValue} onChange={handleTabChange}>
-                <Tab label="Basic Details" />
-                <Tab label="Postback URL" />
-                <Tab label="API Configuration" />
-              </Tabs>
-            </Box>
-
-            {/* Tab 1: Basic Details */}
-            {tabValue === 0 && (
-              <>
-                <Card sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Source Name *"
-                          value={newTemplate.name}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setNewTemplate({
-                              ...newTemplate,
-                              name: value,
-                              alias: value.toLowerCase().replace(/\s+/g, "-"),
-                            });
-                          }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          label="Alias"
-                          value={newTemplate.alias}
-                          disabled
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <FormControl fullWidth>
-                          <InputLabel>Source Type</InputLabel>
-                          <Select
-                            value={newTemplate.sourceType}
-                            onChange={handleSourceTypeChange}
-                            label="Source Type"
-                          >
-                            <MenuItem value="" disabled>Select Source Type</MenuItem>
-                            {source_types.map((type) => (
-                              <MenuItem key={type} value={type}>
-                                {type}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                    </Grid>
-                    
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <InputLabel>Currency</InputLabel>
-                      <Select
-                        value={newTemplate.currency}
-                        onChange={(e) =>
-                          setNewTemplate({ ...newTemplate, currency: e.target.value })
-                        }
-                        label="Currency"
-                      >
-                        <MenuItem value="" disabled>Select Currency</MenuItem>
-                        {currencies.map((currency) => (
-                          <MenuItem key={currency} value={currency}>
-                            {currency}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    
-                    <TextField
-                      fullWidth
-                      label="Offer URL Template"
-                      value={newTemplate.offerUrl}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
-                      }
-                      sx={{ mt: 2 }}
-                      helperText="Template for generating tracking links (optional)"
-                    />
-                    
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={6}>
-                          <Typography variant="body2">Status</Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Select
-                            value={newTemplate.is_active}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, is_active: e.target.value })}
-                            fullWidth
-                          >
-                            <MenuItem value={true}>Active</MenuItem>
-                            <MenuItem value={false}>Inactive</MenuItem>
-                          </Select>
-                        </Grid>
-                      </Grid>
-                    </FormControl>
-                  </CardContent>
-                </Card>
-
-                {/* Postback Parameters */}
-                <Card sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle1">Postback Parameters</Typography>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="CLICKID"
-                          value={newTemplate.clickid}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, clickid: e.target.value })
-                          }
-                          helperText="Parameter name for tracking clicks (e.g., 'clickid', 'cid', etc.)"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="SUM"
-                          value={newTemplate.sum}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, sum: e.target.value })
-                          }
-                          helperText="Parameter name for payout value (e.g., 'payout', 'amount', etc.)"
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-
-                {/* Additional Parameters */}
-                <Card>
-                  <CardContent>
-                  <Typography variant="subtitle1">Additional Parameters</Typography>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={3}>
-                        <TextField
-                          fullWidth
-                          label="Parameter"
-                          value={newTemplate.parameter}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, parameter: e.target.value })
-                          }
-                        />
-                      </Grid>
-                      <Grid item xs={3}>
-                        <TextField
-                          fullWidth
-                          label="Macro / Token"
-                          value={newTemplate.token}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, token: e.target.value })
-                          }
-                        />
-                      </Grid>
-                      <Grid item xs={3}>
-                        <TextField
-                          fullWidth
-                          label="Name / Description"
-                          value={newTemplate.description}
-                          onChange={(e) =>
-                            setNewTemplate({ ...newTemplate, description: e.target.value })
-                          }
-                        />
-                      </Grid>
-                      <Grid item xs={3}>
-                        <FormControl fullWidth>
-                          <InputLabel>Role</InputLabel>
-                          <Select
-                            value={newTemplate.role}
-                            onChange={(e) =>
-                              setNewTemplate({ ...newTemplate, role: e.target.value })
-                            }
-                            label="Role"
-                          >
-                            <MenuItem value="" disabled>Select Role</MenuItem>
-                            {roles.map((role) => (
-                              <MenuItem key={role} value={role}>
-                                {role}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {/* Tab 2: Postback URL Editor */}
-            {tabValue === 1 && (
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Postback URL Configuration
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Create a postback URL template with dynamic parameters. Traffic sources will use this URL to notify your system about conversions.
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <TextField
-                      fullWidth
-                      label="Postback URL"
-                      value={newTemplate.postbackUrl}
-                      onChange={(e) => setNewTemplate({ ...newTemplate, postbackUrl: e.target.value })}
-                      multiline
-                      rows={3}
-                      sx={{ mr: 1 }}
-                    />
-                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                      <IconButton onClick={handleCopyPostback} title="Copy URL">
-                        <ContentCopyIcon />
-                      </IconButton>
-                      <IconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
-                        <HelpOutlineIcon />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Available Parameters:
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
-                      <Button 
-                        key={key}
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleInsertMacro(value)}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        {value}
-                      </Button>
-                    ))}
-                  </Box>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Example preview:
-                  </Typography>
-                  
-                  <TextField
-                    fullWidth
-                    disabled
-                    value={parsePostbackUrl(newTemplate.postbackUrl, {
-                      click_id: 'abc123',
-                      payout: '10.00',
-                      revenue: '10.00',
-                      conversion_id: '123456',
-                      offer_id: '789',
-                      campaign_id: 'camp_1',
-                      status: '1'
-                    })}
-                  />
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    This URL will be used to receive conversion data from your traffic sources. The system will also automatically forward this data to the respective advertising platform (like Facebook or Google) based on your API configuration.
-                    
-                    {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'facebook' && (
-                      <Box mt={1}>
-                        <strong>Facebook-specific:</strong> Use {'{sub1}'} for user_id, {'{sub2}'} for email, and {'{sub3}'} for phone.
-                        These values will be automatically hashed for privacy as required by Facebook.
-                      </Box>
-                    )}
-                    
-                    {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'google' && (
-                      <Box mt={1}>
-                        <strong>Google-specific:</strong> Use {'{gclid}'} or {'{sub1}'} for Google Click ID for conversion tracking.
-                        For enhanced conversions, you can also use {'{sub2}'} for email and {'{sub3}'} for phone number.
-                      </Box>
-                    )}
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Tab 3: API Configuration */}
-            {tabValue === 2 && (
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    API Configuration
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Configure API settings to automatically send conversion data to traffic sources.
-                  </Typography>
-                  
-                  {/* Add Conversion API forwarding section */}
-                  <Box sx={{ mt: 3, mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Conversion Forwarding
-                    </Typography>
-                    
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={newTemplate.forward_to_facebook}
-                          onChange={(e) => setNewTemplate({ 
-                            ...newTemplate, 
-                            forward_to_facebook: e.target.checked 
-                          })}
-                          color="primary"
-                        />
-                      }
-                      label="Forward conversions to Facebook"
-                    />
-                    
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={newTemplate.forward_to_google}
-                          onChange={(e) => setNewTemplate({ 
-                            ...newTemplate, 
-                            forward_to_google: e.target.checked 
-                          })}
-                          color="primary"
-                        />
-                      }
-                      label="Forward conversions to Google"
-                    />
-                  </Box>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Conversion Settings
-                  </Typography>
-                  
-                  <TextField
-                    fullWidth
-                    label="Default Event Name"
-                    value={newTemplate.default_event_name}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, default_event_name: e.target.value })}
-                    sx={{ mb: 2 }}
-                    helperText="Default event name for conversions (e.g., purchase, lead, complete_registration)"
-                  />
-                  
-                  {/* Show Facebook-specific fields if the source type is Facebook */}
-                  {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'facebook' && (
-                    <>
-                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 3 }}>
-                        Facebook API Configuration
-                      </Typography>
-                      
-                      <TextField
-                        fullWidth
-                        label="Facebook Pixel ID"
-                        value={newTemplate.pixel_id}
-                        onChange={(e) => setNewTemplate({ ...newTemplate, pixel_id: e.target.value })}
-                        sx={{ mb: 2 }}
-                        helperText="Your Facebook Pixel ID (required for Facebook Conversions API)"
-                      />
-                      
-                      <TextField
-                        fullWidth
-                        label="Facebook API Access Token"
-                        value={newTemplate.api_key}
-                        onChange={(e) => setNewTemplate({ ...newTemplate, api_key: e.target.value })}
-                        type="password"
-                        helperText="Your Facebook API Access Token (required for Facebook Conversions API)"
-                      />
-                      
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        These credentials will be used to send conversion data to Facebook Conversions API. 
-                        When a conversion occurs, the system will automatically hash personal data and send it to Facebook
-                        following their data privacy requirements.
-                      </Typography>
-                    </>
-                  )}
-                  
-                  {/* Show Google-specific fields if the source type is Google */}
-                  {newTemplate.sourceType && newTemplate.sourceType.toLowerCase() === 'google' && (
-                    <>
-                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 3 }}>
-                        Google Ads Configuration
-                      </Typography>
-                      
-                      <TextField
-                        fullWidth
-                        label="Google Ads Account ID"
-                        value={newTemplate.google_ads_id}
-                        onChange={(e) => setNewTemplate({ ...newTemplate, google_ads_id: e.target.value })}
-                        sx={{ mb: 2 }}
-                        helperText="Your Google Ads Account ID without dashes (required for Google Ads conversion tracking)"
-                      />
-                      
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            label="Conversion ID"
-                            value={newTemplate.conversion_id}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, conversion_id: e.target.value })}
-                            helperText="Google Ads Conversion ID"
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            label="Conversion Label"
-                            value={newTemplate.conversion_label}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, conversion_label: e.target.value })}
-                            helperText="Google Ads Conversion Label"
-                          />
-                        </Grid>
-                      </Grid>
-                      
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        These credentials will be used to send conversion data to Google Ads. 
-                        When a conversion occurs, the system will attempt to use the GCLID (Google Click ID) for tracking,
-                        or use enhanced conversions with hashed email and phone if available.
-                      </Typography>
-                    </>
-                  )}
-                  
-                  <Box sx={{ mt: 4, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                    <Typography variant="subtitle2" color="primary">
-                      How the Postback System Works
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      1. A user clicks on your ad and is redirected to your landing page with tracking parameters.
-                    </Typography>
-                    <Typography variant="body2">
-                      2. When a conversion occurs, the postback URL is pinged with conversion data.
-                    </Typography>
-                    <Typography variant="body2">
-                      3. Our system records the conversion and automatically forwards it to the respective traffic source (Facebook/Google).
-                    </Typography>
-                    <Typography variant="body2">
-                      4. No additional code or pixels needed - everything is handled server-side!
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            )}
-
-            <Divider sx={{ my: 3 }} />
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button onClick={() => setOpenTemplateModal(false)} sx={{ mr: 2 }}>
-                Cancel
-              </Button>
-              <Button variant="contained" color="primary" onClick={handleSaveTemplate}>
-                {editMode ? "Save Changes" : "Save Template"}
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
-        
-        {/* Postback Testing Dialog */}
-        <Modal 
-          open={postbackTestDialogOpen} 
-          onClose={handleClosePostbackTest}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "800px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflow: "auto",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              Test Postback URL
-              {selectedSource && (
-                <Typography variant="subtitle2" color="text.secondary">
-                  {selectedSource.source_name} ({selectedSource.source_type})
-                </Typography>
-              )}
-            </Typography>
-            
-            {selectedSource && (
-              <>
-                <Typography variant="subtitle2" gutterBottom>
-                  Postback URL Template:
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={selectedSource.postback || 'No postback URL configured'}
-                  InputProps={{ readOnly: true }}
-                  sx={{ mb: 3 }}
-                />
-                
-                <Typography variant="subtitle2" gutterBottom>
-                  Test Parameters:
-                </Typography>
-                
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Click ID"
-                      name="click_id"
-                      value={testPostbackData.click_id}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Payout"
-                      name="payout"
-                      value={testPostbackData.payout}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Revenue"
-                      name="revenue"
-                      value={testPostbackData.revenue}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Conversion ID"
-                      name="conversion_id"
-                      value={testPostbackData.conversion_id}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Offer ID"
-                      name="offer_id"
-                      value={testPostbackData.offer_id}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Event Name"
-                      name="event_name"
-                      value={testPostbackData.event_name}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  
-                  {/* Show Facebook-specific fields if the source is Facebook */}
-                  {selectedSource.source_type && selectedSource.source_type.toLowerCase() === 'facebook' && (
-                    <>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="User ID (sub1)"
-                          name="sub1"
-                          value={testPostbackData.sub1}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="Email (sub2)"
-                          name="sub2"
-                          value={testPostbackData.sub2}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="Phone (sub3)"
-                          name="sub3"
-                          value={testPostbackData.sub3}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                    </>
-                  )}
-                  
-                  {/* Show Google-specific fields if the source is Google */}
-                  {selectedSource.source_type && selectedSource.source_type.toLowerCase() === 'google' && (
-                    <>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="GCLID"
-                          name="gclid"
-                          value={testPostbackData.gclid}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="Email (sub2)"
-                          name="sub2"
-                          value={testPostbackData.sub2}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          fullWidth
-                          label="Phone (sub3)"
-                          name="sub3"
-                          value={testPostbackData.sub3}
-                          onChange={handleTestDataChange}
-                        />
-                      </Grid>
-                    </>
-                  )}
-                </Grid>
-                
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleGenerateTestUrl}
-                    disabled={!selectedSource.postback}
-                  >
-                    Generate Test URL
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleTestPostback}
-                    disabled={!selectedSource.postback || isTesting}
-                  >
-                    {isTesting ? 'Testing...' : 'Send Test Postback'}
-                  </Button>
-                </Box>
-                
-                {processedUrl && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Generated URL:
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      value={processedUrl}
-                      multiline
-                      rows={2}
-                      InputProps={{
-                        readOnly: true,
-                        endAdornment: (
-                          <IconButton
-                            onClick={() => {
-                              navigator.clipboard.writeText(processedUrl);
-                              setSnackbar({
-                                open: true,
-                                message: 'URL copied to clipboard',
-                                severity: 'success'
-                              });
-                            }}
-                          >
-                            <ContentCopyIcon />
-                          </IconButton>
-                        )
-                      }}
-                    />
-                  </Box>
-                )}
-                
-                {testResult && (
-                  <Paper 
-                    sx={{ 
-                      p: 2, 
-                      bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
-                      borderRadius: 1
-                    }}
-                  >
-                    <Typography>
-                      {testResult.message}
-                    </Typography>
-                    
-                    {testResult.success && testResult.data && (
-                      <Box mt={2}>
-                        <Typography variant="subtitle2">Response Data:</Typography>
-                        <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                          {JSON.stringify(testResult.data, null, 2)}
-                        </pre>
-                      </Box>
-                    )}
-                    
-                    {testResult.success && selectedSource && (
-                      <Box mt={2} p={2} bgcolor="#f5f5f5" borderRadius={1}>
-                        <Typography variant="subtitle2">
-                          Conversion API Settings:
-                        </Typography>
-                        <Box mt={1}>
-                          <Typography variant="body2">
-                            <strong>Forward to Facebook:</strong> {selectedSource.forward_to_facebook ? 'Enabled' : 'Disabled'}
-                            {selectedSource.forward_to_facebook && !selectedSource.pixel_id && ' (Pixel ID missing)'}
-                          </Typography>
-                          
-                          <Typography variant="body2">
-                            <strong>Forward to Google:</strong> {selectedSource.forward_to_google ? 'Enabled' : 'Disabled'}
-                            {selectedSource.forward_to_google && !selectedSource.google_ads_id && ' (Google Ads ID missing)'}
-                          </Typography>
-                        </Box>
-                        <Box mt={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            When enabled, conversions will be automatically forwarded to the respective platforms.
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-                  </Paper>
-                )}
-              </>
-            )}
-            
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
-              <Button onClick={handleClosePostbackTest}>
-                Close
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
-        
-        {/* Delete Confirmation Dialog */}
-        <Modal
-          open={deleteConfirmOpen}
-          onClose={() => setDeleteConfirmOpen(false)}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "400px",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              Confirm Deletion
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3 }}>
-              Are you sure you want to delete this traffic source? This action cannot be undone.
-            </Typography>
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button 
-                onClick={() => setDeleteConfirmOpen(false)} 
-                sx={{ mr: 2 }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                color="error" 
-                onClick={handleConfirmDelete}
-              >
-                Delete
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
-        
-        {/* Snackbar for notifications */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        >
-          <Alert 
-            onClose={handleCloseSnackbar} 
-            severity={snackbar.severity}
-            sx={{ width: '100%' }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </Box>
+
+      <Paper elevation={2}>
+        {loading ? (
+          <Box display="flex" justifyContent="center" p={4}>
+            <CircularProgress />
+          </Box>
+        ) : campaigns.length === 0 ? (
+          <Box p={4} textAlign="center">
+            <Typography>No campaigns found. Create your first campaign!</Typography>
+          </Box>
+        ) : (
+          <DataGrid
+            rows={campaigns}
+            columns={columns}
+            pageSize={10}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            checkboxSelection
+            onSelectionModelChange={(ids) => setSelectedRows(ids)}
+            disableSelectionOnClick
+            autoHeight
+            sx={{ minHeight: 400 }}
+            getRowId={(row) => row.id}
+          />
+        )}
+      </Paper>
+
+      {/* Create Campaign Modal */}
+      <CampaignModal 
+        open={createOpen} 
+        onClose={handleCreateClose} 
+        onCreate={handleCreate} 
+      />
+      
+      {/* Edit Campaign Modal */}
+      {selectedCampaign && (
+        <CampaignModal 
+          open={editOpen} 
+          onClose={handleEditClose} 
+          onCreate={handleCreate} 
+          editMode={true}
+          campaignData={selectedCampaign}
+        />
+      )}
+      
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
-};
-
-export default OfferSourcePage;
+}
