@@ -10,6 +10,8 @@ import DateRangeIcon from "@mui/icons-material/DateRange";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CancelIcon from "@mui/icons-material/Cancel";
+import LockIcon from "@mui/icons-material/Lock";
 import {
   Button,
   IconButton,
@@ -32,14 +34,7 @@ import {
   Alert,
   Divider,
   Chip,
-  Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Stepper,
-  Step,
-  StepLabel,
-  Badge
+  Paper
 } from "@mui/material";
 import Layout from "./Layout";
 import axios from "axios";
@@ -47,8 +42,8 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 
-// Updated API URL with your specified endpoint
-const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
+// API URL with your specified endpoint
+const API_URL = process.env.REACT_APP_API_URL || "https://yourapi.com";
 
 // Utility functions for formatting numbers and percentages
 const formatNumber = (num, decimals = 2) => {
@@ -97,8 +92,7 @@ const TrafficChannels = () => {
   });
   const [editMode, setEditMode] = useState(false);
   const [formErrors, setFormErrors] = useState({});
-  const [activeStep, setActiveStep] = useState(0);
-  const [expandedSections, setExpandedSections] = useState({});
+  const [currentTab, setCurrentTab] = useState(0);
   
   // Enhanced form data with all potential platform-specific fields
   const [formData, setFormData] = useState({
@@ -112,20 +106,21 @@ const TrafficChannels = () => {
     clickRefId: "",
     externalId: "",
     
+    // Custom parameters for platforms (up to 20)
+    customParameters: Array(20).fill().map((_, index) => ({
+      name: `sub${index + 1}`,
+      macro: index < 3 ? `{{ad.id}}` : "",
+      description: index < 3 ? `ad_id` : "hint",
+      role: index < 3 ? "Aid" : ""
+    })),
+    
     // Facebook specific
     pixelId: "",
     apiAccessToken: "",
     defaultEventName: "Purchase",
+    payoutType: "",
+    value: "",
     customConversionMatching: false,
-    
-    // Facebook macro settings
-    fbPixelMacros: {
-      eventId: "{event_id}",
-      valueParam: "{value}",
-      currencyParam: "{currency}",
-      contentTypeParam: "{content_type}",
-      contentIdsParam: "{content_ids}"
-    },
     
     // Google specific
     googleAdsAccountId: "",
@@ -134,43 +129,13 @@ const TrafficChannels = () => {
     conversionName: "",
     conversionCategory: "",
     includeInConversions: "",
+    profileId: "",
+    floodlightActivityId: "",
     
-    // Google macro settings
-    googleMacros: {
-      clickId: "gclid={gclid}",
-      conversionId: "{conversion_id}",
-      conversionLabel: "{conversion_label}",
-      conversionValue: "{value}",
-      currencyCode: "{currency}"
-    },
-    
-    // TikTok specific
-    tiktokAccessToken: "",
-    tiktokPixelCode: "",
-    tiktokAdvertiserId: "",
-    tiktokEventId: "",
-    
-    // TikTok macro settings
-    tiktokMacros: {
-      clickId: "ttclid={ttclid}",
-      eventId: "{event_id}",
-      eventType: "{event_type}",
-      value: "{value}",
-      currency: "{currency}"
-    },
-    
-    // Custom additional parameters
-    customParameters: [
-      { name: "", value: "" }
-    ],
-    
-    // Connection status flag
+    // Connection status
     connectionComplete: false,
     status: "Active"
   });
-
-  // Define steps for the channel setup wizard
-  const steps = ['Basic Info', 'Platform Settings', 'Connection'];
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -181,7 +146,6 @@ const TrafficChannels = () => {
     const success = searchParams.get('success');
     const platform = searchParams.get('platform');
     const code = searchParams.get('code');
-    const scope = searchParams.get('scope');
     
     if ((success === 'true' || code) && platform) {
       // Check if there's stored state in localStorage
@@ -198,7 +162,7 @@ const TrafficChannels = () => {
             severity: 'success'
           });
           
-          // Restore the modal state and advance to final step
+          // Restore the modal state
           if (state.editingChannelId) {
             // Find the channel and open it for editing
             const channelToEdit = rows.find(row => row.id === state.editingChannelId);
@@ -212,7 +176,12 @@ const TrafficChannels = () => {
               setEditMode(true);
               setSelectedRow(channelToEdit);
               setOpenSecondModal(true);
-              setActiveStep(2); // Move to the final step
+              // Set tab based on platform
+              if (platform.toLowerCase() === 'facebook') {
+                setCurrentTab(1); // Facebook tab
+              } else if (platform.toLowerCase() === 'google') {
+                setCurrentTab(2); // Google tab
+              }
             }
           } else if (state.formData) {
             // For new channel creation
@@ -222,7 +191,12 @@ const TrafficChannels = () => {
             });
             setSelectedChannel(state.selectedChannel);
             setOpenSecondModal(true);
-            setActiveStep(2); // Move to the final step
+            // Set tab based on platform
+            if (platform.toLowerCase() === 'facebook') {
+              setCurrentTab(1); // Facebook tab
+            } else if (platform.toLowerCase() === 'google') {
+              setCurrentTab(2); // Google tab
+            }
           }
           
           // Update auth status
@@ -374,13 +348,20 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
-      fbPixelMacros: {
-        eventId: "{event_id}",
-        valueParam: "{value}",
-        currencyParam: "{currency}",
-        contentTypeParam: "{content_type}",
-        contentIdsParam: "{content_ids}"
-      }
+      customParameters: Array(20).fill().map((_, index) => {
+        if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
+        if (index === 1) return { name: "sub2", macro: "{{adset.id}}", description: "adset_id", role: "Gid" };
+        if (index === 2) return { name: "sub3", macro: "{{campaign.id}}", description: "campaign_id", role: "Cid" };
+        if (index === 3) return { name: "sub4", macro: "{{ad.name}}", description: "ad_name", role: "Rt ad" };
+        if (index === 4) return { name: "sub5", macro: "{{adset.name}}", description: "adset_name", role: "Rt adgroup" };
+        if (index === 5) return { name: "sub6", macro: "{{campaign.name}}", description: "campaign_name", role: "Rt campaign" };
+        if (index === 6) return { name: "sub7", macro: "{{placement}}", description: "Placement", role: "Rt placement" };
+        if (index === 7) return { name: "sub8", macro: "{{site_source_name}}", description: "Site source name", role: "" };
+        if (index === 8) return { name: "utm_source", macro: "facebook", description: "UTM source", role: "Rt source" };
+        if (index === 9) return { name: "utm_medium", macro: "paid", description: "UTM medium", role: "Rt medium" };
+        if (index === 10) return { name: "fbclid", macro: "", description: "Facebook click ID", role: "" };
+        return { name: `sub${index + 1}`, macro: "", description: "hint", role: "" };
+      })
     },
     Google: {
       channelName: "Google Ads",
@@ -389,13 +370,20 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
-      googleMacros: {
-        clickId: "gclid={gclid}",
-        conversionId: "{conversion_id}",
-        conversionLabel: "{conversion_label}",
-        conversionValue: "{value}",
-        currencyCode: "{currency}"
-      }
+      customParameters: Array(20).fill().map((_, index) => {
+        if (index === 0) return { name: "sub1", macro: "{{creative.id}}", description: "creative_id", role: "Aid" };
+        if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
+        if (index === 2) return { name: "sub3", macro: "{{campaign.id}}", description: "campaign_id", role: "Cid" };
+        if (index === 3) return { name: "sub4", macro: "{{creative.name}}", description: "creative_name", role: "Rt ad" };
+        if (index === 4) return { name: "sub5", macro: "{{adgroup.name}}", description: "adgroup_name", role: "Rt adgroup" };
+        if (index === 5) return { name: "sub6", macro: "{{campaign.name}}", description: "campaign_name", role: "Rt campaign" };
+        if (index === 6) return { name: "sub7", macro: "{{placement}}", description: "Placement", role: "Rt placement" };
+        if (index === 7) return { name: "sub8", macro: "{{network}}", description: "Network", role: "" };
+        if (index === 8) return { name: "utm_source", macro: "google", description: "UTM source", role: "Rt source" };
+        if (index === 9) return { name: "utm_medium", macro: "cpc", description: "UTM medium", role: "Rt medium" };
+        if (index === 10) return { name: "gclid", macro: "{gclid}", description: "Google Click ID", role: "" };
+        return { name: `sub${index + 1}`, macro: "", description: "hint", role: "" };
+      })
     },
     TikTok: {
       channelName: "TikTok Ads",
@@ -404,13 +392,18 @@ const TrafficChannels = () => {
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
       defaultEventName: "Purchase",
-      tiktokMacros: {
-        clickId: "ttclid={ttclid}",
-        eventId: "{event_id}",
-        eventType: "{event_type}",
-        value: "{value}",
-        currency: "{currency}"
-      }
+      customParameters: Array(20).fill().map((_, index) => {
+        if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
+        if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
+        if (index === 2) return { name: "sub3", macro: "{{campaign.id}}", description: "campaign_id", role: "Cid" };
+        if (index === 3) return { name: "sub4", macro: "{{ad.name}}", description: "ad_name", role: "Rt ad" };
+        if (index === 4) return { name: "sub5", macro: "{{adgroup.name}}", description: "adgroup_name", role: "Rt adgroup" };
+        if (index === 5) return { name: "sub6", macro: "{{campaign.name}}", description: "campaign_name", role: "Rt campaign" };
+        if (index === 6) return { name: "utm_source", macro: "tiktok", description: "UTM source", role: "Rt source" };
+        if (index === 7) return { name: "utm_medium", macro: "paid", description: "UTM medium", role: "Rt medium" };
+        if (index === 8) return { name: "ttclid", macro: "{ttclid}", description: "TikTok Click ID", role: "" };
+        return { name: `sub${index + 1}`, macro: "", description: "hint", role: "" };
+      })
     },
     Custom: {
       channelName: "",
@@ -421,13 +414,10 @@ const TrafficChannels = () => {
       s2sPostbackUrl: "",
       clickRefId: "",
       externalId: "",
-      defaultEventName: "Purchase",
-      customConversionMatching: false,
-      connectionComplete: false,
-      status: "Active",
-      customParameters: [
-        { name: "", value: "" }
-      ]
+      customParameters: Array(20).fill().map((_, index) => (
+        { name: `sub${index + 1}`, macro: "", description: "hint", role: "" }
+      )),
+      status: "Active"
     }
   };
 
@@ -456,7 +446,7 @@ const TrafficChannels = () => {
       const formattedStartDate = dateRange.startDate.toISOString().split('T')[0];
       const formattedEndDate = dateRange.endDate.toISOString().split('T')[0];
       
-      // Updated API endpoint to match your specified endpoint
+      // API endpoint
       const response = await axios.get(`${API_URL}/api/traffic`, {
         params: {
           start_date: formattedStartDate,
@@ -559,14 +549,6 @@ const TrafficChannels = () => {
     }
   };
 
-  // Toggle accordion sections
-  const handleToggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
   // Form change handler for basic fields
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -584,43 +566,13 @@ const TrafficChannels = () => {
     setFormData(prev => ({ ...prev, [name]: newValue }));
   };
 
-  // Form change handler for nested fields (macros)
-  const handleNestedFormChange = (category, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: value
-      }
-    }));
-  };
-
-  // Handle custom parameters
-  const handleCustomParamChange = (index, field, value) => {
+  // Form change handler for custom parameters
+  const handleParamChange = (index, field, value) => {
     const updatedParams = [...formData.customParameters];
     updatedParams[index] = {
       ...updatedParams[index],
       [field]: value
     };
-    
-    setFormData(prev => ({
-      ...prev,
-      customParameters: updatedParams
-    }));
-  };
-
-  // Add new custom parameter
-  const handleAddCustomParam = () => {
-    setFormData(prev => ({
-      ...prev,
-      customParameters: [...prev.customParameters, { name: "", value: "" }]
-    }));
-  };
-
-  // Remove custom parameter
-  const handleRemoveCustomParam = (index) => {
-    const updatedParams = [...formData.customParameters];
-    updatedParams.splice(index, 1);
     
     setFormData(prev => ({
       ...prev,
@@ -669,7 +621,7 @@ const TrafficChannels = () => {
     }
     
     setEditMode(false);
-    setActiveStep(0); // Reset to first step
+    setCurrentTab(0); // Reset to first tab
     setOpenSecondModal(true);
     setOpenModal(false);
   };
@@ -683,7 +635,7 @@ const TrafficChannels = () => {
     });
     setSelectedChannel(channel.aliasChannel);
     setEditMode(true);
-    setActiveStep(0); // Start at first step when editing
+    setCurrentTab(0); // Start at first tab when editing
     setOpenSecondModal(true);
   };
 
@@ -730,32 +682,19 @@ const TrafficChannels = () => {
     }
   };
 
-  // Next step in wizard
-  const handleNext = () => {
-    // Validate if on first step
-    if (activeStep === 0) {
-      if (!validateBasicSettings()) {
-        setSnackbar({
-          open: true,
-          message: "Please fill in all required fields",
-          severity: "error"
-        });
-        return;
-      }
-    }
-    
-    // Move to next step
-    setActiveStep(prevStep => prevStep + 1);
-  };
-
-  // Back step in wizard
-  const handleBack = () => {
-    setActiveStep(prevStep => Math.max(0, prevStep - 1));
-  };
-
-  // Form submission - Save current progress
+  // Form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    if (!validateBasicSettings()) {
+      setSnackbar({
+        open: true,
+        message: "Please fill in all required fields",
+        severity: "error"
+      });
+      return;
+    }
     
     try {
       setLoading(prev => ({ ...prev, save: true }));
@@ -798,17 +737,13 @@ const TrafficChannels = () => {
         setEditMode(true);
       }
       
-      // If we're on the final step, close the modal
-      if (activeStep === 2) {
-        resetForm();
-        setOpenSecondModal(false);
-      } else if (isPlatformConnectable(formData.aliasChannel) && activeStep === 1) {
-        // If platform requires connection and we're on the platform settings step
-        handleNext(); // Move to connection step
-      }
-      
       // Refresh the data to ensure we have the latest from the server
       fetchChannels();
+      
+      // Don't automatically close the modal - let users navigate to platform settings
+      if (!isPlatformConnectable(formData.aliasChannel)) {
+        setOpenSecondModal(false);
+      }
     } catch (error) {
       console.error("Error saving channel:", error);
       setSnackbar({
@@ -821,24 +756,18 @@ const TrafficChannels = () => {
     }
   };
 
-  // Reset form
-  const resetForm = () => {
-    setFormData(channelTemplates.Custom);
-    setSelectedChannel(null);
-    setSelectedRow(null);
-    setFormErrors({});
-    setEditMode(false);
-    setActiveStep(0);
-    setExpandedSections({});
-  };
-
   // Modal controls
   const handleOpenModal = () => setOpenModal(true);
   const handleCloseModal = () => setOpenModal(false);
   
   const handleCloseSecondModal = () => {
     setOpenSecondModal(false);
-    resetForm();
+    setFormData(channelTemplates.Custom);
+    setSelectedChannel(null);
+    setSelectedRow(null);
+    setFormErrors({});
+    setEditMode(false);
+    setCurrentTab(0);
   };
 
   // Close snackbar
@@ -848,1163 +777,523 @@ const TrafficChannels = () => {
 
   // Handle row click to navigate to detailed view
   const handleRowClick = (params) => {
-    navigate(`/api/traffic/${params.id}/details`);
+    navigate(`/traffic/${params.id}/details`);
   };
 
-  // Helper to render connection section based on platform
-  const renderConnectionSection = (platformName) => {
-    if (!isPlatformConnectable(platformName)) {
-      return null;
-    }
-
-    const platform = platformName.toLowerCase();
-    const isConnected = authStatus[platform];
+  // Render Facebook connection section
+  const renderFacebookConnection = () => {
+    const isConnected = authStatus.facebook;
     
     return (
-      <Box
-        sx={{
-          border: "1px solid #e0e0e0",
-          borderRadius: 2,
-          p: 3,
-          mb: 3,
-          backgroundColor: isConnected ? "#f0f7ff" : "#f8f9fa",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
-        }}
-      >
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={7}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {getChannelIcon(platformName)}
-              <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                {platformName} API Integration
-              </Typography>
-              {isConnected && (
-                <Chip 
-                  icon={<CheckIcon />} 
-                  label="Connected" 
-                  color="success" 
-                  size="small"
-                />
-              )}
-            </Box>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              {isConnected ? 
-                `Your ${platformName} account is connected and ready to use.` :
-                `Connect your ${platformName} account to enable:`
-              }
-              {!isConnected && (
-                <Box component="ul" sx={{ pl: 2, mt: 1, mb: 1 }}>
-                  <Box component="li">Automatic cost updates</Box>
-                  <Box component="li">Campaign management</Box>
-                  <Box component="li">Conversion tracking</Box>
-                </Box>
-              )}
+      <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6">Facebook API integration</Typography>
+            <Tooltip title="Integration information">
+              <InfoIcon sx={{ color: '#6b7280', cursor: 'pointer' }} />
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
+              {isConnected ? "Connected" : "Not connected"}
             </Typography>
+            {isConnected ? (
+              <CheckIcon color="success" fontSize="small" />
+            ) : (
+              <CancelIcon color="error" fontSize="small" />
+            )}
+          </Box>
+        </Box>
+        
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<img src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" alt="Facebook" style={{ width: 24, height: 24 }} />}
+          onClick={() => handleAuth('facebook')}
+          disabled={loading.facebook}
+          sx={{ mb: 2, bgcolor: '#1877F2', '&:hover': { bgcolor: '#166FE5' } }}
+        >
+          {loading.facebook ? <CircularProgress size={24} /> : "Connect Facebook"}
+        </Button>
+        
+        <Box sx={{ mt: 2, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <InfoIcon fontSize="small" />
+            <Typography variant="body2">Please allow access to your Facebook profile to activate integrations:</Typography>
+          </Box>
+          <Typography variant="body2" sx={{ pl: 3 }}>#1 Click on "Connect" and accept integration permissions</Typography>
+          <Typography variant="body2" sx={{ pl: 3 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
+        </Box>
+        
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Facebook default data source (pixel)</Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Pixel ID</Typography>
+              <TextField
+                fullWidth
+                name="pixelId"
+                value={formData.pixelId}
+                onChange={handleFormChange}
+                placeholder="Pixel ID"
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversions API Access token</Typography>
+              <TextField
+                fullWidth
+                name="apiAccessToken"
+                value={formData.apiAccessToken}
+                onChange={handleFormChange}
+                placeholder="Conversions API Access token"
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Default Event name</Typography>
+              <TextField
+                fullWidth
+                name="defaultEventName"
+                value={formData.defaultEventName}
+                onChange={handleFormChange}
+                placeholder="Default Event name"
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Payout type</Typography>
+              <Select
+                fullWidth
+                name="payoutType"
+                value={formData.payoutType}
+                onChange={handleFormChange}
+                displayEmpty
+                size="small"
+              >
+                <MenuItem value="">Select</MenuItem>
+                <MenuItem value="CPA">CPA</MenuItem>
+                <MenuItem value="CPC">CPC</MenuItem>
+                <MenuItem value="CPL">CPL</MenuItem>
+              </Select>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Value</Typography>
+              <TextField
+                fullWidth
+                name="value"
+                value={formData.value}
+                onChange={handleFormChange}
+                placeholder="Value"
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                <Switch
+                  checked={formData.customConversionMatching}
+                  onChange={(e) => handleFormChange({
+                    target: {
+                      name: 'customConversionMatching',
+                      type: 'checkbox',
+                      checked: e.target.checked
+                    }
+                  })}
+                  name="customConversionMatching"
+                  color="primary"
+                />
+                <Typography variant="body2" sx={{ ml: 1 }}>
+                  Custom Conversion Matching
+                </Typography>
+              </Box>
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={5} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render Google connection section
+  const renderGoogleConnection = () => {
+    const isConnected = authStatus.google;
+    
+    return (
+      <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6">Google API integration</Typography>
+            <Tooltip title="Integration information">
+              <InfoIcon sx={{ color: '#6b7280', cursor: 'pointer' }} />
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
+              {isConnected ? "Connected" : "Not connected"}
+            </Typography>
+            {isConnected ? (
+              <CheckIcon color="success" fontSize="small" />
+            ) : (
+              <CancelIcon color="error" fontSize="small" />
+            )}
+          </Box>
+        </Box>
+        
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={8}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Google Ads Account ID *</Typography>
+            <TextField
+              fullWidth
+              name="googleAdsAccountId"
+              value={formData.googleAdsAccountId}
+              onChange={handleFormChange}
+              placeholder="Google Ads Account ID"
+              variant="outlined"
+              size="small"
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
-              variant={isConnected ? "contained" : "outlined"}
-              color={isConnected ? "success" : "primary"}
-              sx={{ 
-                textTransform: "none", 
-                py: 1.2,
-                px: 3,
-                borderRadius: 2,
-                boxShadow: isConnected ? 3 : 0
-              }}
-              onClick={() => handleAuth(platform)}
-              disabled={loading[platform]}
-              startIcon={isConnected ? <CheckIcon /> : getChannelIcon(platformName)}
+              variant="outlined"
+              onClick={() => handleAuth('google')}
+              disabled={loading.google}
+              startIcon={<img src="https://developers.google.com/static/ads/images/ads_192px_clr.svg" alt="Google" style={{ width: 20, height: 20 }} />}
+              fullWidth
+              sx={{ mb: 0.5 }}
             >
-              {loading[platform] ? 
-                <CircularProgress size={24} /> : 
-                isConnected ? "Reconnect" : `Connect ${platformName}`
-              }
+              {loading.google ? <CircularProgress size={24} /> : "Sign in with Google"}
             </Button>
           </Grid>
         </Grid>
-      </Box>
-    );
-  };
-
-  // Render Facebook specific settings
-  const renderFacebookSettings = () => {
-    return (
-      <>
-        {/* Facebook Pixel Data Section */}
-        <Accordion 
-          expanded={expandedSections.fbPixel !== false} 
-          onChange={() => handleToggleSection('fbPixel')}
-          sx={{ mb: 2 }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Facebook Pixel Settings
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              {/* Pixel ID */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Pixel ID"
-                  name="pixelId"
-                  value={formData.pixelId}
-                  onChange={handleFormChange}
-                  placeholder="Enter your Facebook Pixel ID"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your Facebook Pixel ID">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* Conversions API Access Token */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Conversions API Access Token"
-                  name="apiAccessToken"
-                  value={formData.apiAccessToken}
-                  onChange={handleFormChange}
-                  placeholder="Enter your Facebook API Access Token"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your Facebook API Access Token">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* Default Event Name */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Default Event Name"
-                  name="defaultEventName"
-                  value={formData.defaultEventName}
-                  onChange={handleFormChange}
-                  placeholder="e.g., Purchase, Lead"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* Custom Conversion Matching */}
-              <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
-                <FormControl component="fieldset" sx={{ width: '100%' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                    <Switch
-                      checked={formData.customConversionMatching}
-                      onChange={(e) =>
-                        setFormData((prevState) => ({
-                          ...prevState,
-                          customConversionMatching: e.target.checked,
-                        }))
-                      }
-                      name="customConversionMatching"
-                      color="primary"
-                    />
-                    <Typography variant="body1" sx={{ ml: 1 }}>
-                      Custom Conversion Matching
-                    </Typography>
-                    <Tooltip title="Enable to use custom matching parameters for improved conversion tracking">
-                      <HelpOutlineIcon fontSize="small" sx={{ ml: 1, cursor: "pointer", color: "#6b7280" }} />
-                    </Tooltip>
-                  </Box>
-                </FormControl>
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* Facebook Macros Section */}
-        <Accordion 
-          expanded={expandedSections.fbMacros !== false} 
-          onChange={() => handleToggleSection('fbMacros')}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Facebook Macros
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                  Configure the macros that will be used for tracking and data passing with Facebook.
-                </Typography>
-              </Grid>
-              
-              {/* Event ID Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Event ID Macro"
-                  value={formData.fbPixelMacros.eventId}
-                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'eventId', e.target.value)}
-                  placeholder="{event_id}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Event ID parameter for tracking in Facebook">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Value Parameter Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Value Parameter Macro"
-                  value={formData.fbPixelMacros.valueParam}
-                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'valueParam', e.target.value)}
-                  placeholder="{value}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Value parameter for conversion value">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Currency Parameter Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Currency Parameter Macro"
-                  value={formData.fbPixelMacros.currencyParam}
-                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'currencyParam', e.target.value)}
-                  placeholder="{currency}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Currency parameter for conversion currency code">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Content Type Parameter Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Content Type Parameter Macro"
-                  value={formData.fbPixelMacros.contentTypeParam}
-                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'contentTypeParam', e.target.value)}
-                  placeholder="{content_type}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Content type parameter for conversion content type">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Content IDs Parameter Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Content IDs Parameter Macro"
-                  value={formData.fbPixelMacros.contentIdsParam}
-                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'contentIdsParam', e.target.value)}
-                  placeholder="{content_ids}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Content IDs parameter for conversion content identifiers">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-      </>
-    );
-  };
-
-  // Render Google specific settings
-  const renderGoogleSettings = () => {
-    return (
-      <>
-        {/* Google Ads Account Details */}
-        <Accordion 
-          expanded={expandedSections.googleAccount !== false} 
-          onChange={() => handleToggleSection('googleAccount')}
-          sx={{ mb: 2 }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Google Ads Account Details
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              {/* Google Ads Account ID */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Google Ads Account ID"
-                  name="googleAdsAccountId"
-                  value={formData.googleAdsAccountId}
-                  onChange={handleFormChange}
-                  placeholder="e.g., 123-456-7890"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your Google Ads Account ID (e.g., 123-456-7890)">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* Google MCC Account ID */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Google MCC Account ID"
-                  name="googleMccAccountId"
-                  value={formData.googleMccAccountId}
-                  onChange={handleFormChange}
-                  placeholder="Optional"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your Google MCC Account ID if applicable">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary">
-                  Add MCC account ID to send conversions to it and not the ad account (optional).
-                  Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
-                </Typography>
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* Conversion Matching Settings */}
-        <Accordion 
-          expanded={expandedSections.googleConversion !== false} 
-          onChange={() => handleToggleSection('googleConversion')}
-          sx={{ mb: 2 }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Conversion Matching Settings
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                  Configure how conversions are tracked and matched in Google Ads
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Type</Typography>
-                <FormControl fullWidth>
-                  <Select
-                    name="conversionType"
-                    value={formData.conversionType || ""}
-                    onChange={handleFormChange}
-                    displayEmpty
-                    variant="outlined"
-                  >
-                    <MenuItem value="">Select type</MenuItem>
-                    <MenuItem value="Purchase">Purchase</MenuItem>
-                    <MenuItem value="Lead">Lead</MenuItem>
-                    <MenuItem value="SignUp">Sign Up</MenuItem>
-                    <MenuItem value="PageView">Page View</MenuItem>
-                    <MenuItem value="AddToCart">Add To Cart</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Name</Typography>
-                <TextField
-                  fullWidth
-                  name="conversionName"
-                  placeholder="Enter name"
-                  value={formData.conversionName || ""}
-                  onChange={handleFormChange}
-                  variant="outlined"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Category</Typography>
-                <FormControl fullWidth>
-                  <Select
-                    name="conversionCategory"
-                    value={formData.conversionCategory || ""}
-                    onChange={handleFormChange}
-                    displayEmpty
-                    variant="outlined"
-                  >
-                    <MenuItem value="">Select category</MenuItem>
-                    <MenuItem value="Default">Default</MenuItem>
-                    <MenuItem value="Purchase">Purchase</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Include in Conversions</Typography>
-                <FormControl fullWidth>
-                  <Select
-                    name="includeInConversions"
-                    value={formData.includeInConversions || ""}
-                    onChange={handleFormChange}
-                    displayEmpty
-                    variant="outlined"
-                  >
-                    <MenuItem value="">Select option</MenuItem>
-                    <MenuItem value="Yes">Yes</MenuItem>
-                    <MenuItem value="No">No</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* Google Macros */}
-        <Accordion 
-          expanded={expandedSections.googleMacros !== false} 
-          onChange={() => handleToggleSection('googleMacros')}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Google Macros
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                  Configure the macros that will be used for tracking and data passing with Google Ads.
-                </Typography>
-              </Grid>
-              
-              {/* Click ID Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Click ID Macro"
-                  value={formData.googleMacros.clickId}
-                  onChange={(e) => handleNestedFormChange('googleMacros', 'clickId', e.target.value)}
-                  placeholder="gclid={gclid}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Google Click ID parameter for tracking">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Conversion ID Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Conversion ID Macro"
-                  value={formData.googleMacros.conversionId}
-                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionId', e.target.value)}
-                  placeholder="{conversion_id}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Conversion ID parameter for Google Ads">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Conversion Label Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Conversion Label Macro"
-                  value={formData.googleMacros.conversionLabel}
-                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionLabel', e.target.value)}
-                  placeholder="{conversion_label}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Conversion Label parameter for Google Ads">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Conversion Value Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Conversion Value Macro"
-                  value={formData.googleMacros.conversionValue}
-                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionValue', e.target.value)}
-                  placeholder="{value}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Conversion Value parameter for Google Ads">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Currency Code Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Currency Code Macro"
-                  value={formData.googleMacros.currencyCode}
-                  onChange={(e) => handleNestedFormChange('googleMacros', 'currencyCode', e.target.value)}
-                  placeholder="{currency}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Currency Code parameter for Google Ads">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-      </>
-    );
-  };
-
-  // Render TikTok specific settings
-  const renderTikTokSettings = () => {
-    return (
-      <>
-        {/* TikTok Account Settings */}
-        <Accordion 
-          expanded={expandedSections.tiktokAccount !== false} 
-          onChange={() => handleToggleSection('tiktokAccount')}
-          sx={{ mb: 2 }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              TikTok Account Settings
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              {/* TikTok Pixel Code */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="TikTok Pixel Code"
-                  name="tiktokPixelCode"
-                  value={formData.tiktokPixelCode}
-                  onChange={handleFormChange}
-                  placeholder="Enter your TikTok Pixel Code"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your TikTok Pixel Code">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* TikTok Advertiser ID */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="TikTok Advertiser ID"
-                  name="tiktokAdvertiserId"
-                  value={formData.tiktokAdvertiserId}
-                  onChange={handleFormChange}
-                  placeholder="Enter your TikTok Advertiser ID"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your TikTok Advertiser ID">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* TikTok Event ID */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="TikTok Event ID"
-                  name="tiktokEventId"
-                  value={formData.tiktokEventId}
-                  onChange={handleFormChange}
-                  placeholder="Enter your TikTok Event ID"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Enter your TikTok Event ID">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-
-              {/* Default Event Name */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Default Event Name"
-                  name="defaultEventName"
-                  value={formData.defaultEventName}
-                  onChange={handleFormChange}
-                  placeholder="e.g., Purchase, Lead"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* TikTok Macros */}
-        <Accordion 
-          expanded={expandedSections.tiktokMacros !== false} 
-          onChange={() => handleToggleSection('tiktokMacros')}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              TikTok Macros
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                  Configure the macros that will be used for tracking and data passing with TikTok.
-                </Typography>
-              </Grid>
-              
-              {/* Click ID Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Click ID Macro"
-                  value={formData.tiktokMacros.clickId}
-                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'clickId', e.target.value)}
-                  placeholder="ttclid={ttclid}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="TikTok Click ID parameter for tracking">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Event ID Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Event ID Macro"
-                  value={formData.tiktokMacros.eventId}
-                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'eventId', e.target.value)}
-                  placeholder="{event_id}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Event ID parameter for TikTok">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Event Type Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Event Type Macro"
-                  value={formData.tiktokMacros.eventType}
-                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'eventType', e.target.value)}
-                  placeholder="{event_type}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Event Type parameter for TikTok">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Value Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Value Macro"
-                  value={formData.tiktokMacros.value}
-                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'value', e.target.value)}
-                  placeholder="{value}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Value parameter for TikTok conversions">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              
-              {/* Currency Macro */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Currency Macro"
-                  value={formData.tiktokMacros.currency}
-                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'currency', e.target.value)}
-                  placeholder="{currency}"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Tooltip title="Currency parameter for TikTok conversions">
-                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-      </>
-    );
-  };
-
-  // Render custom parameters
-  const renderCustomParameters = () => {
-    return (
-      <Accordion 
-        expanded={expandedSections.customParams !== false} 
-        onChange={() => handleToggleSection('customParams')}
-      >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Custom Parameters
-            {formData.customParameters.length > 1 && (
-              <Badge 
-                badgeContent={formData.customParameters.length} 
-                color="primary" 
-                sx={{ ml: 2 }}
-              />
-            )}
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="textSecondary">
-              Add custom parameters that will be passed with your conversion tracking.
-            </Typography>
-          </Box>
-          
-          {formData.customParameters.map((param, index) => (
-            <Grid container spacing={3} key={index} sx={{ mb: 2 }}>
-              <Grid item xs={12} sm={5}>
-                <TextField
-                  fullWidth
-                  label="Parameter Name"
-                  value={param.name}
-                  onChange={(e) => handleCustomParamChange(index, 'name', e.target.value)}
-                  placeholder="e.g., campaign_id"
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              <Grid item xs={12} sm={5}>
-                <TextField
-                  fullWidth
-                  label="Parameter Value"
-                  value={param.value}
-                  onChange={(e) => handleCustomParamChange(index, 'value', e.target.value)}
-                  placeholder="e.g., {campaign_id}"
-                  variant="outlined"
-                  size="medium"
-                />
-              </Grid>
-              <Grid item xs={12} sm={2} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconButton 
-                  color="error" 
-                  onClick={() => handleRemoveCustomParam(index)}
-                  disabled={formData.customParameters.length === 1}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Grid>
-            </Grid>
-          ))}
-          
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Button 
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={handleAddCustomParam}
-              disabled={formData.customParameters.length >= 20}
-            >
-              Add Parameter
-            </Button>
-          </Box>
-        </AccordionDetails>
-      </Accordion>
-    );
-  };
-
-  // Render platform-specific settings based on selected channel
-  const renderPlatformSettings = () => {
-    if (selectedChannel === "Facebook") {
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon("Facebook")}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              Facebook Settings
-            </Typography>
-          </Box>
-
-          <CardContent sx={{ p: 3 }}>
-            {renderFacebookSettings()}
-            {renderCustomParameters()}
-          </CardContent>
-        </Card>
-      );
-    } else if (selectedChannel === "Google") {
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon("Google")}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              Google Settings
-            </Typography>
-          </Box>
-
-          <CardContent sx={{ p: 3 }}>
-            {renderGoogleSettings()}
-            {renderCustomParameters()}
-          </CardContent>
-        </Card>
-      );
-    } else if (selectedChannel === "TikTok") {
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon("TikTok")}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              TikTok Settings
-            </Typography>
-          </Box>
-
-          <CardContent sx={{ p: 3 }}>
-            {renderTikTokSettings()}
-            {renderCustomParameters()}
-          </CardContent>
-        </Card>
-      );
-    } else if (selectedChannel) {
-      // Custom channel with just custom parameters
-      return (
-        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-          <Box sx={{ 
-            bgcolor: "#f0f7ff", 
-            p: 2, 
-            borderBottom: "1px solid #e0e0e0",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            {getChannelIcon(selectedChannel)}
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              {selectedChannel} Settings
-            </Typography>
-          </Box>
-
-          <CardContent sx={{ p: 3 }}>
-            {renderCustomParameters()}
-          </CardContent>
-        </Card>
-      );
-    }
-    
-    // No specific channel selected, render custom parameters only
-    return (
-      <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-        <Box sx={{ 
-          bgcolor: "#f0f7ff", 
-          p: 2, 
-          borderBottom: "1px solid #e0e0e0"
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            Custom Channel Settings
-          </Typography>
-        </Box>
-
-        <CardContent sx={{ p: 3 }}>
-          {renderCustomParameters()}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Render connection step content
-  const renderConnectionStep = () => {
-    if (!isPlatformConnectable(formData.aliasChannel)) {
-      // If platform doesn't need connection, show completion message
-      return (
-        <Box sx={{ textAlign: 'center', py: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Your channel is ready to use!
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            No additional connection is required for this channel type.
-          </Typography>
-        </Box>
-      );
-    }
-
-    // Platform-specific connection panel
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: "bold" }}>
-          Connect Your {formData.aliasChannel} Account
+        
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1, mb: 3 }}>
+          Our platform will update costs via API and send conversions for the connected ad account
         </Typography>
         
-        {renderConnectionSection(formData.aliasChannel)}
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Google MCC Account ID (optional)</Typography>
+        <TextField
+          fullWidth
+          name="googleMccAccountId"
+          value={formData.googleMccAccountId}
+          onChange={handleFormChange}
+          placeholder="Google MCC Account ID (optional)"
+          variant="outlined"
+          size="small"
+          sx={{ mb: 1 }}
+        />
         
-        <Box sx={{ mt: 3 }}>
-          {authStatus[formData.aliasChannel.toLowerCase()] ? (
-            <Alert severity="success" sx={{ mb: 3 }}>
-              <Typography variant="subtitle1">Successfully connected!</Typography>
-              <Typography variant="body2">
-                Your {formData.aliasChannel} account is now connected. You can proceed to save your channel.
-              </Typography>
-            </Alert>
-          ) : (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <Typography variant="subtitle1">Connection Required</Typography>
-              <Typography variant="body2">
-                Please connect your {formData.aliasChannel} account to enable automatic cost updates and conversion tracking.
-              </Typography>
-            </Alert>
-          )}
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+          Add MCC account id to send conversions to it and not ad account (optional).<br />
+          Please make sure you have access to ad account and MCC with the e-mail you used for integration.
+        </Typography>
+        
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Conversion Matching</Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Conversion Type *</Typography>
+                <Tooltip title="Conversion type information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+                <LockIcon fontSize="small" sx={{ mr: 1, color: '#9ca3af' }} />
+                <Typography variant="body2" sx={{ color: '#9ca3af' }}>ADD MORE</Typography>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Conversion name *</Typography>
+                <Tooltip title="Conversion name information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Category *</Typography>
+                <Tooltip title="Category information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Include in "conversions" *</Typography>
+                <Tooltip title="Include in 'conversions' information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+        
+        <Box>
+          <Typography variant="h6" sx={{ mb: 2 }}>Campaign Manager 360</Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Conversion Type *</Typography>
+                <Tooltip title="Conversion type information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+                <LockIcon fontSize="small" sx={{ mr: 1, color: '#9ca3af' }} />
+                <Typography variant="body2" sx={{ color: '#9ca3af' }}>ADD MORE</Typography>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Profile ID *</Typography>
+                <Tooltip title="Profile ID information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="textSecondary">Floodlight activity ID *</Typography>
+                <Tooltip title="Floodlight activity ID information">
+                  <InfoIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                </Tooltip>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+        
+        <Box sx={{ mt: 4, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <InfoIcon fontSize="small" />
+            <Typography variant="body2">Please allow access to your Google Ads account to activate integrations:</Typography>
+          </Box>
+          <Typography variant="body2" sx={{ pl: 3 }}>#1 Click on "Connect" and accept integration permissions</Typography>
+          <Typography variant="body2" sx={{ pl: 3 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
         </Box>
       </Box>
     );
   };
 
-  // Render the appropriate step content
-  const getStepContent = (step) => {
-    switch (step) {
-      case 0:
-        return (
-          <Box sx={{ p: 2 }}>
-            <Grid container spacing={3}>
-              {/* Channel Name & Alias Channel in one row */}
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Channel Name"
-                  name="channelName"
-                  value={formData.channelName}
-                  onChange={handleFormChange}
-                  required
-                  error={!!formErrors.channelName}
-                  helperText={formErrors.channelName}
-                  variant="outlined"
-                  placeholder="e.g., Facebook Ads"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Alias Channel"
-                  name="aliasChannel"
-                  value={formData.aliasChannel}
-                  onChange={handleFormChange}
-                  required
-                  error={!!formErrors.aliasChannel}
-                  helperText={formErrors.aliasChannel}
-                  variant="outlined"
-                  placeholder="e.g., Facebook"
-                />
-              </Grid>
+  // Render custom parameters section
+  const renderCustomParameters = () => {
+    // Determine how many rows to display based on filled data
+    const visibleParams = formData.customParameters.filter(param => 
+      param.name || param.macro || param.description
+    ).length + 1; // add one more empty row
+    
+    const displayParams = formData.customParameters.slice(0, Math.max(visibleParams, 10));
+    
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 3 }}>Additional parameters</Typography>
+        
+        {displayParams.map((param, index) => (
+          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={3}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                Parameter *
+              </Typography>
+              <TextField
+                fullWidth
+                value={param.name}
+                onChange={(e) => handleParamChange(index, 'name', e.target.value)}
+                placeholder={`sub${index + 1}`}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={3}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                Macro/token *
+              </Typography>
+              <TextField
+                fullWidth
+                value={param.macro}
+                onChange={(e) => handleParamChange(index, 'macro', e.target.value)}
+                placeholder={index < 3 ? `{{ad.id}}` : ""}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={3}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                Name / Description *
+              </Typography>
+              <TextField
+                fullWidth
+                value={param.description}
+                onChange={(e) => handleParamChange(index, 'description', e.target.value)}
+                placeholder={index < 3 ? "ad_id" : "hint"}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={3}>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                Select role
+              </Typography>
+              <Select
+                fullWidth
+                value={param.role || ""}
+                onChange={(e) => handleParamChange(index, 'role', e.target.value)}
+                displayEmpty
+                size="small"
+              >
+                <MenuItem value="">Select</MenuItem>
+                <MenuItem value="Aid">Aid</MenuItem>
+                <MenuItem value="Gid">Gid</MenuItem>
+                <MenuItem value="Cid">Cid</MenuItem>
+                <MenuItem value="Rt ad">Rt ad</MenuItem>
+                <MenuItem value="Rt adgroup">Rt adgroup</MenuItem>
+                <MenuItem value="Rt campaign">Rt campaign</MenuItem>
+                <MenuItem value="Rt placement">Rt placement</MenuItem>
+                <MenuItem value="Rt source">Rt source</MenuItem>
+                <MenuItem value="Rt medium">Rt medium</MenuItem>
+              </Select>
+            </Grid>
+          </Grid>
+        ))}
+      </Box>
+    );
+  };
 
-              {/* Cost Update Depth with description */}
-              <Grid item xs={12} md={6}>
-                <Box sx={{ mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                    Cost Update Depth
+  // Render the main tabs based on the channel type
+  const renderTabs = () => {
+    return (
+      <Box sx={{ width: '100%', mb: 2 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0' }}>
+            <Box
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                borderBottom: currentTab === 0 ? '2px solid #1976d2' : 'none',
+                fontWeight: currentTab === 0 ? 'bold' : 'normal',
+                color: currentTab === 0 ? '#1976d2' : 'inherit'
+              }}
+              onClick={() => setCurrentTab(0)}
+            >
+              Basic Settings
+            </Box>
+            
+            {selectedChannel === 'Facebook' && (
+              <Box
+                sx={{
+                  p: 2,
+                  cursor: 'pointer',
+                  borderBottom: currentTab === 1 ? '2px solid #1976d2' : 'none',
+                  fontWeight: currentTab === 1 ? 'bold' : 'normal',
+                  color: currentTab === 1 ? '#1976d2' : 'inherit'
+                }}
+                onClick={() => setCurrentTab(1)}
+              >
+                Facebook Integration
+              </Box>
+            )}
+            
+            {selectedChannel === 'Google' && (
+              <Box
+                sx={{
+                  p: 2,
+                  cursor: 'pointer',
+                  borderBottom: currentTab === 2 ? '2px solid #1976d2' : 'none',
+                  fontWeight: currentTab === 2 ? 'bold' : 'normal',
+                  color: currentTab === 2 ? '#1976d2' : 'inherit'
+                }}
+                onClick={() => setCurrentTab(2)}
+              >
+                Google Integration
+              </Box>
+            )}
+            
+            <Box
+              sx={{
+                p: 2,
+                cursor: 'pointer',
+                borderBottom: currentTab === 3 ? '2px solid #1976d2' : 'none',
+                fontWeight: currentTab === 3 ? 'bold' : 'normal',
+                color: currentTab === 3 ? '#1976d2' : 'inherit'
+              }}
+              onClick={() => setCurrentTab(3)}
+            >
+              Additional Parameters
+            </Box>
+          </Box>
+        </Box>
+        
+        <Box sx={{ mt: 2 }}>
+          {currentTab === 0 && (
+            <Box sx={{ p: 2 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Channel name *
                   </Typography>
-                </Box>
-                <FormControl fullWidth error={!!formErrors.costUpdateDepth}>
+                  <TextField
+                    fullWidth
+                    name="channelName"
+                    value={formData.channelName}
+                    onChange={handleFormChange}
+                    error={!!formErrors.channelName}
+                    helperText={formErrors.channelName}
+                    placeholder="e.g., Facebook Ads"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Alias channel
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    name="aliasChannel"
+                    value={formData.aliasChannel}
+                    onChange={handleFormChange}
+                    error={!!formErrors.aliasChannel}
+                    helperText={formErrors.aliasChannel}
+                    placeholder="e.g., Facebook"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={12}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Cost update depth:
+                  </Typography>
                   <Select
+                    fullWidth
                     name="costUpdateDepth"
                     value={formData.costUpdateDepth}
                     onChange={handleFormChange}
+                    error={!!formErrors.costUpdateDepth}
                     displayEmpty
-                    required
                     variant="outlined"
+                    size="small"
+                    sx={{ mb: 0.5 }}
                   >
                     <MenuItem value="">Select depth</MenuItem>
                     <MenuItem value="None">None</MenuItem>
@@ -2012,32 +1301,25 @@ const TrafficChannels = () => {
                     <MenuItem value="Adset Level">Adset Level</MenuItem>
                     <MenuItem value="Ad Level">Ad Level</MenuItem>
                   </Select>
-                  {formErrors.costUpdateDepth && (
-                    <Typography variant="caption" color="error">
-                      {formErrors.costUpdateDepth}
-                    </Typography>
-                  )}
-                </FormControl>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  Please select the cost update depth from the available options.
-                  The default setting is the maximum depth available for your account plan.
-                </Typography>
-              </Grid>
-
-              {/* Cost Update Frequency */}
-              <Grid item xs={12} md={6}>
-                <Box sx={{ mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                    Cost Update Frequency
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                    Please select the cost update depth from the available options.
+                    The default setting is the maximum depth available for your account plan.
                   </Typography>
-                </Box>
-                <FormControl fullWidth error={!!formErrors.costUpdateFrequency}>
+                </Grid>
+                
+                <Grid item xs={12} md={12}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Cost update frequency:
+                  </Typography>
                   <Select
+                    fullWidth
                     name="costUpdateFrequency"
                     value={formData.costUpdateFrequency}
                     onChange={handleFormChange}
-                    required
+                    error={!!formErrors.costUpdateFrequency}
                     variant="outlined"
+                    size="small"
+                    sx={{ mb: 0.5 }}
                   >
                     <MenuItem value="None">None</MenuItem>
                     <MenuItem value="60 Minutes">60 Minutes</MenuItem>
@@ -2045,32 +1327,25 @@ const TrafficChannels = () => {
                     <MenuItem value="15 Minutes">15 Minutes</MenuItem>
                     <MenuItem value="5 Minutes">5 Minutes</MenuItem>
                   </Select>
-                  {formErrors.costUpdateFrequency && (
-                    <Typography variant="caption" color="error">
-                      {formErrors.costUpdateFrequency}
-                    </Typography>
-                  )}
-                </FormControl>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  These are the current settings for your account. If you would like to change the frequency of
-                  cost updates - please contact support.
-                </Typography>
-              </Grid>
-
-              {/* Currency */}
-              <Grid item xs={12} md={6}>
-                <Box sx={{ mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                    These are the current settings for your account. If you would like to change the frequency of
+                    cost updates - please contact support.
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
                     Currency
                   </Typography>
-                </Box>
-                <FormControl fullWidth error={!!formErrors.currency}>
                   <Select
+                    fullWidth
                     name="currency"
                     value={formData.currency}
                     onChange={handleFormChange}
-                    required
+                    error={!!formErrors.currency}
                     variant="outlined"
+                    size="small"
+                    sx={{ mb: 0.5 }}
                   >
                     <MenuItem value="USD">USD</MenuItem>
                     <MenuItem value="EUR">EUR</MenuItem>
@@ -2093,70 +1368,65 @@ const TrafficChannels = () => {
                     <MenuItem value="BRL">BRL</MenuItem>
                     <MenuItem value="ZAR">ZAR</MenuItem>
                   </Select>
-                  {formErrors.currency && (
-                    <Typography variant="caption" color="error">
-                      {formErrors.currency}
-                    </Typography>
-                  )}
-                </FormControl>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  If no currency is selected, the value selected in the profile will be used.
-                </Typography>
-              </Grid>
-
-              {/* S2S Postback URL */}
-              <Grid item xs={12} md={6}>
-                <Box sx={{ mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                    If no currency is selected, the value selected in the profile will be used.
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
                     S2S Postback URL
                   </Typography>
-                </Box>
-                <TextField
-                  fullWidth
-                  name="s2sPostbackUrl"
-                  value={formData.s2sPostbackUrl}
-                  onChange={handleFormChange}
-                  placeholder="https://your-domain.com/postback?click_id={click_id}"
-                  variant="outlined"
-                />
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  Use if you need to send conversions back to your traffic source.
-                </Typography>
+                  <TextField
+                    fullWidth
+                    name="s2sPostbackUrl"
+                    value={formData.s2sPostbackUrl}
+                    onChange={handleFormChange}
+                    placeholder="https://your-domain.com/postback?click_id={click_id}"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    Click Ref ID
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    name="clickRefId"
+                    value={formData.clickRefId}
+                    onChange={handleFormChange}
+                    placeholder="Click Ref ID"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                    External ID
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    name="externalId"
+                    value={formData.externalId}
+                    onChange={handleFormChange}
+                    placeholder="External ID"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Grid>
               </Grid>
-
-              {/* Click Ref ID & External ID in one row */}
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Click Ref ID"
-                  name="clickRefId"
-                  value={formData.clickRefId}
-                  onChange={handleFormChange}
-                  placeholder="Click Ref ID"
-                  variant="outlined"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="External ID"
-                  name="externalId"
-                  value={formData.externalId}
-                  onChange={handleFormChange}
-                  placeholder="External ID"
-                  variant="outlined"
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        );
-      case 1:
-        return renderPlatformSettings();
-      case 2:
-        return renderConnectionStep();
-      default:
-        return 'Unknown step';
-    }
+            </Box>
+          )}
+          
+          {currentTab === 1 && renderFacebookConnection()}
+          {currentTab === 2 && renderGoogleConnection()}
+          {currentTab === 3 && renderCustomParameters()}
+        </Box>
+      </Box>
+    );
   };
 
   return (
@@ -2522,7 +1792,7 @@ const TrafficChannels = () => {
           </Box>
         </Modal>
 
-        {/* Channel Setup Modal with Steps */}
+        {/* Channel Setup Modal */}
         <Modal open={openSecondModal} onClose={handleCloseSecondModal}>
           <Box
             sx={{
@@ -2539,104 +1809,44 @@ const TrafficChannels = () => {
               maxWidth: "1000px"
             }}
           >
-            <form onSubmit={handleSubmit}>
-              {/* Sticky header */}
-              <Box
-                sx={{
-                  position: "sticky",
-                  top: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  boxShadow: 2,
-                  zIndex: 10,
-                  backgroundColor: "white",
-                  borderTopLeftRadius: 2,
-                  borderTopRightRadius: 2,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: 3,
-                  }}
+            <Box
+              sx={{
+                position: "sticky",
+                top: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                p: 2,
+                boxShadow: 1,
+                zIndex: 10,
+                backgroundColor: "white",
+                borderTopLeftRadius: 2,
+                borderTopRightRadius: 2,
+              }}
+            >
+              <Typography variant="h6" fontWeight="bold">
+                {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={handleCloseSecondModal}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {selectedChannel && getChannelIcon(selectedChannel)}
-                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                      {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
-                      {selectedChannel && (
-                        <Chip 
-                          label={selectedChannel} 
-                          size="small" 
-                          color="primary" 
-                          sx={{ ml: 1 }}
-                        />
-                      )}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                    <Button 
-                      variant="outlined" 
-                      onClick={handleCloseSecondModal}
-                      sx={{ px: 3, py: 1, borderRadius: 2 }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      type="submit"
-                      disabled={loading.save}
-                      sx={{ px: 3, py: 1, borderRadius: 2 }}
-                    >
-                      {loading.save ? <CircularProgress size={24} /> : 
-                        activeStep === steps.length - 1 ? 'Finish' : 
-                        (editMode ? 'Save & Continue' : 'Save & Continue')}
-                    </Button>
-                  </Box>
-                </Box>
-                
-                {/* Stepper */}
-                <Stepper 
-                  activeStep={activeStep} 
-                  alternativeLabel
-                  sx={{ px: 4, pb: 3 }}
+                  CLOSE
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={handleSubmit}
+                  disabled={loading.save}
+                  startIcon={loading.save ? <CircularProgress size={20} /> : null}
                 >
-                  {steps.map((label, index) => (
-                    <Step key={label}>
-                      <StepLabel>{label}</StepLabel>
-                    </Step>
-                  ))}
-                </Stepper>
+                  SAVE
+                </Button>
               </Box>
+            </Box>
 
-              {/* Main form content */}
-              <Box sx={{ p: 3 }}>
-                {getStepContent(activeStep)}
-                
-                {/* Navigation buttons */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleBack}
-                    disabled={activeStep === 0}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={handleNext}
-                    disabled={activeStep === steps.length - 1}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    Next
-                  </Button>
-                </Box>
-              </Box>
-            </form>
+            {renderTabs()}
           </Box>
         </Modal>
 
