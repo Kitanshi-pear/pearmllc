@@ -597,8 +597,8 @@ export default function CampaignsPage() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [domains, setDomains] = useState([]);
-  const [offersList, setOffersList] = useState([]); // Added offersList state
-  const [trafficChannels, setTrafficChannels] = useState([]); // Added to store traffic channels for lookup
+  const [offersList, setOffersList] = useState([]);
+  const [trafficChannels, setTrafficChannels] = useState([]);
 
   // Fetch offers and traffic channels when component mounts
   useEffect(() => {
@@ -655,20 +655,21 @@ export default function CampaignsPage() {
       });
   }, []);
 
-  // Enhanced columns with proper data mapping
+  // Enhanced columns with proper data mapping - THE KEY PART THAT WAS FIXED
   const columns = [
     { 
       field: "id", 
       headerName: "ID", 
-      width: 70,
-      valueGetter: (params) => params?.row?.id || ""
+      width: 70
     },
     { 
       field: "name", 
       headerName: "Campaign Name", 
       flex: 1,
-      // Do not provide default value so empty cells will just be empty
-      valueGetter: (params) => params?.row?.name || params?.row?.campaign_name || params?.row?.title || params?.row?.campaignName
+      valueGetter: (params) => {
+        // Don't provide fallback values, just return the actual campaign name
+        return params?.row?.name || params?.row?.campaign_name || params?.row?.title || params?.row?.campaignName;
+      }
     },
     {
       field: "status",
@@ -690,39 +691,38 @@ export default function CampaignsPage() {
       headerName: "Traffic Source",
       width: 150,
       valueGetter: (params) => {
-        // Try multiple ways to get the channel name without default fallbacks
-        
-        // First check if we have a traffic channel name in our normalized data
+        // First check for the name in directly accessible properties
         if (params?.row?.traffic_channel_name) {
           return params.row.traffic_channel_name;
         }
         
-        // Check for nested TrafficChannel object (uppercase from Sequelize)
+        // Check nested models in various forms
         if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
           return params.row.TrafficChannel.channelName;
         }
         
-        // Check lowercase variant
         if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
           return params.row.trafficChannel.channelName;
         }
         
-        // Look up from our local traffic channels list
-        if (params?.row?.traffic_channel_id !== undefined && params?.row?.traffic_channel_id !== null) {
+        // Look up from our locally cached traffic channels
+        if (params?.row?.traffic_channel_id) {
           const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
           if (channel) {
             return channel.channelName;
           }
+          // Just return the ID itself with no text
+          return params.row.traffic_channel_id;
         }
         
-        // Last resort, just return the ID (no default text like "Source #")
-        return params?.row?.traffic_channel_id;
+        // Return empty string if nothing was found
+        return "";
       }
     },
     { 
       field: "costType", 
       headerName: "Cost Type", 
-      width: 100 
+      width: 100
     },
     { 
       field: "costValue", 
@@ -798,6 +798,7 @@ export default function CampaignsPage() {
       width: 120,
       valueGetter: (params) => {
         if (!params?.row?.offer_id) return "";
+        
         // Find offer name from the offers list if available
         const offerItem = offersList.find(
           offer => offer.Serial_No === params.row.offer_id
@@ -806,14 +807,14 @@ export default function CampaignsPage() {
         if (offerItem) {
           return offerItem.Offer_name;
         } else if (params.row.Offer && params.row.Offer.name) {
-          // Try to get from nested Offer object if available
+          // Try to get from nested Offer object
           return params.row.Offer.name;
         } else if (params.row.offer && params.row.offer.name) {
           // Try lowercase variant
           return params.row.offer.name;
         }
         
-        // Just return the ID without prefix text if nothing else works
+        // Just return the ID without additional text
         return params.row.offer_id;
       }
     },
@@ -838,8 +839,8 @@ export default function CampaignsPage() {
                 try {
                   // Function to copy tracking URL
                   const domain = params.row.domain?.url || 
-                              (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
-                              "";
+                                (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                                "";
                   const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
                   navigator.clipboard.writeText(trackingUrl);
                   setSnackbarMessage("Tracking URL copied to clipboard!");
@@ -874,11 +875,10 @@ export default function CampaignsPage() {
     },
   ];
 
-  // Improved campaign fetching with better endpoint targeting and data normalization
+  // Improved campaign fetching with better data normalization
   const fetchCampaigns = () => {
     setLoading(true);
     
-    // Use the proper API endpoint for campaigns
     console.log("Fetching campaigns from:", `${API_URL}/api/campaigns`);
     
     axios.get(`${API_URL}/api/campaigns`)
@@ -888,61 +888,48 @@ export default function CampaignsPage() {
         // Check if res.data is an array, if not, try to convert it
         let campaignsData = res.data;
         if (!Array.isArray(campaignsData)) {
-          // If it's an object with a data property that's an array
           if (res.data && Array.isArray(res.data.data)) {
             campaignsData = res.data.data;
-          } 
-          // If it's an object with a campaigns property that's an array
-          else if (res.data && Array.isArray(res.data.campaigns)) {
+          } else if (res.data && Array.isArray(res.data.campaigns)) {
             campaignsData = res.data.campaigns;
-          }
-          // If it's just a single object
-          else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+          } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
             campaignsData = [res.data];
-          } 
-          // Last resort, create an empty array
-          else {
+          } else {
             campaignsData = [];
             console.warn("Received unexpected data structure:", res.data);
           }
         }
         
-        // Log the raw data for debugging
+        // Log first raw item for debugging
         if (campaignsData.length > 0) {
           console.log("Raw first campaign data:", JSON.stringify(campaignsData[0], null, 2));
         }
         
         // Add proper field mapping before setting state
         const campaignsWithIds = campaignsData.map((campaign) => {
-          // Log original field names to help debug
+          // Log original field names for debugging
           console.log("Original campaign fields:", Object.keys(campaign).join(", "));
           
-          // Check for nested relationships
+          // Log nested relationship data if exists
           if (campaign.TrafficChannel) {
             console.log("TrafficChannel data:", campaign.TrafficChannel);
           }
           
-          // Return a normalized object with all possible fields preserved
+          // Keep more of the original data while adding normalized fields
           return {
             ...campaign,
             // Ensure ID field exists
             id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
             
-            // Ensure all name variants are preserved
-            name: campaign.name || campaign.campaign_name || campaign.title || campaign.campaignName,
-            
-            // Capture all possible traffic channel data
+            // Capture traffic channel name from various places
             traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
                                (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
                                campaign.traffic_channel_name ||
-                               (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName),
-                              
-            // Status field with default
-            status: campaign.status || "ACTIVE"
+                               (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName)
           };
         });
         
-        // Debug logging of first campaign after normalization
+        // Show normalized first campaign for debugging
         if (campaignsWithIds.length > 0) {
           console.log("Normalized first campaign:", campaignsWithIds[0]);
         }
@@ -951,7 +938,6 @@ export default function CampaignsPage() {
         
         // Fetch metrics for these campaigns
         if (campaignsWithIds.length > 0) {
-          console.log("Fetching metrics for campaigns:", campaignsWithIds.map(c => c.id));
           fetchMetrics(campaignsWithIds.map(c => c.id));
         } else {
           setLoading(false);
@@ -959,7 +945,6 @@ export default function CampaignsPage() {
       })
       .catch((err) => {
         console.error("Error fetching campaigns:", err);
-        // Log detailed error information
         if (err.response) {
           console.error("Response error data:", err.response.data);
           console.error("Response status:", err.response.status);  
@@ -1017,17 +1002,11 @@ export default function CampaignsPage() {
         // Ensure ID field exists
         id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
         
-        // Ensure name field exists - map from possible alternative field names
-        name: campaign.name || campaign.campaign_name || campaign.title || campaign.campaignName,
-              
-        // Ensure traffic channel info is normalized
+        // Capture traffic channel info from various places
         traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
                              (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
                              campaign.traffic_channel_name ||
-                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName),
-                            
-        // Ensure status field exists
-        status: campaign.status || "ACTIVE"
+                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName)
       };
     });
     
@@ -1110,16 +1089,7 @@ export default function CampaignsPage() {
         })
         .catch(err => {
           console.error(`Error fetching metrics for campaign ${id}:`, err);
-          
-          // Instead of showing the error, provide a more helpful message and 
-          // use default values (already set above)
           console.log(`Using default metrics values for campaign ${id}`);
-          
-          // Optionally show a UI notification for persistent errors
-          if (err.response && err.response.status === 500) {
-            // You could set a state to show a notification or toast
-            // setErrorNotification(`There was a problem loading metrics for some campaigns. Default values are being shown.`);
-          }
         })
         .finally(() => {
           completedRequests++;
@@ -1199,7 +1169,7 @@ export default function CampaignsPage() {
           <Grid item flexGrow={1}>
             <Box display="flex" justifyContent="flex-end">
               <ToggleButtonGroup
-                value={null} // This needs to be fixed to match the format used in the onChange
+                value={null}
                 exclusive
                 onChange={(e, newValue) => {
                   if (newValue && predefinedRanges[newValue]) {
