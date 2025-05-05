@@ -7,6 +7,9 @@ import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DateRangeIcon from "@mui/icons-material/DateRange";
+import AddIcon from "@mui/icons-material/Add";
+import CheckIcon from "@mui/icons-material/Check";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   Button,
   IconButton,
@@ -29,11 +32,17 @@ import {
   Alert,
   Divider,
   Chip,
-  Paper
+  Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Stepper,
+  Step,
+  StepLabel,
+  Badge
 } from "@mui/material";
 import Layout from "./Layout";
 import axios from "axios";
-import CheckIcon from "@mui/icons-material/Check";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -59,7 +68,8 @@ const TrafficChannels = () => {
   // State management
   const [authStatus, setAuthStatus] = useState({
     facebook: false,
-    google: false
+    google: false,
+    tiktok: false
   });
   const [rows, setRows] = useState([]);
   const [filterText, setFilterText] = useState("");
@@ -76,6 +86,7 @@ const TrafficChannels = () => {
     form: false,
     facebook: false,
     google: false,
+    tiktok: false,
     save: false,
     delete: false
   });
@@ -86,7 +97,12 @@ const TrafficChannels = () => {
   });
   const [editMode, setEditMode] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [activeStep, setActiveStep] = useState(0);
+  const [expandedSections, setExpandedSections] = useState({});
+  
+  // Enhanced form data with all potential platform-specific fields
   const [formData, setFormData] = useState({
+    // Basic settings
     channelName: "",
     aliasChannel: "",
     costUpdateDepth: "",
@@ -95,17 +111,66 @@ const TrafficChannels = () => {
     s2sPostbackUrl: "",
     clickRefId: "",
     externalId: "",
+    
+    // Facebook specific
     pixelId: "",
     apiAccessToken: "",
     defaultEventName: "Purchase",
     customConversionMatching: false,
+    
+    // Facebook macro settings
+    fbPixelMacros: {
+      eventId: "{event_id}",
+      valueParam: "{value}",
+      currencyParam: "{currency}",
+      contentTypeParam: "{content_type}",
+      contentIdsParam: "{content_ids}"
+    },
+    
+    // Google specific
     googleAdsAccountId: "",
     googleMccAccountId: "",
     conversionType: "",
     conversionName: "",
     conversionCategory: "",
-    includeInConversions: ""
+    includeInConversions: "",
+    
+    // Google macro settings
+    googleMacros: {
+      clickId: "gclid={gclid}",
+      conversionId: "{conversion_id}",
+      conversionLabel: "{conversion_label}",
+      conversionValue: "{value}",
+      currencyCode: "{currency}"
+    },
+    
+    // TikTok specific
+    tiktokAccessToken: "",
+    tiktokPixelCode: "",
+    tiktokAdvertiserId: "",
+    tiktokEventId: "",
+    
+    // TikTok macro settings
+    tiktokMacros: {
+      clickId: "ttclid={ttclid}",
+      eventId: "{event_id}",
+      eventType: "{event_type}",
+      value: "{value}",
+      currency: "{currency}"
+    },
+    
+    // Custom additional parameters
+    customParameters: [
+      { name: "", value: "" }
+    ],
+    
+    // Connection status flag
+    connectionComplete: false,
+    status: "Active"
   });
+
+  // Define steps for the channel setup wizard
+  const steps = ['Basic Info', 'Platform Settings', 'Connection'];
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,25 +198,31 @@ const TrafficChannels = () => {
             severity: 'success'
           });
           
-          // Restore the modal state
+          // Restore the modal state and advance to final step
           if (state.editingChannelId) {
             // Find the channel and open it for editing
             const channelToEdit = rows.find(row => row.id === state.editingChannelId);
             if (channelToEdit) {
               setFormData({
                 ...channelToEdit,
-                ...state.formData
+                ...state.formData,
+                connectionComplete: true
               });
               setSelectedChannel(channelToEdit.aliasChannel);
               setEditMode(true);
               setSelectedRow(channelToEdit);
               setOpenSecondModal(true);
+              setActiveStep(2); // Move to the final step
             }
           } else if (state.formData) {
             // For new channel creation
-            setFormData(state.formData);
+            setFormData({
+              ...state.formData,
+              connectionComplete: true
+            });
             setSelectedChannel(state.selectedChannel);
             setOpenSecondModal(true);
+            setActiveStep(2); // Move to the final step
           }
           
           // Update auth status
@@ -185,6 +256,13 @@ const TrafficChannels = () => {
           <Typography variant="body2">{params.value}</Typography>
           {params.row.status === 'Inactive' && (
             <Chip size="small" label="Inactive" color="default" />
+          )}
+          {isPlatformConnectable(params.row.aliasChannel) && (
+            <Chip 
+              size="small" 
+              label={authStatus[params.row.aliasChannel.toLowerCase()] ? "Connected" : "Not Connected"} 
+              color={authStatus[params.row.aliasChannel.toLowerCase()] ? "success" : "warning"} 
+            />
           )}
         </Box>
       ),
@@ -295,7 +373,14 @@ const TrafficChannels = () => {
       costUpdateDepth: "Ad Level",
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
-      defaultEventName: "Purchase"
+      defaultEventName: "Purchase",
+      fbPixelMacros: {
+        eventId: "{event_id}",
+        valueParam: "{value}",
+        currencyParam: "{currency}",
+        contentTypeParam: "{content_type}",
+        contentIdsParam: "{content_ids}"
+      }
     },
     Google: {
       channelName: "Google Ads",
@@ -303,7 +388,14 @@ const TrafficChannels = () => {
       costUpdateDepth: "Ad Level",
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
-      defaultEventName: "Purchase"
+      defaultEventName: "Purchase",
+      googleMacros: {
+        clickId: "gclid={gclid}",
+        conversionId: "{conversion_id}",
+        conversionLabel: "{conversion_label}",
+        conversionValue: "{value}",
+        currencyCode: "{currency}"
+      }
     },
     TikTok: {
       channelName: "TikTok Ads",
@@ -311,7 +403,14 @@ const TrafficChannels = () => {
       costUpdateDepth: "Ad Level",
       costUpdateFrequency: "15 Minutes",
       currency: "USD",
-      defaultEventName: "Purchase"
+      defaultEventName: "Purchase",
+      tiktokMacros: {
+        clickId: "ttclid={ttclid}",
+        eventId: "{event_id}",
+        eventType: "{event_type}",
+        value: "{value}",
+        currency: "{currency}"
+      }
     },
     Custom: {
       channelName: "",
@@ -322,16 +421,13 @@ const TrafficChannels = () => {
       s2sPostbackUrl: "",
       clickRefId: "",
       externalId: "",
-      pixelId: "",
-      apiAccessToken: "",
       defaultEventName: "Purchase",
       customConversionMatching: false,
-      googleAdsAccountId: "",
-      googleMccAccountId: "",
-      conversionType: "",
-      conversionName: "",
-      conversionCategory: "",
-      includeInConversions: ""
+      connectionComplete: false,
+      status: "Active",
+      customParameters: [
+        { name: "", value: "" }
+      ]
     }
   };
 
@@ -414,9 +510,14 @@ const TrafficChannels = () => {
     )
   : [];
 
+  // Helper to determine if platform connection is available
+  const isPlatformConnectable = (platformName) => {
+    return ["Facebook", "Google", "TikTok"].includes(platformName);
+  };
+
   // Handle authentication for platforms
   const handleAuth = async (platform) => {
-    setLoading(prev => ({ ...prev, [platform]: true }));
+    setLoading(prev => ({ ...prev, [platform.toLowerCase()]: true }));
     
     try {
       // Save current state before redirecting
@@ -430,9 +531,21 @@ const TrafficChannels = () => {
       localStorage.setItem('oauthState', JSON.stringify(stateToSave));
       
       // Redirect to OAuth
-      const authUrl = platform === "google" 
-        ? `${API_URL}/api/traffic/auth/google` 
-        : `${API_URL}/api/traffic/auth/facebook`;
+      let authUrl = '';
+      
+      switch(platform.toLowerCase()) {
+        case 'facebook':
+          authUrl = `${API_URL}/api/traffic/auth/facebook`;
+          break;
+        case 'google':
+          authUrl = `${API_URL}/api/traffic/auth/google`;
+          break;
+        case 'tiktok':
+          authUrl = `${API_URL}/api/traffic/auth/tiktok`;
+          break;
+        default:
+          throw new Error(`Unsupported platform: ${platform}`);
+      }
       
       window.location.href = authUrl;
     } catch (err) {
@@ -442,11 +555,19 @@ const TrafficChannels = () => {
         message: `Failed to connect to ${platform}. Please try again.`,
         severity: "error"
       });
-      setLoading(prev => ({ ...prev, [platform]: false }));
+      setLoading(prev => ({ ...prev, [platform.toLowerCase()]: false }));
     }
   };
 
-  // Form change handler
+  // Toggle accordion sections
+  const handleToggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Form change handler for basic fields
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === 'checkbox' ? checked : value;
@@ -463,6 +584,50 @@ const TrafficChannels = () => {
     setFormData(prev => ({ ...prev, [name]: newValue }));
   };
 
+  // Form change handler for nested fields (macros)
+  const handleNestedFormChange = (category, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [field]: value
+      }
+    }));
+  };
+
+  // Handle custom parameters
+  const handleCustomParamChange = (index, field, value) => {
+    const updatedParams = [...formData.customParameters];
+    updatedParams[index] = {
+      ...updatedParams[index],
+      [field]: value
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      customParameters: updatedParams
+    }));
+  };
+
+  // Add new custom parameter
+  const handleAddCustomParam = () => {
+    setFormData(prev => ({
+      ...prev,
+      customParameters: [...prev.customParameters, { name: "", value: "" }]
+    }));
+  };
+
+  // Remove custom parameter
+  const handleRemoveCustomParam = (index) => {
+    const updatedParams = [...formData.customParameters];
+    updatedParams.splice(index, 1);
+    
+    setFormData(prev => ({
+      ...prev,
+      customParameters: updatedParams
+    }));
+  };
+
   // Date range change handler
   const handleDateRangeChange = (field, date) => {
     setDateRange(prev => ({
@@ -471,8 +636,8 @@ const TrafficChannels = () => {
     }));
   };
 
-  // Validate form - Modified to only require basic fields
-  const validateForm = () => {
+  // Validate form for basic settings
+  const validateBasicSettings = () => {
     const errors = {};
     const requiredFields = ['channelName', 'aliasChannel', 'costUpdateDepth', 'costUpdateFrequency', 'currency'];
     
@@ -482,8 +647,6 @@ const TrafficChannels = () => {
         errors[field] = 'This field is required';
       }
     });
-    
-    // Don't require platform-specific fields - they can be filled later after OAuth
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -506,6 +669,7 @@ const TrafficChannels = () => {
     }
     
     setEditMode(false);
+    setActiveStep(0); // Reset to first step
     setOpenSecondModal(true);
     setOpenModal(false);
   };
@@ -519,6 +683,7 @@ const TrafficChannels = () => {
     });
     setSelectedChannel(channel.aliasChannel);
     setEditMode(true);
+    setActiveStep(0); // Start at first step when editing
     setOpenSecondModal(true);
   };
 
@@ -565,19 +730,32 @@ const TrafficChannels = () => {
     }
   };
 
-  // Form submission - Modified to allow saving without platform-specific fields
+  // Next step in wizard
+  const handleNext = () => {
+    // Validate if on first step
+    if (activeStep === 0) {
+      if (!validateBasicSettings()) {
+        setSnackbar({
+          open: true,
+          message: "Please fill in all required fields",
+          severity: "error"
+        });
+        return;
+      }
+    }
+    
+    // Move to next step
+    setActiveStep(prevStep => prevStep + 1);
+  };
+
+  // Back step in wizard
+  const handleBack = () => {
+    setActiveStep(prevStep => Math.max(0, prevStep - 1));
+  };
+
+  // Form submission - Save current progress
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form
-    if (!validateForm()) {
-      setSnackbar({
-        open: true,
-        message: "Please fill in all required fields",
-        severity: "error"
-      });
-      return;
-    }
     
     try {
       setLoading(prev => ({ ...prev, save: true }));
@@ -615,17 +793,18 @@ const TrafficChannels = () => {
           severity: "success"
         });
         
-        // Immediately open edit mode for newly created channel if it's a platform that needs connection
-        if (["Facebook", "Google"].includes(formData.aliasChannel)) {
-          setSelectedRow(response.data);
-          setEditMode(true);
-        }
+        // Set selected row to newly created channel
+        setSelectedRow(response.data);
+        setEditMode(true);
       }
       
-      // Close modal only if not immediately going to edit mode
-      if (!["Facebook", "Google"].includes(formData.aliasChannel) || editMode) {
+      // If we're on the final step, close the modal
+      if (activeStep === 2) {
         resetForm();
         setOpenSecondModal(false);
+      } else if (isPlatformConnectable(formData.aliasChannel) && activeStep === 1) {
+        // If platform requires connection and we're on the platform settings step
+        handleNext(); // Move to connection step
       }
       
       // Refresh the data to ensure we have the latest from the server
@@ -649,6 +828,8 @@ const TrafficChannels = () => {
     setSelectedRow(null);
     setFormErrors({});
     setEditMode(false);
+    setActiveStep(0);
+    setExpandedSections({});
   };
 
   // Modal controls
@@ -670,11 +851,6 @@ const TrafficChannels = () => {
     navigate(`/api/traffic/${params.id}/details`);
   };
 
-  // Helper to determine if platform connection is available
-  const isPlatformConnectable = (platformName) => {
-    return ["Facebook", "Google"].includes(platformName);
-  };
-
   // Helper to render connection section based on platform
   const renderConnectionSection = (platformName) => {
     if (!isPlatformConnectable(platformName)) {
@@ -682,6 +858,7 @@ const TrafficChannels = () => {
     }
 
     const platform = platformName.toLowerCase();
+    const isConnected = authStatus[platform];
     
     return (
       <Box
@@ -690,7 +867,7 @@ const TrafficChannels = () => {
           borderRadius: 2,
           p: 3,
           mb: 3,
-          backgroundColor: "#f8f9fa",
+          backgroundColor: isConnected ? "#f0f7ff" : "#f8f9fa",
           boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
         }}
       >
@@ -701,34 +878,47 @@ const TrafficChannels = () => {
               <Typography variant="h6" sx={{ fontWeight: "bold" }}>
                 {platformName} API Integration
               </Typography>
+              {isConnected && (
+                <Chip 
+                  icon={<CheckIcon />} 
+                  label="Connected" 
+                  color="success" 
+                  size="small"
+                />
+              )}
             </Box>
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Connect your {platformName} account to enable:
-              <Box component="ul" sx={{ pl: 2, mt: 1, mb: 1 }}>
-                <Box component="li">Automatic cost updates</Box>
-                <Box component="li">Campaign management</Box>
-                <Box component="li">Conversion tracking</Box>
-              </Box>
+              {isConnected ? 
+                `Your ${platformName} account is connected and ready to use.` :
+                `Connect your ${platformName} account to enable:`
+              }
+              {!isConnected && (
+                <Box component="ul" sx={{ pl: 2, mt: 1, mb: 1 }}>
+                  <Box component="li">Automatic cost updates</Box>
+                  <Box component="li">Campaign management</Box>
+                  <Box component="li">Conversion tracking</Box>
+                </Box>
+              )}
             </Typography>
           </Grid>
           <Grid item xs={12} sm={5} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
             <Button
-              variant={authStatus[platform] ? "contained" : "outlined"}
-              color={authStatus[platform] ? "success" : "primary"}
+              variant={isConnected ? "contained" : "outlined"}
+              color={isConnected ? "success" : "primary"}
               sx={{ 
                 textTransform: "none", 
                 py: 1.2,
                 px: 3,
                 borderRadius: 2,
-                boxShadow: authStatus[platform] ? 3 : 0
+                boxShadow: isConnected ? 3 : 0
               }}
               onClick={() => handleAuth(platform)}
               disabled={loading[platform]}
-              startIcon={authStatus[platform] ? <CheckIcon /> : getChannelIcon(platformName)}
+              startIcon={isConnected ? <CheckIcon /> : getChannelIcon(platformName)}
             >
               {loading[platform] ? 
                 <CircularProgress size={24} /> : 
-                authStatus[platform] ? "Connected" : `Connect ${platformName}`
+                isConnected ? "Reconnect" : `Connect ${platformName}`
               }
             </Button>
           </Grid>
@@ -737,7 +927,871 @@ const TrafficChannels = () => {
     );
   };
 
-  // Render platform-specific settings
+  // Render Facebook specific settings
+  const renderFacebookSettings = () => {
+    return (
+      <>
+        {/* Facebook Pixel Data Section */}
+        <Accordion 
+          expanded={expandedSections.fbPixel !== false} 
+          onChange={() => handleToggleSection('fbPixel')}
+          sx={{ mb: 2 }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              Facebook Pixel Settings
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              {/* Pixel ID */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Pixel ID"
+                  name="pixelId"
+                  value={formData.pixelId}
+                  onChange={handleFormChange}
+                  placeholder="Enter your Facebook Pixel ID"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your Facebook Pixel ID">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* Conversions API Access Token */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Conversions API Access Token"
+                  name="apiAccessToken"
+                  value={formData.apiAccessToken}
+                  onChange={handleFormChange}
+                  placeholder="Enter your Facebook API Access Token"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your Facebook API Access Token">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* Default Event Name */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Default Event Name"
+                  name="defaultEventName"
+                  value={formData.defaultEventName}
+                  onChange={handleFormChange}
+                  placeholder="e.g., Purchase, Lead"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* Custom Conversion Matching */}
+              <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                    <Switch
+                      checked={formData.customConversionMatching}
+                      onChange={(e) =>
+                        setFormData((prevState) => ({
+                          ...prevState,
+                          customConversionMatching: e.target.checked,
+                        }))
+                      }
+                      name="customConversionMatching"
+                      color="primary"
+                    />
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      Custom Conversion Matching
+                    </Typography>
+                    <Tooltip title="Enable to use custom matching parameters for improved conversion tracking">
+                      <HelpOutlineIcon fontSize="small" sx={{ ml: 1, cursor: "pointer", color: "#6b7280" }} />
+                    </Tooltip>
+                  </Box>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Facebook Macros Section */}
+        <Accordion 
+          expanded={expandedSections.fbMacros !== false} 
+          onChange={() => handleToggleSection('fbMacros')}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              Facebook Macros
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Configure the macros that will be used for tracking and data passing with Facebook.
+                </Typography>
+              </Grid>
+              
+              {/* Event ID Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Event ID Macro"
+                  value={formData.fbPixelMacros.eventId}
+                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'eventId', e.target.value)}
+                  placeholder="{event_id}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Event ID parameter for tracking in Facebook">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Value Parameter Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Value Parameter Macro"
+                  value={formData.fbPixelMacros.valueParam}
+                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'valueParam', e.target.value)}
+                  placeholder="{value}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Value parameter for conversion value">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Currency Parameter Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Currency Parameter Macro"
+                  value={formData.fbPixelMacros.currencyParam}
+                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'currencyParam', e.target.value)}
+                  placeholder="{currency}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Currency parameter for conversion currency code">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Content Type Parameter Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Content Type Parameter Macro"
+                  value={formData.fbPixelMacros.contentTypeParam}
+                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'contentTypeParam', e.target.value)}
+                  placeholder="{content_type}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Content type parameter for conversion content type">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Content IDs Parameter Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Content IDs Parameter Macro"
+                  value={formData.fbPixelMacros.contentIdsParam}
+                  onChange={(e) => handleNestedFormChange('fbPixelMacros', 'contentIdsParam', e.target.value)}
+                  placeholder="{content_ids}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Content IDs parameter for conversion content identifiers">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+      </>
+    );
+  };
+
+  // Render Google specific settings
+  const renderGoogleSettings = () => {
+    return (
+      <>
+        {/* Google Ads Account Details */}
+        <Accordion 
+          expanded={expandedSections.googleAccount !== false} 
+          onChange={() => handleToggleSection('googleAccount')}
+          sx={{ mb: 2 }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              Google Ads Account Details
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              {/* Google Ads Account ID */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Google Ads Account ID"
+                  name="googleAdsAccountId"
+                  value={formData.googleAdsAccountId}
+                  onChange={handleFormChange}
+                  placeholder="e.g., 123-456-7890"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your Google Ads Account ID (e.g., 123-456-7890)">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* Google MCC Account ID */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Google MCC Account ID"
+                  name="googleMccAccountId"
+                  value={formData.googleMccAccountId}
+                  onChange={handleFormChange}
+                  placeholder="Optional"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your Google MCC Account ID if applicable">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="body2" color="textSecondary">
+                  Add MCC account ID to send conversions to it and not the ad account (optional).
+                  Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
+                </Typography>
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Conversion Matching Settings */}
+        <Accordion 
+          expanded={expandedSections.googleConversion !== false} 
+          onChange={() => handleToggleSection('googleConversion')}
+          sx={{ mb: 2 }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              Conversion Matching Settings
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Configure how conversions are tracked and matched in Google Ads
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Type</Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="conversionType"
+                    value={formData.conversionType || ""}
+                    onChange={handleFormChange}
+                    displayEmpty
+                    variant="outlined"
+                  >
+                    <MenuItem value="">Select type</MenuItem>
+                    <MenuItem value="Purchase">Purchase</MenuItem>
+                    <MenuItem value="Lead">Lead</MenuItem>
+                    <MenuItem value="SignUp">Sign Up</MenuItem>
+                    <MenuItem value="PageView">Page View</MenuItem>
+                    <MenuItem value="AddToCart">Add To Cart</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Name</Typography>
+                <TextField
+                  fullWidth
+                  name="conversionName"
+                  placeholder="Enter name"
+                  value={formData.conversionName || ""}
+                  onChange={handleFormChange}
+                  variant="outlined"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Category</Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="conversionCategory"
+                    value={formData.conversionCategory || ""}
+                    onChange={handleFormChange}
+                    displayEmpty
+                    variant="outlined"
+                  >
+                    <MenuItem value="">Select category</MenuItem>
+                    <MenuItem value="Default">Default</MenuItem>
+                    <MenuItem value="Purchase">Purchase</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Include in Conversions</Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="includeInConversions"
+                    value={formData.includeInConversions || ""}
+                    onChange={handleFormChange}
+                    displayEmpty
+                    variant="outlined"
+                  >
+                    <MenuItem value="">Select option</MenuItem>
+                    <MenuItem value="Yes">Yes</MenuItem>
+                    <MenuItem value="No">No</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Google Macros */}
+        <Accordion 
+          expanded={expandedSections.googleMacros !== false} 
+          onChange={() => handleToggleSection('googleMacros')}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              Google Macros
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Configure the macros that will be used for tracking and data passing with Google Ads.
+                </Typography>
+              </Grid>
+              
+              {/* Click ID Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Click ID Macro"
+                  value={formData.googleMacros.clickId}
+                  onChange={(e) => handleNestedFormChange('googleMacros', 'clickId', e.target.value)}
+                  placeholder="gclid={gclid}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Google Click ID parameter for tracking">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Conversion ID Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Conversion ID Macro"
+                  value={formData.googleMacros.conversionId}
+                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionId', e.target.value)}
+                  placeholder="{conversion_id}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Conversion ID parameter for Google Ads">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Conversion Label Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Conversion Label Macro"
+                  value={formData.googleMacros.conversionLabel}
+                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionLabel', e.target.value)}
+                  placeholder="{conversion_label}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Conversion Label parameter for Google Ads">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Conversion Value Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Conversion Value Macro"
+                  value={formData.googleMacros.conversionValue}
+                  onChange={(e) => handleNestedFormChange('googleMacros', 'conversionValue', e.target.value)}
+                  placeholder="{value}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Conversion Value parameter for Google Ads">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Currency Code Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Currency Code Macro"
+                  value={formData.googleMacros.currencyCode}
+                  onChange={(e) => handleNestedFormChange('googleMacros', 'currencyCode', e.target.value)}
+                  placeholder="{currency}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Currency Code parameter for Google Ads">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+      </>
+    );
+  };
+
+  // Render TikTok specific settings
+  const renderTikTokSettings = () => {
+    return (
+      <>
+        {/* TikTok Account Settings */}
+        <Accordion 
+          expanded={expandedSections.tiktokAccount !== false} 
+          onChange={() => handleToggleSection('tiktokAccount')}
+          sx={{ mb: 2 }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              TikTok Account Settings
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              {/* TikTok Pixel Code */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="TikTok Pixel Code"
+                  name="tiktokPixelCode"
+                  value={formData.tiktokPixelCode}
+                  onChange={handleFormChange}
+                  placeholder="Enter your TikTok Pixel Code"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your TikTok Pixel Code">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* TikTok Advertiser ID */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="TikTok Advertiser ID"
+                  name="tiktokAdvertiserId"
+                  value={formData.tiktokAdvertiserId}
+                  onChange={handleFormChange}
+                  placeholder="Enter your TikTok Advertiser ID"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your TikTok Advertiser ID">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* TikTok Event ID */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="TikTok Event ID"
+                  name="tiktokEventId"
+                  value={formData.tiktokEventId}
+                  onChange={handleFormChange}
+                  placeholder="Enter your TikTok Event ID"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Enter your TikTok Event ID">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+
+              {/* Default Event Name */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Default Event Name"
+                  name="defaultEventName"
+                  value={formData.defaultEventName}
+                  onChange={handleFormChange}
+                  placeholder="e.g., Purchase, Lead"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* TikTok Macros */}
+        <Accordion 
+          expanded={expandedSections.tiktokMacros !== false} 
+          onChange={() => handleToggleSection('tiktokMacros')}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              TikTok Macros
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Configure the macros that will be used for tracking and data passing with TikTok.
+                </Typography>
+              </Grid>
+              
+              {/* Click ID Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Click ID Macro"
+                  value={formData.tiktokMacros.clickId}
+                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'clickId', e.target.value)}
+                  placeholder="ttclid={ttclid}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="TikTok Click ID parameter for tracking">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Event ID Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Event ID Macro"
+                  value={formData.tiktokMacros.eventId}
+                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'eventId', e.target.value)}
+                  placeholder="{event_id}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Event ID parameter for TikTok">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Event Type Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Event Type Macro"
+                  value={formData.tiktokMacros.eventType}
+                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'eventType', e.target.value)}
+                  placeholder="{event_type}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Event Type parameter for TikTok">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Value Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Value Macro"
+                  value={formData.tiktokMacros.value}
+                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'value', e.target.value)}
+                  placeholder="{value}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Value parameter for TikTok conversions">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              
+              {/* Currency Macro */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Currency Macro"
+                  value={formData.tiktokMacros.currency}
+                  onChange={(e) => handleNestedFormChange('tiktokMacros', 'currency', e.target.value)}
+                  placeholder="{currency}"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title="Currency parameter for TikTok conversions">
+                          <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
+      </>
+    );
+  };
+
+  // Render custom parameters
+  const renderCustomParameters = () => {
+    return (
+      <Accordion 
+        expanded={expandedSections.customParams !== false} 
+        onChange={() => handleToggleSection('customParams')}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+            Custom Parameters
+            {formData.customParameters.length > 1 && (
+              <Badge 
+                badgeContent={formData.customParameters.length} 
+                color="primary" 
+                sx={{ ml: 2 }}
+              />
+            )}
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Add custom parameters that will be passed with your conversion tracking.
+            </Typography>
+          </Box>
+          
+          {formData.customParameters.map((param, index) => (
+            <Grid container spacing={3} key={index} sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  fullWidth
+                  label="Parameter Name"
+                  value={param.name}
+                  onChange={(e) => handleCustomParamChange(index, 'name', e.target.value)}
+                  placeholder="e.g., campaign_id"
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  fullWidth
+                  label="Parameter Value"
+                  value={param.value}
+                  onChange={(e) => handleCustomParamChange(index, 'value', e.target.value)}
+                  placeholder="e.g., {campaign_id}"
+                  variant="outlined"
+                  size="medium"
+                />
+              </Grid>
+              <Grid item xs={12} sm={2} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <IconButton 
+                  color="error" 
+                  onClick={() => handleRemoveCustomParam(index)}
+                  disabled={formData.customParameters.length === 1}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Grid>
+            </Grid>
+          ))}
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+            <Button 
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={handleAddCustomParam}
+              disabled={formData.customParameters.length >= 20}
+            >
+              Add Parameter
+            </Button>
+          </Box>
+        </AccordionDetails>
+      </Accordion>
+    );
+  };
+
+  // Render platform-specific settings based on selected channel
   const renderPlatformSettings = () => {
     if (selectedChannel === "Facebook") {
       return (
@@ -757,118 +1811,8 @@ const TrafficChannels = () => {
           </Box>
 
           <CardContent sx={{ p: 3 }}>
-            {/* Always show connection section first in the channel settings */}
-            {renderConnectionSection("Facebook")}
-
-            {/* Facebook Pixel Data Section - Optional fields */}
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2, mb: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                      Facebook Default Data Source (Pixel)
-                    </Typography>
-                    <Tooltip title="The Facebook pixel helps you track conversions from Facebook ads, optimize ads based on collected data, build targeted audiences for future ads, and remarket to people who have already taken some action on your website.">
-                      <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                    </Tooltip>
-                  </Box>
-                </Grid>
-
-                {/* Pixel ID - Optional */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Pixel ID"
-                    name="pixelId"
-                    value={formData.pixelId}
-                    onChange={handleFormChange}
-                    placeholder="Enter your Facebook Pixel ID"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Facebook Pixel ID">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Conversions API Access Token - Optional */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Conversions API Access Token"
-                    name="apiAccessToken"
-                    value={formData.apiAccessToken}
-                    onChange={handleFormChange}
-                    placeholder="Enter your Facebook API Access Token"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Facebook API Access Token">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Default Event Name */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Default Event Name"
-                    name="defaultEventName"
-                    value={formData.defaultEventName}
-                    onChange={handleFormChange}
-                    placeholder="e.g., Purchase, Lead"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Default event triggered in your pixel (e.g., Purchase, Lead)">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Custom Conversion Matching */}
-                <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
-                  <FormControl component="fieldset" sx={{ width: '100%' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <Switch
-                        checked={formData.customConversionMatching}
-                        onChange={(e) =>
-                          setFormData((prevState) => ({
-                            ...prevState,
-                            customConversionMatching: e.target.checked,
-                          }))
-                        }
-                        name="customConversionMatching"
-                        color="primary"
-                      />
-                      <Typography variant="body1" sx={{ ml: 1 }}>
-                        Custom Conversion Matching
-                      </Typography>
-                      <Tooltip title="Enable to use custom matching parameters for improved conversion tracking">
-                        <HelpOutlineIcon fontSize="small" sx={{ ml: 1, cursor: "pointer", color: "#6b7280" }} />
-                      </Tooltip>
-                    </Box>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Paper>
+            {renderFacebookSettings()}
+            {renderCustomParameters()}
           </CardContent>
         </Card>
       );
@@ -890,160 +1834,329 @@ const TrafficChannels = () => {
           </Box>
 
           <CardContent sx={{ p: 3 }}>
-            {/* Always show connection section first in the channel settings */}
-            {renderConnectionSection("Google")}
+            {renderGoogleSettings()}
+            {renderCustomParameters()}
+          </CardContent>
+        </Card>
+      );
+    } else if (selectedChannel === "TikTok") {
+      return (
+        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ 
+            bgcolor: "#f0f7ff", 
+            p: 2, 
+            borderBottom: "1px solid #e0e0e0",
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            {getChannelIcon("TikTok")}
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+              TikTok Settings
+            </Typography>
+          </Box>
 
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2, mb: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                      Google Ads Account Details
-                    </Typography>
-                    <Tooltip title="Enter your Google Ads account information to enable tracking and automation">
-                      <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                    </Tooltip>
-                  </Box>
-                </Grid>
+          <CardContent sx={{ p: 3 }}>
+            {renderTikTokSettings()}
+            {renderCustomParameters()}
+          </CardContent>
+        </Card>
+      );
+    } else if (selectedChannel) {
+      // Custom channel with just custom parameters
+      return (
+        <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ 
+            bgcolor: "#f0f7ff", 
+            p: 2, 
+            borderBottom: "1px solid #e0e0e0",
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            {getChannelIcon(selectedChannel)}
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+              {selectedChannel} Settings
+            </Typography>
+          </Box>
 
-                {/* Google Ads Account ID */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Google Ads Account ID"
-                    name="googleAdsAccountId"
-                    value={formData.googleAdsAccountId}
-                    onChange={handleFormChange}
-                    placeholder="e.g., 123-456-7890"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Google Ads Account ID (e.g., 123-456-7890)">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                {/* Google MCC Account ID */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Google MCC Account ID"
-                    name="googleMccAccountId"
-                    value={formData.googleMccAccountId}
-                    onChange={handleFormChange}
-                    placeholder="Optional"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tooltip title="Enter your Google MCC Account ID if applicable">
-                            <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#6b7280" }} />
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    }}
-                    variant="outlined"
-                    size="medium"
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary">
-                    Add MCC account ID to send conversions to it and not the ad account (optional).
-                    Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
-
-            {/* Conversion Matching Section */}
-            <Paper elevation={0} sx={{ p: 3, border: "1px solid #e0e0e0", borderRadius: 2 }}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                  Conversion Matching Settings
-                </Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                  Configure how conversions are tracked and matched in Google Ads
-                </Typography>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Type</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="conversionType"
-                      value={formData.conversionType || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select type</MenuItem>
-                      <MenuItem value="Purchase">Purchase</MenuItem>
-                      <MenuItem value="Lead">Lead</MenuItem>
-                      <MenuItem value="SignUp">Sign Up</MenuItem>
-                      <MenuItem value="PageView">Page View</MenuItem>
-                      <MenuItem value="AddToCart">Add To Cart</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversion Name</Typography>
-                  <TextField
-                    fullWidth
-                    name="conversionName"
-                    placeholder="Enter name"
-                    value={formData.conversionName || ""}
-                    onChange={handleFormChange}
-                    variant="outlined"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Category</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="conversionCategory"
-                      value={formData.conversionCategory || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select category</MenuItem>
-                      <MenuItem value="Default">Default</MenuItem>
-                      <MenuItem value="Purchase">Purchase</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Include in Conversions</Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      name="includeInConversions"
-                      value={formData.includeInConversions || ""}
-                      onChange={handleFormChange}
-                      displayEmpty
-                      variant="outlined"
-                    >
-                      <MenuItem value="">Select option</MenuItem>
-                      <MenuItem value="Yes">Yes</MenuItem>
-                      <MenuItem value="No">No</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Paper>
+          <CardContent sx={{ p: 3 }}>
+            {renderCustomParameters()}
           </CardContent>
         </Card>
       );
     }
     
-    return null;
+    // No specific channel selected, render custom parameters only
+    return (
+      <Card sx={{ mt: 3, p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
+        <Box sx={{ 
+          bgcolor: "#f0f7ff", 
+          p: 2, 
+          borderBottom: "1px solid #e0e0e0"
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            Custom Channel Settings
+          </Typography>
+        </Box>
+
+        <CardContent sx={{ p: 3 }}>
+          {renderCustomParameters()}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Render connection step content
+  const renderConnectionStep = () => {
+    if (!isPlatformConnectable(formData.aliasChannel)) {
+      // If platform doesn't need connection, show completion message
+      return (
+        <Box sx={{ textAlign: 'center', py: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Your channel is ready to use!
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            No additional connection is required for this channel type.
+          </Typography>
+        </Box>
+      );
+    }
+
+    // Platform-specific connection panel
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" sx={{ mb: 3, fontWeight: "bold" }}>
+          Connect Your {formData.aliasChannel} Account
+        </Typography>
+        
+        {renderConnectionSection(formData.aliasChannel)}
+        
+        <Box sx={{ mt: 3 }}>
+          {authStatus[formData.aliasChannel.toLowerCase()] ? (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              <Typography variant="subtitle1">Successfully connected!</Typography>
+              <Typography variant="body2">
+                Your {formData.aliasChannel} account is now connected. You can proceed to save your channel.
+              </Typography>
+            </Alert>
+          ) : (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <Typography variant="subtitle1">Connection Required</Typography>
+              <Typography variant="body2">
+                Please connect your {formData.aliasChannel} account to enable automatic cost updates and conversion tracking.
+              </Typography>
+            </Alert>
+          )}
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render the appropriate step content
+  const getStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return (
+          <Box sx={{ p: 2 }}>
+            <Grid container spacing={3}>
+              {/* Channel Name & Alias Channel in one row */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Channel Name"
+                  name="channelName"
+                  value={formData.channelName}
+                  onChange={handleFormChange}
+                  required
+                  error={!!formErrors.channelName}
+                  helperText={formErrors.channelName}
+                  variant="outlined"
+                  placeholder="e.g., Facebook Ads"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Alias Channel"
+                  name="aliasChannel"
+                  value={formData.aliasChannel}
+                  onChange={handleFormChange}
+                  required
+                  error={!!formErrors.aliasChannel}
+                  helperText={formErrors.aliasChannel}
+                  variant="outlined"
+                  placeholder="e.g., Facebook"
+                />
+              </Grid>
+
+              {/* Cost Update Depth with description */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                    Cost Update Depth
+                  </Typography>
+                </Box>
+                <FormControl fullWidth error={!!formErrors.costUpdateDepth}>
+                  <Select
+                    name="costUpdateDepth"
+                    value={formData.costUpdateDepth}
+                    onChange={handleFormChange}
+                    displayEmpty
+                    required
+                    variant="outlined"
+                  >
+                    <MenuItem value="">Select depth</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                    <MenuItem value="Campaign Level">Campaign Level</MenuItem>
+                    <MenuItem value="Adset Level">Adset Level</MenuItem>
+                    <MenuItem value="Ad Level">Ad Level</MenuItem>
+                  </Select>
+                  {formErrors.costUpdateDepth && (
+                    <Typography variant="caption" color="error">
+                      {formErrors.costUpdateDepth}
+                    </Typography>
+                  )}
+                </FormControl>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  Please select the cost update depth from the available options.
+                  The default setting is the maximum depth available for your account plan.
+                </Typography>
+              </Grid>
+
+              {/* Cost Update Frequency */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                    Cost Update Frequency
+                  </Typography>
+                </Box>
+                <FormControl fullWidth error={!!formErrors.costUpdateFrequency}>
+                  <Select
+                    name="costUpdateFrequency"
+                    value={formData.costUpdateFrequency}
+                    onChange={handleFormChange}
+                    required
+                    variant="outlined"
+                  >
+                    <MenuItem value="None">None</MenuItem>
+                    <MenuItem value="60 Minutes">60 Minutes</MenuItem>
+                    <MenuItem value="30 Minutes">30 Minutes</MenuItem>
+                    <MenuItem value="15 Minutes">15 Minutes</MenuItem>
+                    <MenuItem value="5 Minutes">5 Minutes</MenuItem>
+                  </Select>
+                  {formErrors.costUpdateFrequency && (
+                    <Typography variant="caption" color="error">
+                      {formErrors.costUpdateFrequency}
+                    </Typography>
+                  )}
+                </FormControl>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  These are the current settings for your account. If you would like to change the frequency of
+                  cost updates - please contact support.
+                </Typography>
+              </Grid>
+
+              {/* Currency */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                    Currency
+                  </Typography>
+                </Box>
+                <FormControl fullWidth error={!!formErrors.currency}>
+                  <Select
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleFormChange}
+                    required
+                    variant="outlined"
+                  >
+                    <MenuItem value="USD">USD</MenuItem>
+                    <MenuItem value="EUR">EUR</MenuItem>
+                    <MenuItem value="GBP">GBP</MenuItem>
+                    <MenuItem value="INR">INR</MenuItem>
+                    <MenuItem value="JPY">JPY</MenuItem>
+                    <MenuItem value="AUD">AUD</MenuItem>
+                    <MenuItem value="CAD">CAD</MenuItem>
+                    <MenuItem value="CHF">CHF</MenuItem>
+                    <MenuItem value="CNY">CNY</MenuItem>
+                    <MenuItem value="SEK">SEK</MenuItem>
+                    <MenuItem value="NZD">NZD</MenuItem>
+                    <MenuItem value="MXN">MXN</MenuItem>
+                    <MenuItem value="SGD">SGD</MenuItem>
+                    <MenuItem value="HKD">HKD</MenuItem>
+                    <MenuItem value="NOK">NOK</MenuItem>
+                    <MenuItem value="KRW">KRW</MenuItem>
+                    <MenuItem value="TRY">TRY</MenuItem>
+                    <MenuItem value="RUB">RUB</MenuItem>
+                    <MenuItem value="BRL">BRL</MenuItem>
+                    <MenuItem value="ZAR">ZAR</MenuItem>
+                  </Select>
+                  {formErrors.currency && (
+                    <Typography variant="caption" color="error">
+                      {formErrors.currency}
+                    </Typography>
+                  )}
+                </FormControl>
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  If no currency is selected, the value selected in the profile will be used.
+                </Typography>
+              </Grid>
+
+              {/* S2S Postback URL */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: "medium" }}>
+                    S2S Postback URL
+                  </Typography>
+                </Box>
+                <TextField
+                  fullWidth
+                  name="s2sPostbackUrl"
+                  value={formData.s2sPostbackUrl}
+                  onChange={handleFormChange}
+                  placeholder="https://your-domain.com/postback?click_id={click_id}"
+                  variant="outlined"
+                />
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  Use if you need to send conversions back to your traffic source.
+                </Typography>
+              </Grid>
+
+              {/* Click Ref ID & External ID in one row */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Click Ref ID"
+                  name="clickRefId"
+                  value={formData.clickRefId}
+                  onChange={handleFormChange}
+                  placeholder="Click Ref ID"
+                  variant="outlined"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="External ID"
+                  name="externalId"
+                  value={formData.externalId}
+                  onChange={handleFormChange}
+                  placeholder="External ID"
+                  variant="outlined"
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        );
+      case 1:
+        return renderPlatformSettings();
+      case 2:
+        return renderConnectionStep();
+      default:
+        return 'Unknown step';
+    }
   };
 
   return (
@@ -1409,7 +2522,7 @@ const TrafficChannels = () => {
           </Box>
         </Modal>
 
-        {/* Channel Setup Modal */}
+        {/* Channel Setup Modal with Steps */}
         <Modal open={openSecondModal} onClose={handleCloseSecondModal}>
           <Box
             sx={{
@@ -1433,9 +2546,7 @@ const TrafficChannels = () => {
                   position: "sticky",
                   top: 0,
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  p: 3,
+                  flexDirection: "column",
                   boxShadow: 2,
                   zIndex: 10,
                   backgroundColor: "white",
@@ -1443,261 +2554,87 @@ const TrafficChannels = () => {
                   borderTopRightRadius: 2,
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {selectedChannel && getChannelIcon(selectedChannel)}
-                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                    {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
-                    {selectedChannel && (
-                      <Chip 
-                        label={selectedChannel} 
-                        size="small" 
-                        color="primary" 
-                        sx={{ ml: 1 }}
-                      />
-                    )}
-                  </Typography>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 3,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {selectedChannel && getChannelIcon(selectedChannel)}
+                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                      {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
+                      {selectedChannel && (
+                        <Chip 
+                          label={selectedChannel} 
+                          size="small" 
+                          color="primary" 
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={handleCloseSecondModal}
+                      sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      type="submit"
+                      disabled={loading.save}
+                      sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    >
+                      {loading.save ? <CircularProgress size={24} /> : 
+                        activeStep === steps.length - 1 ? 'Finish' : 
+                        (editMode ? 'Save & Continue' : 'Save & Continue')}
+                    </Button>
+                  </Box>
                 </Box>
-                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                  <Button 
-                    variant="outlined" 
-                    onClick={handleCloseSecondModal}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    type="submit"
-                    disabled={loading.save}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
-                  >
-                    {loading.save ? <CircularProgress size={24} /> : editMode ? 'Update' : 'Save'}
-                  </Button>
-                </Box>
+                
+                {/* Stepper */}
+                <Stepper 
+                  activeStep={activeStep} 
+                  alternativeLabel
+                  sx={{ px: 4, pb: 3 }}
+                >
+                  {steps.map((label, index) => (
+                    <Step key={label}>
+                      <StepLabel>{label}</StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
               </Box>
 
               {/* Main form content */}
               <Box sx={{ p: 3 }}>
-                {/* Basic settings */}
-                <Card sx={{ p: 0, boxShadow: 2, borderRadius: 2, overflow: 'hidden' }}>
-                  <Box sx={{ bgcolor: "#f8f9fa", p: 2, borderBottom: "1px solid #e0e0e0" }}>
-                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>Basic Settings</Typography>
-                  </Box>
-                  
-                  <CardContent sx={{ p: 3 }}>
-                    <Grid container spacing={3}>
-                      {/* Channel Name & Alias Channel in one row */}
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Channel Name"
-                          name="channelName"
-                          value={formData.channelName}
-                          onChange={handleFormChange}
-                          required
-                          error={!!formErrors.channelName}
-                          helperText={formErrors.channelName}
-                          variant="outlined"
-                          placeholder="e.g., Facebook Ads"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Alias Channel"
-                          name="aliasChannel"
-                          value={formData.aliasChannel}
-                          onChange={handleFormChange}
-                          required
-                          error={!!formErrors.aliasChannel}
-                          helperText={formErrors.aliasChannel}
-                          variant="outlined"
-                          placeholder="e.g., Facebook"
-                        />
-                      </Grid>
-
-                      {/* Cost Update Depth with description */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Cost Update Depth
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.costUpdateDepth}>
-                          <Select
-                            name="costUpdateDepth"
-                            value={formData.costUpdateDepth}
-                            onChange={handleFormChange}
-                            displayEmpty
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="">Select depth</MenuItem>
-                            <MenuItem value="None">None</MenuItem>
-                            <MenuItem value="Campaign Level">Campaign Level</MenuItem>
-                            <MenuItem value="Adset Level">Adset Level</MenuItem>
-                            <MenuItem value="Ad Level">Ad Level</MenuItem>
-                          </Select>
-                          {formErrors.costUpdateDepth && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.costUpdateDepth}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          Please select the cost update depth from the available options.
-                          The default setting is the maximum depth available for your account plan.
-                        </Typography>
-                      </Grid>
-
-                      {/* Cost Update Frequency */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Cost Update Frequency
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.costUpdateFrequency}>
-                          <Select
-                            name="costUpdateFrequency"
-                            value={formData.costUpdateFrequency}
-                            onChange={handleFormChange}
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="None">None</MenuItem>
-                            <MenuItem value="60 Minutes">60 Minutes</MenuItem>
-                            <MenuItem value="30 Minutes">30 Minutes</MenuItem>
-                            <MenuItem value="15 Minutes">15 Minutes</MenuItem>
-                            <MenuItem value="5 Minutes">5 Minutes</MenuItem>
-                          </Select>
-                          {formErrors.costUpdateFrequency && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.costUpdateFrequency}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          These are the current settings for your account. If you would like to change the frequency of
-                          cost updates - please contact support.
-                        </Typography>
-                      </Grid>
-
-                      {/* Currency */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            Currency
-                          </Typography>
-                        </Box>
-                        <FormControl fullWidth error={!!formErrors.currency}>
-                          <Select
-                            name="currency"
-                            value={formData.currency}
-                            onChange={handleFormChange}
-                            required
-                            variant="outlined"
-                          >
-                            <MenuItem value="USD">USD</MenuItem>
-                            <MenuItem value="EUR">EUR</MenuItem>
-                            <MenuItem value="GBP">GBP</MenuItem>
-                            <MenuItem value="INR">INR</MenuItem>
-                            <MenuItem value="JPY">JPY</MenuItem>
-                            <MenuItem value="AUD">AUD</MenuItem>
-                            <MenuItem value="CAD">CAD</MenuItem>
-                            <MenuItem value="CHF">CHF</MenuItem>
-                            <MenuItem value="CNY">CNY</MenuItem>
-                            <MenuItem value="SEK">SEK</MenuItem>
-                            <MenuItem value="NZD">NZD</MenuItem>
-                            <MenuItem value="MXN">MXN</MenuItem>
-                            <MenuItem value="SGD">SGD</MenuItem>
-                            <MenuItem value="HKD">HKD</MenuItem>
-                            <MenuItem value="NOK">NOK</MenuItem>
-                            <MenuItem value="KRW">KRW</MenuItem>
-                            <MenuItem value="TRY">TRY</MenuItem>
-                            <MenuItem value="RUB">RUB</MenuItem>
-                            <MenuItem value="BRL">BRL</MenuItem>
-                            <MenuItem value="ZAR">ZAR</MenuItem>
-                          </Select>
-                          {formErrors.currency && (
-                            <Typography variant="caption" color="error">
-                              {formErrors.currency}
-                            </Typography>
-                          )}
-                        </FormControl>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          If no currency is selected, the value selected in the profile will be used.
-                        </Typography>
-                      </Grid>
-
-                      {/* S2S Postback URL */}
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                            S2S Postback URL
-                          </Typography>
-                        </Box>
-                        <TextField
-                          fullWidth
-                          name="s2sPostbackUrl"
-                          value={formData.s2sPostbackUrl}
-                          onChange={handleFormChange}
-                          placeholder="https://your-domain.com/postback?click_id={click_id}"
-                          variant="outlined"
-                        />
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          Use if you need to send conversions back to your traffic source.
-                        </Typography>
-                      </Grid>
-
-                      {/* Click Ref ID & External ID in one row */}
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Click Ref ID"
-                          name="clickRefId"
-                          value={formData.clickRefId}
-                          onChange={handleFormChange}
-                          placeholder="Click Ref ID"
-                          variant="outlined"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="External ID"
-                          name="externalId"
-                          value={formData.externalId}
-                          onChange={handleFormChange}
-                          placeholder="External ID"
-                          variant="outlined"
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-
-                {/* Platform-specific settings */}
-                {renderPlatformSettings()}
+                {getStepContent(activeStep)}
                 
-                {/* Connection reminders for new channels that need connection */}
-                {!editMode && isPlatformConnectable(selectedChannel) && (
-                  <Card sx={{ mt: 3, p: 3, boxShadow: 2, borderRadius: 2, bgcolor: "#f0f7ff" }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <InfoIcon color="primary" />
-                      <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                          Set up {selectedChannel} Connection
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          After creating this channel, you'll need to connect your {selectedChannel} account to enable cost updates and conversion tracking.
-                          You'll be automatically taken to the connection page after saving.
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Card>
-                )}
+                {/* Navigation buttons */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleBack}
+                    disabled={activeStep === 0}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleNext}
+                    disabled={activeStep === steps.length - 1}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                  >
+                    Next
+                  </Button>
+                </Box>
               </Box>
             </form>
           </Box>
@@ -1716,7 +2653,6 @@ const TrafficChannels = () => {
             sx={{ width: '100%', boxShadow: 3, borderRadius: 2 }}
           >
             {snackbar.message}
-            
           </Alert>
         </Snackbar>
       </Box>

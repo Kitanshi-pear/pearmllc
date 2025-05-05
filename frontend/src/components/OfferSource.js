@@ -18,6 +18,8 @@ import {
   Tabs,
   Paper,
   FormControl,
+  FormControlLabel,
+  Switch,
   InputLabel,
   CircularProgress,
   Snackbar,
@@ -30,6 +32,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import SendIcon from "@mui/icons-material/Send";
+import ApiIcon from "@mui/icons-material/Api";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -155,6 +159,11 @@ const OfferSourcePage = () => {
   const [processedUrl, setProcessedUrl] = useState('');
   const [testResult, setTestResult] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
+  
+  // New state for conversion API forwarding
+  const [conversionAPIDialogOpen, setConversionAPIDialogOpen] = useState(false);
+  const [apiStatusLoading, setApiStatusLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState(null);
 
   const currencies = ["USD", "EUR", "INR", "GBP", "CAD", "AUD", "JPY", "CNY"];
   const roles = [
@@ -209,7 +218,11 @@ const OfferSourcePage = () => {
     conversion_id: "", // Google conversion ID
     conversion_label: "", // Google conversion label
     default_event_name: "purchase", // Default event name
-    is_active: true  // Active status
+    is_active: true,  // Active status
+    // Conversion API settings
+    forward_to_facebook: false,
+    forward_to_google: false,
+    facebook_event_name: "purchase"
   });
 
   const handleDateChange = (e) => {
@@ -250,6 +263,9 @@ const OfferSourcePage = () => {
         description: item.description,
         role: item.role,
         is_active: item.is_active !== false, // Default to true if not specified
+        forward_to_facebook: item.forward_to_facebook || false,
+        forward_to_google: item.forward_to_google || false,
+        facebook_event_name: item.facebook_event_name || "purchase",
         clicks: item.clicks || 0,
         lp_clicks: item.lp_clicks || 0,
         conversion: item.conversions || 0,
@@ -306,7 +322,10 @@ const OfferSourcePage = () => {
       conversion_id: row.conversion_id || "",
       conversion_label: row.conversion_label || "",
       default_event_name: row.default_event_name || "purchase",
-      is_active: row.is_active !== false // Default to true if not specified
+      is_active: row.is_active !== false, // Default to true if not specified
+      forward_to_facebook: row.forward_to_facebook || false,
+      forward_to_google: row.forward_to_google || false,
+      facebook_event_name: row.facebook_event_name || "purchase"
     });
     setOpenTemplateModal(true);
   };
@@ -363,7 +382,11 @@ const OfferSourcePage = () => {
         conversion_id: newTemplate.conversion_id,
         conversion_label: newTemplate.conversion_label,
         default_event_name: newTemplate.default_event_name,
-        is_active: newTemplate.is_active
+        is_active: newTemplate.is_active,
+        // Conversion API settings
+        forward_to_facebook: newTemplate.forward_to_facebook,
+        forward_to_google: newTemplate.forward_to_google,
+        facebook_event_name: newTemplate.facebook_event_name
       };
 
       if (editMode && selectedRowId) {
@@ -411,7 +434,10 @@ const OfferSourcePage = () => {
         conversion_id: "",
         conversion_label: "",
         default_event_name: "purchase",
-        is_active: true
+        is_active: true,
+        forward_to_facebook: false,
+        forward_to_google: false,
+        facebook_event_name: "purchase"
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
@@ -469,6 +495,71 @@ const OfferSourcePage = () => {
     setPostbackTestDialogOpen(false);
     setProcessedUrl('');
     setTestResult(null);
+  };
+  
+  // New function to open the conversion API dialog
+  const handleOpenConversionAPIStatus = (source) => {
+    setSelectedSource(source);
+    setConversionAPIDialogOpen(true);
+    fetchConversionAPIStatus(source.id);
+  };
+  
+  // New function to close the conversion API dialog
+  const handleCloseConversionAPIStatus = () => {
+    setConversionAPIDialogOpen(false);
+    setApiStatus(null);
+  };
+  
+  // New function to fetch conversion API status
+  const fetchConversionAPIStatus = async (sourceId) => {
+    setApiStatusLoading(true);
+    try {
+      const response = await axios.get(
+        `https://pearmllc.onrender.com/api/offersource/${sourceId}/conversion-settings`
+      );
+      
+      setApiStatus(response.data);
+    } catch (error) {
+      console.error("Error fetching API status:", error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch API status',
+        severity: 'error'
+      });
+    } finally {
+      setApiStatusLoading(false);
+    }
+  };
+  
+  // New function to update conversion API settings
+  const updateConversionAPISettings = async (settings) => {
+    if (!selectedSource) return;
+    
+    try {
+      const response = await axios.put(
+        `https://pearmllc.onrender.com/api/offersource/${selectedSource.id}/conversion-settings`,
+        settings
+      );
+      
+      setSnackbar({
+        open: true,
+        message: 'Conversion API settings updated successfully',
+        severity: 'success'
+      });
+      
+      // Update API status
+      setApiStatus(response.data.settings);
+      
+      // Refresh the list to show updated settings
+      fetchOfferSources();
+    } catch (error) {
+      console.error("Error updating API settings:", error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update API settings',
+        severity: 'error'
+      });
+    }
   };
 
   // Postback testing functions
@@ -629,6 +720,46 @@ const OfferSourcePage = () => {
           )}
         </Box>
       )
+    },
+    { 
+      field: "conversion_api", 
+      headerName: "Conversion API", 
+      width: 150,
+      renderCell: (params) => {
+        const hasFacebook = params.row.forward_to_facebook && params.row.pixel_id;
+        const hasGoogle = params.row.forward_to_google && params.row.google_ads_id;
+        
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: (hasFacebook || hasGoogle) ? "#e6f7e7" : "#f5f5f5",
+                color: (hasFacebook || hasGoogle) ? "#2e7d32" : "#757575",
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                mr: 1
+              }}
+            >
+              {hasFacebook && hasGoogle ? "FB + Google" : 
+               hasFacebook ? "Facebook" : 
+               hasGoogle ? "Google" : "Off"}
+            </Box>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenConversionAPIStatus(params.row);
+              }}
+              title="API Settings"
+            >
+              <ApiIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        );
+      }
     },
     { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
     { field: "lp_clicks", headerName: "LP Clicks", width: 120, type: "number" },
@@ -833,7 +964,10 @@ const OfferSourcePage = () => {
                   conversion_id: "",
                   conversion_label: "",
                   default_event_name: "purchase",
-                  is_active: true
+                  is_active: true,
+                  forward_to_facebook: false,
+                  forward_to_google: false,
+                  facebook_event_name: "purchase"
                 });
               }}
             >
@@ -936,6 +1070,7 @@ const OfferSourcePage = () => {
                 <Tab label="Basic Details" />
                 <Tab label="Postback URL" />
                 <Tab label="API Configuration" />
+                <Tab label="Conversion API" />
               </Tabs>
             </Box>
 
@@ -1337,6 +1472,124 @@ const OfferSourcePage = () => {
                 </CardContent>
               </Card>
             )}
+            
+            {/* Tab 4: Conversion API Settings */}
+            {tabValue === 3 && (
+              <Card sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Conversion API Settings
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Enable automatic forwarding of conversions to external platforms
+                  </Typography>
+                  
+                  <Paper sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa' }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Facebook Conversions API
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={newTemplate.forward_to_facebook}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, forward_to_facebook: e.target.checked })}
+                          color="primary"
+                        />
+                      }
+                      label="Forward conversions to Facebook"
+                    />
+                    
+                    {newTemplate.forward_to_facebook && (
+                      <>
+                        <Box sx={{ mt: 2 }}>
+                          <TextField
+                            fullWidth
+                            label="Facebook Event Name"
+                            value={newTemplate.facebook_event_name}
+                            onChange={(e) => setNewTemplate({ ...newTemplate, facebook_event_name: e.target.value })}
+                            helperText="The event name to use when sending data to Facebook (e.g., Purchase, Lead)"
+                          />
+                        </Box>
+                        
+                        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                            Status: {newTemplate.pixel_id && newTemplate.api_key ? 
+                              <span style={{ color: '#2e7d32' }}>Ready to send</span> : 
+                              <span style={{ color: '#d32f2f' }}>Missing configuration</span>}
+                          </Typography>
+                          {!newTemplate.pixel_id && (
+                            <Typography variant="caption" color="error">
+                              Facebook Pixel ID required
+                            </Typography>
+                          )}
+                          {!newTemplate.api_key && newTemplate.pixel_id && (
+                            <Typography variant="caption" color="error">
+                              Facebook API Token required
+                            </Typography>
+                          )}
+                        </Box>
+                      </>
+                    )}
+                  </Paper>
+                  
+                  <Paper sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa' }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Google Ads Conversion API
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={newTemplate.forward_to_google}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, forward_to_google: e.target.checked })}
+                          color="primary"
+                        />
+                      }
+                      label="Forward conversions to Google Ads"
+                    />
+                    
+                    {newTemplate.forward_to_google && (
+                      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                          Status: {newTemplate.google_ads_id && newTemplate.conversion_id ? 
+                            <span style={{ color: '#2e7d32' }}>Ready to send</span> : 
+                            <span style={{ color: '#d32f2f' }}>Missing configuration</span>}
+                        </Typography>
+                        {!newTemplate.google_ads_id && (
+                          <Typography variant="caption" color="error">
+                            Google Ads Account ID required
+                          </Typography>
+                        )}
+                        {!newTemplate.conversion_id && newTemplate.google_ads_id && (
+                          <Typography variant="caption" color="error">
+                            Conversion ID required
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+                  
+                  <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" color="primary">
+                      How Conversion API Forwarding Works
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      When enabled, our server will automatically forward conversion data to the selected platforms:
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      • <strong>Facebook:</strong> Uses server-side conversion tracking via the Conversions API to improve tracking accuracy and ad performance.
+                    </Typography>
+                    <Typography variant="body2">
+                      • <strong>Google:</strong> Server-side conversion tracking helps record conversions even when cookies are blocked.
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      All personal data is automatically hashed for privacy before being sent to these platforms.
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
 
             <Divider sx={{ my: 3 }} />
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
@@ -1532,6 +1785,7 @@ const OfferSourcePage = () => {
                     color="primary"
                     onClick={handleTestPostback}
                     disabled={!selectedSource.postback || isTesting}
+                    startIcon={isTesting ? <CircularProgress size={20} /> : <SendIcon />}
                   >
                     {isTesting ? 'Testing...' : 'Send Test Postback'}
                   </Button>
@@ -1549,6 +1803,20 @@ const OfferSourcePage = () => {
                       rows={2}
                       InputProps={{
                         readOnly: true,
+                        endAdornment: (
+                          <IconButton
+                            onClick={() => {
+                              navigator.clipboard.writeText(processedUrl);
+                              setSnackbar({
+                                open: true,
+                                message: 'URL copied to clipboard',
+                                severity: 'success'
+                              });
+                            }}
+                          >
+                            <ContentCopyIcon />
+                          </IconButton>
+                        )
                       }}
                     />
                   </Box>
@@ -1569,7 +1837,7 @@ const OfferSourcePage = () => {
                     {testResult.success && testResult.data && (
                       <Box mt={2}>
                         <Typography variant="subtitle2">Response Data:</Typography>
-                        <pre style={{ whiteSpace: 'pre-wrap' }}>
+                        <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
                           {JSON.stringify(testResult.data, null, 2)}
                         </pre>
                       </Box>
@@ -1580,20 +1848,19 @@ const OfferSourcePage = () => {
                         <Typography variant="subtitle2">
                           {selectedSource.source_type} Conversion Details:
                         </Typography>
-                        {selectedSource.source_type.toLowerCase() === 'facebook' && (
+                        
+                        {/* Show the conversion API forwarding status */}
+                        <Box mt={1}>
                           <Typography variant="body2">
-                            This test conversion was sent to Facebook using your Pixel ID {selectedSource.pixel_id || '[Not configured]'}.
-                            {!selectedSource.pixel_id && ' Please configure your Facebook Pixel ID in the source settings.'}
-                            {!selectedSource.api_key && ' Please configure your Facebook API Key in the source settings.'}
+                            <strong>Forward to Facebook:</strong> {selectedSource.forward_to_facebook ? 'Enabled' : 'Disabled'}
+                            {selectedSource.forward_to_facebook && !selectedSource.pixel_id && ' (Pixel ID missing)'}
                           </Typography>
-                        )}
-                        {selectedSource.source_type.toLowerCase() === 'google' && (
+                          
                           <Typography variant="body2">
-                            This test conversion was sent to Google Ads using Account ID {selectedSource.google_ads_id || '[Not configured]'}.
-                            {!selectedSource.google_ads_id && ' Please configure your Google Ads Account ID in the source settings.'}
-                            {!selectedSource.conversion_id && ' Please configure your Google Conversion ID in the source settings.'}
+                            <strong>Forward to Google:</strong> {selectedSource.forward_to_google ? 'Enabled' : 'Disabled'}
+                            {selectedSource.forward_to_google && !selectedSource.google_ads_id && ' (Google Ads ID missing)'}
                           </Typography>
-                        )}
+                        </Box>
                       </Box>
                     )}
                   </Paper>
@@ -1603,6 +1870,265 @@ const OfferSourcePage = () => {
             
             <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
               <Button onClick={handleClosePostbackTest}>
+                Close
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+        
+        {/* Conversion API Status Dialog */}
+        <Modal
+          open={conversionAPIDialogOpen}
+          onClose={handleCloseConversionAPIStatus}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "700px",
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              overflow: "auto",
+              bgcolor: "background.paper",
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" gutterBottom>
+              Conversion API Status
+              {selectedSource && (
+                <Typography variant="subtitle2" color="text.secondary">
+                  {selectedSource.source_name} ({selectedSource.source_type})
+                </Typography>
+              )}
+            </Typography>
+            
+            {apiStatusLoading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+              </Box>
+            ) : selectedSource ? (
+              <>
+                <Paper sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle1">
+                      Facebook Conversions API
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={selectedSource.forward_to_facebook}
+                          onChange={(e) => {
+                            const newSource = {...selectedSource, forward_to_facebook: e.target.checked};
+                            setSelectedSource(newSource);
+                            updateConversionAPISettings({
+                              forward_to_facebook: e.target.checked
+                            });
+                          }}
+                          color="primary"
+                        />
+                      }
+                      label="Enabled"
+                    />
+                  </Box>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ 
+                        p: 2, 
+                        bgcolor: selectedSource.pixel_id ? '#e3f2fd' : '#ffebee',
+                        borderRadius: 1
+                      }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Facebook Pixel ID
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedSource.pixel_id || 'Not configured'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ 
+                        p: 2, 
+                        bgcolor: selectedSource.api_key ? '#e3f2fd' : '#ffebee',
+                        borderRadius: 1
+                      }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          API Access Token
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedSource.api_key ? '••••••••••••••••' : 'Not configured'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                  
+                  <Box sx={{ 
+                    mt: 2, 
+                    p: 2, 
+                    bgcolor: selectedSource.forward_to_facebook && selectedSource.pixel_id && selectedSource.api_key ? 
+                      '#e8f5e9' : '#f5f5f5',
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Status
+                      </Typography>
+                      <Typography variant="body2">
+                        {selectedSource.forward_to_facebook ? 
+                          (selectedSource.pixel_id && selectedSource.api_key ? 
+                            '✅ Ready to send conversions to Facebook' : 
+                            '⚠️ Missing configuration') : 
+                          '❌ Forwarding disabled'}
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={() => handleEditClick(selectedSource)}
+                      sx={{ ml: 2 }}
+                    >
+                      Edit Configuration
+                    </Button>
+                  </Box>
+                </Paper>
+                
+                <Paper sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle1">
+                      Google Ads Conversion API
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={selectedSource.forward_to_google}
+                          onChange={(e) => {
+                            const newSource = {...selectedSource, forward_to_google: e.target.checked};
+                            setSelectedSource(newSource);
+                            updateConversionAPISettings({
+                              forward_to_google: e.target.checked
+                            });
+                          }}
+                          color="primary"
+                        />
+                      }
+                      label="Enabled"
+                    />
+                  </Box>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ 
+                        p: 2, 
+                        bgcolor: selectedSource.google_ads_id ? '#e3f2fd' : '#ffebee',
+                        borderRadius: 1
+                      }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Google Ads ID
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedSource.google_ads_id || 'Not configured'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ 
+                        p: 2, 
+                        bgcolor: selectedSource.conversion_id ? '#e3f2fd' : '#ffebee',
+                        borderRadius: 1
+                      }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Conversion ID
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedSource.conversion_id || 'Not configured'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ 
+                        p: 2, 
+                        bgcolor: selectedSource.conversion_label ? '#e3f2fd' : '#ffebee',
+                        borderRadius: 1
+                      }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Conversion Label
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedSource.conversion_label || 'Not configured'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                  
+                  <Box sx={{ 
+                    mt: 2, 
+                    p: 2, 
+                    bgcolor: selectedSource.forward_to_google && selectedSource.google_ads_id && selectedSource.conversion_id ? 
+                      '#e8f5e9' : '#f5f5f5',
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Status
+                      </Typography>
+                      <Typography variant="body2">
+                        {selectedSource.forward_to_google ? 
+                          (selectedSource.google_ads_id && selectedSource.conversion_id ? 
+                            '✅ Ready to send conversions to Google' : 
+                            '⚠️ Missing configuration') : 
+                          '❌ Forwarding disabled'}
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={() => handleEditClick(selectedSource)}
+                      sx={{ ml: 2 }}
+                    >
+                      Edit Configuration
+                    </Button>
+                  </Box>
+                </Paper>
+                
+                <Box sx={{ p: 3, bgcolor: '#f0f4c3', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Conversion Tracking Information
+                  </Typography>
+                  <Typography variant="body2" gutterBottom sx={{ mt: 1 }}>
+                    When a conversion occurs via the postback URL, our system will:
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    1. Record the conversion in our database
+                  </Typography>
+                  <Typography variant="body2">
+                    2. If enabled, forward the conversion to Facebook CAPI
+                  </Typography>
+                  <Typography variant="body2">
+                    3. If enabled, forward the conversion to Google Ads
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    All user data is automatically hashed for privacy before being sent.
+                  </Typography>
+                </Box>
+              </>
+            ) : (
+              <Typography>No source selected</Typography>
+            )}
+            
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
+              <Button onClick={handleCloseConversionAPIStatus}>
                 Close
               </Button>
             </Box>
