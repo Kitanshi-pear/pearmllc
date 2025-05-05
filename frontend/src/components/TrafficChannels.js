@@ -43,7 +43,7 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 
 // API URL with your specified endpoint
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = process.env.REACT_APP_API_URL || "https://pearmllc.onrender.com";
 
 // Utility functions for formatting numbers and percentages
 const formatNumber = (num, decimals = 2) => {
