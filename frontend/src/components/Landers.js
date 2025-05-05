@@ -104,7 +104,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       }
       
       // Format the final URL with the domain and click path
-      const finalUrl = `https://${landerData.domain}/click${queryParams}`;
+      const finalUrl = `https://${landerData.domain}/click`;
       
       const payload = {
         ...landerData,
@@ -154,7 +154,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
       queryParams = `?${queryParams}`;
     }
     
-    return `https://${landerData.domain}/click${queryParams}`;
+    return `https://${landerData.domain}/click`;
   };
 
   // All available macro tokens based on the image
