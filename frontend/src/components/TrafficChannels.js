@@ -500,19 +500,60 @@ const TrafficChannels = () => {
     setFormData(prev => ({ ...prev, [name]: newValue }));
   };
 
-  // Handle additional parameter change
+  // Handle additional parameter change - FIXED WITH NULL CHECKS
   const handleParamChange = (index, field, value) => {
-    const selectedParams = selectedChannel?.toLowerCase() === 'google' ? 'googleParams' : 'additionalParams';
+    const selectedParamsKey = selectedChannel?.toLowerCase() === 'google' ? 'googleParams' : 'additionalParams';
     
     setFormData(prev => {
-      const updatedParams = [...prev[selectedParams]];
+      // Create a safety check to ensure the parameter array exists
+      if (!prev[selectedParamsKey]) {
+        // If the parameter array doesn't exist, initialize it with default values
+        const defaultParams = selectedParamsKey === 'googleParams' 
+          ? [
+              { parameter: "utm_campaign", macroToken: "{replace}", nameDescription: "Campaign name", selectRole: "Rt campaign" },
+              { parameter: "sub2", macroToken: "{keyword}", nameDescription: "Bidded keyword", selectRole: "Rt keyword" },
+              { parameter: "sub3", macroToken: "{matchtype}", nameDescription: "Keyword match type", selectRole: "Rt match type" }
+            ]
+          : Array(20).fill({}).map((_, i) => {
+              // Set defaults for the first three and sub20
+              if (i === 0) return { parameter: "sub1", macroToken: "{ad.id}", nameDescription: "ad_id", selectRole: "Aid" };
+              if (i === 1) return { parameter: "sub2", macroToken: "{adset.id}", nameDescription: "adset_id", selectRole: "Gid" };
+              if (i === 2) return { parameter: "sub3", macroToken: "{campaign.id}", nameDescription: "campaign_id", selectRole: "Gid" };
+              if (i === 19) return { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" };
+              return { parameter: "", macroToken: "", nameDescription: "", selectRole: "" };
+            });
+        
+        // Create a new object with the parameter array initialized
+        const newState = {
+          ...prev,
+          [selectedParamsKey]: defaultParams
+        };
+        
+        // Update the specific field in the param
+        newState[selectedParamsKey][index] = {
+          ...newState[selectedParamsKey][index],
+          [field]: value
+        };
+        
+        return newState;
+      }
+      
+      // Normal case - parameter array exists
+      const updatedParams = [...prev[selectedParamsKey]];
+      
+      // Make sure the parameter object exists at this index
+      if (!updatedParams[index]) {
+        updatedParams[index] = { parameter: "", macroToken: "", nameDescription: "", selectRole: "" };
+      }
+      
       updatedParams[index] = {
         ...updatedParams[index],
         [field]: value
       };
+      
       return {
         ...prev,
-        [selectedParams]: updatedParams
+        [selectedParamsKey]: updatedParams
       };
     });
   };
@@ -530,6 +571,12 @@ const TrafficChannels = () => {
     const errors = {};
     const requiredFields = ['channelName', 'aliasChannel', 'costUpdateDepth', 'costUpdateFrequency', 'currency'];
     
+    // Platform-specific validations
+    if (selectedChannel?.toLowerCase() === 'google' && editMode) {
+      // Additional requirements for Google in edit mode
+      if (!formData.googleAdsAccountId) errors.googleAdsAccountId = 'Google Ads Account ID is required';
+    }
+    
     // Check required fields
     requiredFields.forEach(field => {
       if (!formData[field]) {
@@ -541,16 +588,65 @@ const TrafficChannels = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // Handle platform selection and template application
+  const handlePlatformSelectionChange = (platformName) => {
+    // Get the template for the selected platform
+    const template = channelTemplates[platformName] || channelTemplates.Custom;
+    
+    // Reset the form and apply the new template
+    const initialFormData = {
+      ...channelTemplates.Custom, // Reset first to ensure all fields exist
+      ...template,
+      aliasChannel: template.aliasChannel.toLowerCase()
+    };
+    
+    // Initialize platform-specific fields based on the platform
+    switch(platformName) {
+      case 'Facebook':
+        initialFormData.additionalParams = [
+          { parameter: "sub1", macroToken: "{ad.id}", nameDescription: "ad_id", selectRole: "Aid" },
+          { parameter: "sub2", macroToken: "{adset.id}", nameDescription: "adset_id", selectRole: "Gid" },
+          { parameter: "sub3", macroToken: "{campaign.id}", nameDescription: "campaign_id", selectRole: "Gid" },
+          ...Array(16).fill({}).map(() => ({ parameter: "", macroToken: "", nameDescription: "", selectRole: "" })),
+          { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" }
+        ];
+        break;
+        
+      case 'Google':
+        initialFormData.clickRefId = "{gclid}";
+        initialFormData.googleParams = [
+          { parameter: "utm_campaign", macroToken: "{replace}", nameDescription: "Campaign name", selectRole: "Rt campaign" },
+          { parameter: "sub2", macroToken: "{keyword}", nameDescription: "Bidded keyword", selectRole: "Rt keyword" },
+          { parameter: "sub3", macroToken: "{matchtype}", nameDescription: "Keyword match type", selectRole: "Rt match type" },
+          { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" }
+        ];
+        break;
+        
+      case 'TikTok':
+        initialFormData.additionalParams = [
+          { parameter: "sub1", macroToken: "{campaign_id}", nameDescription: "campaign_id", selectRole: "Gid" },
+          { parameter: "sub2", macroToken: "{adgroup_id}", nameDescription: "adgroup_id", selectRole: "Gid" },
+          { parameter: "sub3", macroToken: "{ad_id}", nameDescription: "ad_id", selectRole: "Aid" },
+          ...Array(16).fill({}).map(() => ({ parameter: "", macroToken: "", nameDescription: "", selectRole: "" })),
+          { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" }
+        ];
+        break;
+        
+      default:
+        // Custom platform - maintain current structure
+        break;
+    }
+    
+    // Update form data with the initialized platform data
+    setFormData(initialFormData);
+    setSelectedChannel(platformName);
+  };
+
   // Handle template selection
   const handleOpenSecondModal = (channelType) => {
     if (channelType) {
-      const template = channelTemplates[channelType] || channelTemplates.Custom;
-      setFormData({
-        ...formData,
-        ...template,
-        aliasChannel: template.aliasChannel
-      });
-      setSelectedChannel(channelType);
+      // Apply platform-specific template
+      handlePlatformSelectionChange(channelType);
     } else {
       // Reset form for custom channel
       setFormData(channelTemplates.Custom);
@@ -560,15 +656,47 @@ const TrafficChannels = () => {
     setEditMode(false);
     setOpenSecondModal(true);
     setOpenModal(false);
+    
+    // Show a success message if a template was selected
+    if (channelType) {
+      setSnackbar({
+        open: true,
+        message: `${channelType} template applied successfully`,
+        severity: "success"
+      });
+    }
   };
 
   // Edit channel
   const handleEditChannel = (channel) => {
     setSelectedRow(channel);
-    setFormData({
-      ...channelTemplates.Custom,
-      ...channel
-    });
+    
+    // Deep clone to avoid reference issues
+    const initialFormData = {
+      ...channelTemplates.Custom, // Reset first to ensure all fields exist
+      ...channel, // Apply channel data
+    };
+    
+    // Initialize parameter arrays if they don't exist in the channel data
+    if (!initialFormData.additionalParams) {
+      initialFormData.additionalParams = Array(20).fill({}).map((_, i) => {
+        if (i === 0) return { parameter: "sub1", macroToken: "{ad.id}", nameDescription: "ad_id", selectRole: "Aid" };
+        if (i === 1) return { parameter: "sub2", macroToken: "{adset.id}", nameDescription: "adset_id", selectRole: "Gid" };
+        if (i === 2) return { parameter: "sub3", macroToken: "{campaign.id}", nameDescription: "campaign_id", selectRole: "Gid" };
+        if (i === 19) return { parameter: "sub20", macroToken: "", nameDescription: "hint", selectRole: "" };
+        return { parameter: "", macroToken: "", nameDescription: "", selectRole: "" };
+      });
+    }
+    
+    if (!initialFormData.googleParams && channel.aliasChannel?.toLowerCase() === 'google') {
+      initialFormData.googleParams = [
+        { parameter: "utm_campaign", macroToken: "{replace}", nameDescription: "Campaign name", selectRole: "Rt campaign" },
+        { parameter: "sub2", macroToken: "{keyword}", nameDescription: "Bidded keyword", selectRole: "Rt keyword" },
+        { parameter: "sub3", macroToken: "{matchtype}", nameDescription: "Keyword match type", selectRole: "Rt match type" }
+      ];
+    }
+    
+    setFormData(initialFormData);
     setSelectedChannel(channel.aliasChannel);
     setEditMode(true);
     setOpenSecondModal(true);
@@ -617,7 +745,7 @@ const TrafficChannels = () => {
     }
   };
 
-  // Form submission - Modified to allow saving without platform-specific fields
+  // Form submission - Modified to handle platform-specific validations
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -634,12 +762,26 @@ const TrafficChannels = () => {
     try {
       setLoading(prev => ({ ...prev, save: true }));
       
+      // Create a copy of formData for submission
+      const submissionData = { ...formData };
+      
+      // For Google, remove Facebook-specific fields and vice versa
+      if (selectedChannel?.toLowerCase() === 'google') {
+        delete submissionData.pixelId;
+        delete submissionData.payoutType;
+        delete submissionData.payoutValue;
+        delete submissionData.customConversionMatching;
+      } else if (selectedChannel?.toLowerCase() === 'facebook') {
+        delete submissionData.googleAdsAccountId;
+        delete submissionData.googleMccAccountId;
+      }
+      
       let response;
       if (editMode) {
         // Update existing channel
         response = await axios.put(
           `${API_URL}/api/traffic/${selectedRow.id}`, 
-          formData
+          submissionData
         );
         
         // Update local state
@@ -656,7 +798,7 @@ const TrafficChannels = () => {
         });
       } else {
         // Create new channel
-        response = await axios.post(`${API_URL}/api/traffic`, formData);
+        response = await axios.post(`${API_URL}/api/traffic`, submissionData);
         
         // Update local state with the newly created channel
         setRows(prevRows => [...prevRows, response.data]);
@@ -726,10 +868,43 @@ const TrafficChannels = () => {
     return ["Facebook", "Google"].includes(platformName);
   };
 
+  // Main function to render platform-specific sections
+  const renderPlatformSpecificSections = () => {
+    // If no platform is selected, return additional parameters section only
+    if (!selectedChannel) return renderAdditionalParameters();
+    
+    // Render different sections based on the selected platform
+    switch(selectedChannel.toLowerCase()) {
+      case 'facebook':
+        return (
+          <>
+            {editMode && renderFacebookApiSection()}
+            {renderFacebookPixelSection()}
+            {renderAdditionalParameters()}
+          </>
+        );
+      case 'google':
+        return (
+          <>
+            {editMode && renderGoogleApiSection()}
+            {renderAdditionalParameters()}
+          </>
+        );
+      case 'tiktok':
+        return (
+          <>
+            {renderTikTokSection()}
+            {renderAdditionalParameters()}
+          </>
+        );
+      default:
+        // For custom or other channels, just show additional parameters
+        return renderAdditionalParameters();
+    }
+  };
+
   // Render Facebook API integration section - Only shown in edit mode
   const renderFacebookApiSection = () => {
-    if (selectedChannel?.toLowerCase() !== 'facebook' || !editMode) return null;
-
     return (
       <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
         <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -792,8 +967,6 @@ const TrafficChannels = () => {
 
   // Render Facebook Pixel section
   const renderFacebookPixelSection = () => {
-    if (selectedChannel?.toLowerCase() !== 'facebook') return null;
-
     return (
       <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
         <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center' }}>
@@ -812,7 +985,7 @@ const TrafficChannels = () => {
               fullWidth
               placeholder="Pixel ID"
               name="pixelId"
-              value={formData.pixelId}
+              value={formData.pixelId || ""}
               onChange={handleFormChange}
               variant="outlined"
               size="small"
@@ -827,7 +1000,7 @@ const TrafficChannels = () => {
               fullWidth
               placeholder="Conversions API Access token"
               name="apiAccessToken"
-              value={formData.apiAccessToken}
+              value={formData.apiAccessToken || ""}
               onChange={handleFormChange}
               variant="outlined"
               size="small"
@@ -842,7 +1015,7 @@ const TrafficChannels = () => {
               fullWidth
               placeholder="Default Event name"
               name="defaultEventName"
-              value={formData.defaultEventName}
+              value={formData.defaultEventName || ""}
               onChange={handleFormChange}
               variant="outlined"
               size="small"
@@ -886,7 +1059,7 @@ const TrafficChannels = () => {
 
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Switch
-              checked={formData.customConversionMatching}
+              checked={formData.customConversionMatching || false}
               onChange={(e) => setFormData(prev => ({
                 ...prev,
                 customConversionMatching: e.target.checked
@@ -905,8 +1078,6 @@ const TrafficChannels = () => {
 
   // Render Google API integration section - Only shown in edit mode
   const renderGoogleApiSection = () => {
-    if (selectedChannel?.toLowerCase() !== 'google' || !editMode) return null;
-
     return (
       <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
         <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -931,18 +1102,24 @@ const TrafficChannels = () => {
 
         <Box sx={{ p: 3 }}>
           <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Google Ads Account ID *
+            </Typography>
             <TextField
               fullWidth
-              label="Google Ads Account ID *"
+              placeholder="Google Ads Account ID"
               name="googleAdsAccountId"
-              value={formData.googleAdsAccountId}
+              value={formData.googleAdsAccountId || ""}
               onChange={handleFormChange}
               variant="outlined"
               size="small"
+              required
+              error={!!formErrors.googleAdsAccountId}
+              helperText={formErrors.googleAdsAccountId}
             />
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="body2" color="textSecondary">
               RedTrack will update costs via API and send conversions for the connected ad account
             </Typography>
@@ -961,12 +1138,15 @@ const TrafficChannels = () => {
             </Button>
           </Box>
 
-          <Box sx={{ mt: 3, mb: 2 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Google MCC Account ID (optional)
+            </Typography>
             <TextField
               fullWidth
-              label="Google MCC Account ID (optional)"
+              placeholder="Google MCC Account ID (optional)"
               name="googleMccAccountId"
-              value={formData.googleMccAccountId}
+              value={formData.googleMccAccountId || ""}
               onChange={handleFormChange}
               variant="outlined"
               size="small"
@@ -1073,19 +1253,77 @@ const TrafficChannels = () => {
     );
   };
 
-  // Render additional parameters section
+  // Render TikTok section
+  const renderTikTokSection = () => {
+    return (
+      <Box sx={{ mt: 3, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center' }}>
+          <Typography variant="subtitle1" fontWeight="medium">
+            TikTok Integration
+          </Typography>
+          <HelpOutlineIcon fontSize="small" sx={{ ml: 1, color: '#757575', cursor: 'pointer' }} />
+        </Box>
+
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              TikTok Pixel ID
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Pixel ID"
+              name="pixelId"
+              value={formData.pixelId || ""}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              TikTok Events API Access Token
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="API Access Token"
+              name="apiAccessToken"
+              value={formData.apiAccessToken || ""}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Default Event name
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Default Event name"
+              name="defaultEventName"
+              value={formData.defaultEventName || ""}
+              onChange={handleFormChange}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render additional parameters section - FIXED WITH NULL CHECKS
   const renderAdditionalParameters = () => {
-    const params = selectedChannel?.toLowerCase() === 'google' ? 
-      formData.googleParams : 
-      formData.additionalParams;
+    // Safely determine which params array to use
+    const selectedParamsKey = selectedChannel?.toLowerCase() === 'google' ? 'googleParams' : 'additionalParams';
+    const params = formData[selectedParamsKey] || [];
     
     // Show only the first 5 parameters plus any that are filled in
     const displayParams = params.filter((param, index) => 
       index < 5 || 
-      param.parameter || 
-      param.macroToken || 
-      param.nameDescription || 
-      param.selectRole
+      (param && (param.parameter || param.macroToken || param.nameDescription || param.selectRole))
     );
     
     return (
@@ -1115,7 +1353,7 @@ const TrafficChannels = () => {
                   </Typography>
                   <TextField
                     fullWidth
-                    value={param.parameter || ""}
+                    value={param?.parameter || ""}
                     onChange={(e) => handleParamChange(index, 'parameter', e.target.value)}
                     variant="outlined"
                     size="small"
@@ -1127,7 +1365,7 @@ const TrafficChannels = () => {
                   </Typography>
                   <TextField
                     fullWidth
-                    value={param.macroToken || ""}
+                    value={param?.macroToken || ""}
                     onChange={(e) => handleParamChange(index, 'macroToken', e.target.value)}
                     variant="outlined"
                     size="small"
@@ -1139,7 +1377,7 @@ const TrafficChannels = () => {
                   </Typography>
                   <TextField
                     fullWidth
-                    value={param.nameDescription || ""}
+                    value={param?.nameDescription || ""}
                     onChange={(e) => handleParamChange(index, 'nameDescription', e.target.value)}
                     variant="outlined"
                     size="small"
@@ -1151,7 +1389,7 @@ const TrafficChannels = () => {
                   </Typography>
                   <FormControl fullWidth size="small">
                     <Select
-                      value={param.selectRole || ""}
+                      value={param?.selectRole || ""}
                       onChange={(e) => handleParamChange(index, 'selectRole', e.target.value)}
                       displayEmpty
                       variant="outlined"
@@ -1567,7 +1805,7 @@ const TrafficChannels = () => {
               }}
             >
               <Typography variant="h6">
-                New Traffic Channel
+                {editMode ? `Edit ${formData.channelName}` : 'New Traffic Channel'}
               </Typography>
               <Box sx={{ display: "flex", gap: 1.5 }}>
                 <Button
@@ -1781,11 +2019,8 @@ const TrafficChannels = () => {
                 </Grid>
               </Box>
 
-              {/* Platform-specific sections */}
-              {renderFacebookApiSection()}
-              {renderFacebookPixelSection()}
-              {renderGoogleApiSection()}
-              {renderAdditionalParameters()}
+              {/* Platform-specific sections - FIXED */}
+              {renderPlatformSpecificSections()}
 
               {/* Bottom Save/Close buttons */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 1.5 }}>
