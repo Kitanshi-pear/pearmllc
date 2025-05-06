@@ -20,91 +20,77 @@ import {
   faExchangeAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
-// Constants from your system
-const DATE_FORMAT = 'YYYY-MM-DD';
-const DATE_FORMAT_HOUR_SECONDS = 'YYYY-MM-DD HH:mm:ss';
+// Import the DateFormatter to ensure consistent date formatting
+import DateFormatter from './DateFormat';
 
-// Time ranges similar to what's in your paste.txt file
-const generateRanges = (formatMessage, timeZone) => [
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.today' }) : 'Today',
-    startDate: timeZone ? moment().tz(timeZone).startOf('day') : moment().startOf('day'),
-    endDate: timeZone ? moment().tz(timeZone).endOf('day') : moment().endOf('day'),
-    rangeKey: 'today',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.yesterday' }) : 'Yesterday',
-    startDate: timeZone ? moment().tz(timeZone).subtract(1, 'day').startOf('day') : moment().subtract(1, 'day').startOf('day'),
-    endDate: timeZone ? moment().tz(timeZone).subtract(1, 'day').endOf('day') : moment().subtract(1, 'day').endOf('day'),
-    rangeKey: 'yesterday',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.this_week' }) : 'This Week',
-    startDate: timeZone ? moment().tz(timeZone).startOf('isoweek') : moment().startOf('isoweek'),
-    endDate: timeZone ? moment().tz(timeZone).endOf('isoweek') : moment().endOf('isoweek'),
-    rangeKey: 'this_week',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.last_seven_days' }) : 'Last 7 Days',
-    startDate: timeZone ? moment().tz(timeZone).subtract(6, 'days').startOf('day') : moment().subtract(6, 'days').startOf('day'),
-    endDate: timeZone ? moment().tz(timeZone).endOf('day') : moment().endOf('day'),
-    rangeKey: 'last_seven_days',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.last_week' }) : 'Last Week',
-    startDate: timeZone ? moment().tz(timeZone).subtract(1, 'week').startOf('isoweek') : moment().subtract(1, 'week').startOf('isoweek'),
-    endDate: timeZone ? moment().tz(timeZone).subtract(1, 'week').endOf('isoweek') : moment().subtract(1, 'week').endOf('isoweek'),
-    rangeKey: 'last_week',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.this_month' }) : 'This Month',
-    startDate: timeZone ? moment().tz(timeZone).startOf('month') : moment().startOf('month'),
-    endDate: timeZone ? moment().tz(timeZone).endOf('month') : moment().endOf('month'),
-    rangeKey: 'this_month',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.last_thirty_days' }) : 'Last 30 Days',
-    startDate: timeZone ? moment().tz(timeZone).subtract(29, 'days').startOf('day') : moment().subtract(29, 'days').startOf('day'),
-    endDate: timeZone ? moment().tz(timeZone).endOf('day') : moment().endOf('day'),
-    rangeKey: 'last_thirty_days',
-    timeInterval: '',
-  },
-  {
-    label: formatMessage ? formatMessage({ id: 'daterangepicker.last_month' }) : 'Last Month',
-    startDate: timeZone ? moment().tz(timeZone).subtract(1, 'month').startOf('month') : moment().subtract(1, 'month').startOf('month'),
-    endDate: timeZone ? moment().tz(timeZone).subtract(1, 'month').endOf('month') : moment().subtract(1, 'month').endOf('month'),
-    rangeKey: 'last_month',
-    timeInterval: '',
-  },
-];
+// Create date formatter instance
+const dateFormatter = new DateFormatter();
 
-// Helper functions from paste.txt
-const getCorrectDate = (date, tz = '') => {
-  const parsedDate = moment(date);
-  if (tz && !parsedDate.isUTC()) {
-    return parsedDate.tz(tz);
-  }
-  return parsedDate;
-};
-
-const prepareDate = (date) => {
-  if (!date || !moment.isMoment(date)) {
-    return '';
-  }
-  return date.format(DATE_FORMAT);
-};
-
-const DateRangePicker = ({ onDateRangeChange }) => {
-  // Default timezone to browser's timezone if none specified
+const DateRange = ({ onDateRangeChange }) => {
+  // Initialize with browser's timezone
   const [timeZone, setTimeZone] = useState(moment.tz.guess());
-  const [ranges, setRanges] = useState(generateRanges(null, timeZone));
-  const [selectedRange, setSelectedRange] = useState(ranges[0]); // Default to Today
+  
+  // Predefined date ranges
+  const dateRanges = [
+    {
+      label: 'Today',
+      startDate: dateFormatter.getDateRange('today').startDate,
+      endDate: dateFormatter.getDateRange('today').endDate,
+      rangeKey: 'today',
+      timeInterval: '',
+    },
+    {
+      label: 'Yesterday',
+      startDate: dateFormatter.getDateRange('yesterday').startDate,
+      endDate: dateFormatter.getDateRange('yesterday').endDate,
+      rangeKey: 'yesterday',
+      timeInterval: '',
+    },
+    {
+      label: 'This Week',
+      startDate: dateFormatter.getDateRange('this_week').startDate,
+      endDate: dateFormatter.getDateRange('this_week').endDate,
+      rangeKey: 'this_week',
+      timeInterval: '',
+    },
+    {
+      label: 'Last 7 Days',
+      startDate: dateFormatter.getDateRange('last_seven_days').startDate,
+      endDate: dateFormatter.getDateRange('last_seven_days').endDate,
+      rangeKey: 'last_seven_days',
+      timeInterval: '',
+    },
+    {
+      label: 'Last Week',
+      startDate: dateFormatter.getDateRange('last_week').startDate,
+      endDate: dateFormatter.getDateRange('last_week').endDate,
+      rangeKey: 'last_week',
+      timeInterval: '',
+    },
+    {
+      label: 'This Month',
+      startDate: dateFormatter.getDateRange('this_month').startDate,
+      endDate: dateFormatter.getDateRange('this_month').endDate,
+      rangeKey: 'this_month',
+      timeInterval: '',
+    },
+    {
+      label: 'Last 30 Days',
+      startDate: dateFormatter.getDateRange('last_thirty_days').startDate,
+      endDate: dateFormatter.getDateRange('last_thirty_days').endDate,
+      rangeKey: 'last_thirty_days',
+      timeInterval: '',
+    },
+    {
+      label: 'Last Month',
+      startDate: dateFormatter.getDateRange('last_month').startDate,
+      endDate: dateFormatter.getDateRange('last_month').endDate,
+      rangeKey: 'last_month',
+      timeInterval: '',
+    },
+  ];
+
+  const [selectedRange, setSelectedRange] = useState(dateRanges[0]); // Default to Today
   const [anchorEl, setAnchorEl] = useState(null);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -115,28 +101,20 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     value: tz,
     label: tz
   }));
-  
+
+  // Update date ranges when timezone changes
   useEffect(() => {
-    // Update ranges when timezone changes
-    setRanges(generateRanges(null, timeZone));
+    // Set the timezone in the dateFormatter
+    dateFormatter.setTimezone(timeZone);
     
-    // Update selected range with new timezone
-    if (selectedRange) {
-      const updatedRanges = generateRanges(null, timeZone);
-      const rangeWithSameKey = updatedRanges.find(r => r.rangeKey === selectedRange.rangeKey);
-      if (rangeWithSameKey) {
-        setSelectedRange(rangeWithSameKey);
-        
-        // Notify parent component about date range change
-        if (onDateRangeChange) {
-          onDateRangeChange({
-            startDate: prepareDate(rangeWithSameKey.startDate),
-            endDate: prepareDate(rangeWithSameKey.endDate),
-            label: rangeWithSameKey.label,
-            timeInterval: rangeWithSameKey.timeInterval
-          });
-        }
-      }
+    // Notify parent component about initial date range selection
+    if (onDateRangeChange) {
+      onDateRangeChange({
+        startDate: dateFormatter.prepareDate(selectedRange.startDate),
+        endDate: dateFormatter.prepareDate(selectedRange.endDate),
+        label: selectedRange.label,
+        timeInterval: selectedRange.timeInterval
+      });
     }
   }, [timeZone]);
   
@@ -158,8 +136,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     // Notify parent component about date range change
     if (onDateRangeChange) {
       onDateRangeChange({
-        startDate: prepareDate(range.startDate),
-        endDate: prepareDate(range.endDate),
+        startDate: dateFormatter.prepareDate(range.startDate),
+        endDate: dateFormatter.prepareDate(range.endDate),
         label: range.label,
         timeInterval: range.timeInterval
       });
@@ -177,8 +155,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
       if (startDate.isValid() && endDate.isValid() && !endDate.isBefore(startDate)) {
         const customRange = {
           label: 'Custom Range',
-          startDate: getCorrectDate(startDate, timeZone).startOf('day'),
-          endDate: getCorrectDate(endDate, timeZone).endOf('day'),
+          startDate: dateFormatter.getCorrectDate(startDate),
+          endDate: dateFormatter.getCorrectDate(endDate),
           rangeKey: 'custom',
           timeInterval: '',
         };
@@ -188,8 +166,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
         // Notify parent component about date range change
         if (onDateRangeChange) {
           onDateRangeChange({
-            startDate: prepareDate(customRange.startDate),
-            endDate: prepareDate(customRange.endDate),
+            startDate: dateFormatter.prepareDate(customRange.startDate),
+            endDate: dateFormatter.prepareDate(customRange.endDate),
             label: customRange.label,
             timeInterval: customRange.timeInterval
           });
@@ -224,8 +202,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     // Notify parent component about date range change
     if (onDateRangeChange) {
       onDateRangeChange({
-        startDate: prepareDate(newRange.startDate),
-        endDate: prepareDate(newRange.endDate),
+        startDate: dateFormatter.prepareDate(newRange.startDate),
+        endDate: dateFormatter.prepareDate(newRange.endDate),
         label: newRange.label,
         timeInterval: newRange.timeInterval
       });
@@ -259,8 +237,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     // Notify parent component about date range change
     if (onDateRangeChange) {
       onDateRangeChange({
-        startDate: prepareDate(newRange.startDate),
-        endDate: prepareDate(newRange.endDate),
+        startDate: dateFormatter.prepareDate(newRange.startDate),
+        endDate: dateFormatter.prepareDate(newRange.endDate),
         label: newRange.label,
         timeInterval: newRange.timeInterval
       });
@@ -273,14 +251,14 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     
     const newRange = {
       ...selectedRange,
-      startDate: selectedRange.endDate,
-      endDate: selectedRange.startDate,
+      startDate: selectedRange.endDate.clone(),
+      endDate: selectedRange.startDate.clone(),
       label: `${selectedRange.label} (Swapped)`,
     };
     
     if (newRange.startDate.isAfter(newRange.endDate)) {
-      const temp = newRange.startDate;
-      newRange.startDate = newRange.endDate;
+      const temp = newRange.startDate.clone();
+      newRange.startDate = newRange.endDate.clone();
       newRange.endDate = temp;
     }
     
@@ -289,8 +267,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
     // Notify parent component about date range change
     if (onDateRangeChange) {
       onDateRangeChange({
-        startDate: prepareDate(newRange.startDate),
-        endDate: prepareDate(newRange.endDate),
+        startDate: dateFormatter.prepareDate(newRange.startDate),
+        endDate: dateFormatter.prepareDate(newRange.endDate),
         label: newRange.label,
         timeInterval: newRange.timeInterval
       });
@@ -306,8 +284,8 @@ const DateRangePicker = ({ onDateRangeChange }) => {
   const toggleCustomRange = () => {
     setShowCustomRange(!showCustomRange);
     if (!showCustomRange) {
-      setCustomStartDate(prepareDate(moment().subtract(6, 'days')));
-      setCustomEndDate(prepareDate(moment()));
+      setCustomStartDate(dateFormatter.prepareDate(moment().subtract(6, 'days')));
+      setCustomEndDate(dateFormatter.prepareDate(moment()));
     }
   };
   
@@ -325,7 +303,7 @@ const DateRangePicker = ({ onDateRangeChange }) => {
         >
           <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
             <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-              {selectedRange ? `${prepareDate(selectedRange.startDate)} - ${prepareDate(selectedRange.endDate)}` : 'Select date range'}
+              {selectedRange ? `${dateFormatter.formatForDisplay(selectedRange.startDate)} - ${dateFormatter.formatForDisplay(selectedRange.endDate)}` : 'Select date range'}
             </Typography>
             <Typography variant="body1" sx={{ fontWeight: "400" }}>
               {selectedRange ? selectedRange.label : 'Today'}
@@ -434,7 +412,7 @@ const DateRangePicker = ({ onDateRangeChange }) => {
                 Preset Ranges
               </Typography>
               <Grid container spacing={1}>
-                {ranges.map((range) => (
+                {dateRanges.map((range) => (
                   <Grid item xs={6} key={range.rangeKey}>
                     <Button
                       fullWidth
@@ -512,4 +490,4 @@ const DateRangePicker = ({ onDateRangeChange }) => {
   );
 };
 
-export default DateRangePicker;
+export default DateRange;

@@ -67,6 +67,8 @@ class DateFormatter {
    * @returns {moment} Moment date object with correct timezone
    */
   getCorrectDate(date) {
+    if (!date) return moment();
+    
     const parsedDate = moment(date);
     if (this.timezone && !parsedDate.isUTC()) {
       return parsedDate.tz(this.timezone);
@@ -80,9 +82,14 @@ class DateFormatter {
    * @returns {string} Formatted date string for API
    */
   prepareDate(date) {
-    if (!date || (typeof date === 'object' && !Object.keys(date).length)) {
-      return '';
+    if (!date) return '';
+    
+    // Handle moment objects
+    if (moment.isMoment(date)) {
+      return date.format(DATE_FORMAT);
     }
+    
+    // Handle string/date objects
     return this.format(date);
   }
 
@@ -98,7 +105,7 @@ class DateFormatter {
   /**
    * Generate a date range for a specified period
    * @param {string} period - The period ('today', 'yesterday', 'this_week', etc.)
-   * @returns {Object} Object with startDate and endDate
+   * @returns {Object} Object with startDate and endDate as moment objects
    */
   getDateRange(period) {
     switch (period) {
@@ -155,7 +162,7 @@ class DateFormatter {
    * Get a custom date range
    * @param {Date|string|moment} startDate - The start date
    * @param {Date|string|moment} endDate - The end date
-   * @returns {Object} Object with startDate and endDate
+   * @returns {Object} Object with startDate and endDate as moment objects
    */
   getCustomDateRange(startDate, endDate) {
     return {

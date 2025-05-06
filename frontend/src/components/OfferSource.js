@@ -57,8 +57,6 @@ import DateFormatter, { DATE_FORMAT } from "./DateFormat";
 // Create date formatter instance
 const dateFormatter = new DateFormatter();
 
-// Rest of your component code remains the same...
-
 // Enhanced Postback Macros - RedTrack style
 const POSTBACK_MACROS = {
   CLICKID: '{click_id}',
@@ -779,13 +777,14 @@ const OfferSourcePage = () => {
   return (
     <Layout>
       <Box>
+        {/* Title and Add New Source button in the same row */}
         <Box
           display="flex"
           justifyContent="space-between"
           alignItems="center"
-          sx={{ mb: 2 }}
+          sx={{ mb: 3 }}
         >
-          <Typography variant="h4">Offer Source</Typography>
+          <Typography variant="h4">Offer Sources</Typography>
           <Box display="flex" gap={2}>
             <Button
               variant="outlined"
@@ -829,35 +828,45 @@ const OfferSourcePage = () => {
           </Box>
         </Box>
 
-        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid item xs={6} sm={2}>
-            <TextField
-              label="Title"
-              value={titleText}
-              onChange={(e) => setTitle(e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={4} sm={2}>
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={() => fetchOfferSources()}
-            >
-              Apply
-            </Button>
-          </Grid>
-        </Grid>
+        {/* Title field, DateRangePicker, and Apply button in the same row */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            mb: 3,
+            gap: 2,
+            flexWrap: { xs: "wrap", md: "nowrap" }
+          }}
+        >
+          {/* Title filter */}
+          <TextField
+            label="Title"
+            value={titleText}
+            onChange={(e) => setTitle(e.target.value)}
+            size="small"
+            sx={{ width: { xs: "100%", sm: "200px" } }}
+          />
+          
+          {/* Date range picker - takes up most of the space */}
+          <Box sx={{ flexGrow: 1 }}>
+            <DateRangePicker onDateRangeChange={handleDateRangeChange} />
+          </Box>
+          
+          {/* Apply button */}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => fetchOfferSources()}
+          >
+            Apply
+          </Button>
+        </Box>
 
-        {/* DateRangePicker component for improved date selection */}
-        <DateRangePicker onDateRangeChange={handleDateRangeChange} />
-
+        {/* DataGrid for displaying offer sources */}
         <Box
           sx={{
             height: 700,
             width: "100%",
-            mt: 3,
             bgcolor: "white",
             boxShadow: 2,
             p: 2,
@@ -912,7 +921,6 @@ const OfferSourcePage = () => {
               <Tabs value={tabValue} onChange={handleTabChange}>
                 <Tab label="Basic Details" />
                 <Tab label="Postback URL" />
-                <Tab label="Conversion API" />
               </Tabs>
             </Box>
 
