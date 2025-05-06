@@ -45,8 +45,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 // Import our custom date components
-import DateRangePicker from "./DateRangePicker";
-import DateFormatter, { DATE_FORMAT } from "./DateFormatter";
+import DateRangePicker from "./DateRange";
+import DateFormatter, { DATE_FORMAT } from "./DateFormat";
 
 // Create date formatter instance
 const dateFormatter = new DateFormatter();
