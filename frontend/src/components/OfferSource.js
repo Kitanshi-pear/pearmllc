@@ -216,8 +216,7 @@ const OfferSourcePage = () => {
           params: {
             date_from: dateParams.startDate,
             date_to: dateParams.endDate,
-            time_interval: dateParams.timeInterval,
-            title: titleText || undefined
+            time_interval: dateParams.timeInterval
           }
         }
       );
@@ -838,14 +837,7 @@ const OfferSourcePage = () => {
             flexWrap: { xs: "wrap", md: "nowrap" }
           }}
         >
-          {/* Title filter */}
-          <TextField
-            label="Title"
-            value={titleText}
-            onChange={(e) => setTitle(e.target.value)}
-            size="small"
-            sx={{ width: { xs: "100%", sm: "200px" } }}
-          />
+         
           
           {/* Date range picker - takes up most of the space */}
           <Box sx={{ flexGrow: 1 }}>
