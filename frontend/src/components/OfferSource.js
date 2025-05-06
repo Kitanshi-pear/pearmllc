@@ -112,7 +112,6 @@ const OfferSourcePage = () => {
   const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [conversionApiDialogOpen, setConversionApiDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -184,12 +183,7 @@ const OfferSourcePage = () => {
     description: "",
     role: "",
     is_active: true,
-    // Conversion API settings
-    forward_to_facebook: false,
-    forward_to_google: false,
-    facebook_event_name: "Purchase",
-    google_conversion_id: "",
-    google_conversion_label: ""
+    // Conversion API settings removed from default state
   });
 
   // Handle date range change
@@ -246,7 +240,7 @@ const OfferSourcePage = () => {
         profit: item.profit || 0,
         total_roi: item.total_roi || 0,
         lp_views: item.lp_views || 0,
-        // Conversion API attributes
+        // Conversion API attributes still in API response mapping
         forward_to_facebook: item.forward_to_facebook || false,
         forward_to_google: item.forward_to_google || false,
         facebook_event_name: item.facebook_event_name || "Purchase",
@@ -294,12 +288,7 @@ const OfferSourcePage = () => {
       description: row.description || "",
       role: row.role || "",
       is_active: row.is_active !== false,
-      // Conversion API settings
-      forward_to_facebook: row.forward_to_facebook || false,
-      forward_to_google: row.forward_to_google || false,
-      facebook_event_name: row.facebook_event_name || "Purchase",
-      google_conversion_id: row.google_conversion_id || "",
-      google_conversion_label: row.google_conversion_label || ""
+      // Conversion API settings removed from edit mapping
     });
     setOpenTemplateModal(true);
   };
@@ -307,53 +296,6 @@ const OfferSourcePage = () => {
   const handleDeleteClick = (row) => {
     setSelectedRowId(row.id);
     setDeleteConfirmOpen(true);
-  };
-
-  const handleOpenConversionSettings = (row) => {
-    setSelectedRowId(row.id);
-    setSelectedSource(row);
-    setNewTemplate({
-      ...newTemplate,
-      forward_to_facebook: row.forward_to_facebook || false,
-      forward_to_google: row.forward_to_google || false,
-      facebook_event_name: row.facebook_event_name || "Purchase",
-      google_conversion_id: row.google_conversion_id || "",
-      google_conversion_label: row.google_conversion_label || ""
-    });
-    setConversionApiDialogOpen(true);
-  };
-
-  const handleSaveConversionSettings = async () => {
-    try {
-      const payload = {
-        forward_to_facebook: newTemplate.forward_to_facebook,
-        forward_to_google: newTemplate.forward_to_google,
-        facebook_event_name: newTemplate.facebook_event_name,
-        google_conversion_id: newTemplate.google_conversion_id,
-        google_conversion_label: newTemplate.google_conversion_label
-      };
-
-      await axios.put(
-        `https://pearmllc.onrender.com/offersource/${selectedRowId}/conversion-settings`,
-        payload
-      );
-      
-      setSnackbar({
-        open: true,
-        message: 'Conversion settings updated successfully',
-        severity: 'success'
-      });
-      
-      fetchOfferSources();
-      setConversionApiDialogOpen(false);
-    } catch (error) {
-      console.error("Error saving conversion settings:", error.message);
-      setSnackbar({
-        open: true,
-        message: 'Failed to save conversion settings: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
-    }
   };
 
   const handleConfirmDelete = async () => {
@@ -397,12 +339,7 @@ const OfferSourcePage = () => {
         description: newTemplate.description,
         role: newTemplate.role,
         is_active: newTemplate.is_active,
-        // Include conversion API settings
-        forward_to_facebook: newTemplate.forward_to_facebook,
-        forward_to_google: newTemplate.forward_to_google,
-        facebook_event_name: newTemplate.facebook_event_name,
-        google_conversion_id: newTemplate.google_conversion_id,
-        google_conversion_label: newTemplate.google_conversion_label
+        // Conversion API settings removed from payload
       };
 
       if (editMode && selectedRowId) {
@@ -445,11 +382,7 @@ const OfferSourcePage = () => {
         description: "",
         role: "",
         is_active: true,
-        forward_to_facebook: false,
-        forward_to_google: false,
-        facebook_event_name: "Purchase",
-        google_conversion_id: "",
-        google_conversion_label: ""
+        // Conversion API settings removed from reset
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
@@ -663,46 +596,7 @@ const OfferSourcePage = () => {
         </Box>
       )
     },
-    {
-      field: "integration",
-      headerName: "Conversions",
-      width: 130,
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Tooltip title={params.row.forward_to_facebook ? "Facebook Integration Active" : "Facebook Integration Inactive"}>
-            <Box 
-              sx={{ 
-                color: params.row.forward_to_facebook ? "#4267B2" : "#bdbdbd",
-                mr: 1
-              }}
-            >
-              <FontAwesomeIcon icon={faFacebookF} />
-            </Box>
-          </Tooltip>
-          <Tooltip title={params.row.forward_to_google ? "Google Integration Active" : "Google Integration Inactive"}>
-            <Box 
-              sx={{ 
-                color: params.row.forward_to_google ? "#DB4437" : "#bdbdbd",
-                mr: 1
-              }}
-            >
-              <FontAwesomeIcon icon={faGoogle} />
-            </Box>
-          </Tooltip>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenConversionSettings(params.row);
-            }}
-            sx={{ fontSize: '0.7rem', py: 0.3 }}
-          >
-            Settings
-          </Button>
-        </Box>
-      )
-    },
+    // Removed "Conversions" column with Facebook/Google integration icons
     { field: "clicks", headerName: "Clicks", width: 80, type: "number" },
     { field: "conversion", headerName: "Conv", width: 80, type: "number" },
     { 
@@ -812,11 +706,7 @@ const OfferSourcePage = () => {
                   description: "",
                   role: "",
                   is_active: true,
-                  forward_to_facebook: false,
-                  forward_to_google: false,
-                  facebook_event_name: "Purchase",
-                  google_conversion_id: "",
-                  google_conversion_label: ""
+                  // Conversion API settings removed from reset
                 });
               }}
             >
@@ -835,8 +725,6 @@ const OfferSourcePage = () => {
             flexWrap: { xs: "wrap", md: "nowrap" }
           }}
         >
-         
-          
           {/* Date range picker - takes up most of the space */}
           <Box sx={{ flexGrow: 1 }}>
             <DateRangePicker onDateRangeChange={handleDateRangeChange} />
@@ -885,7 +773,7 @@ const OfferSourcePage = () => {
           )}
         </Box>
 
-        {/* Source Modal with 3 tabs - Basic Details, Postback URL, Conversion API */}
+        {/* Source Modal with 2 tabs - Basic Details and Postback URL */}
         <Modal open={openTemplateModal} onClose={() => setOpenTemplateModal(false)}>
           <Box
             sx={{
@@ -1174,135 +1062,6 @@ const OfferSourcePage = () => {
               </Card>
             )}
 
-            {/* Tab 3: Conversion API Settings */}
-            {tabValue === 2 && (
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Conversion Tracking Integration
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Configure conversion forwarding to external platforms to track your campaign performance.
-                  </Typography>
-                  
-                  {/* Facebook Integration */}
-                  <Paper sx={{ p: 2, mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Box 
-                        sx={{ 
-                          backgroundColor: '#4267B2', 
-                          color: 'white',
-                          p: 1,
-                          borderRadius: 1,
-                          mr: 2
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faFacebookF} />
-                      </Box>
-                      <Typography variant="h6">Facebook Conversions API</Typography>
-                      <Box sx={{ ml: 'auto' }}>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={newTemplate.forward_to_facebook}
-                              onChange={(e) => setNewTemplate({ 
-                                ...newTemplate, 
-                                forward_to_facebook: e.target.checked 
-                              })}
-                            />
-                          }
-                          label={newTemplate.forward_to_facebook ? "Enabled" : "Disabled"}
-                        />
-                      </Box>
-                    </Box>
-                    
-                    {newTemplate.forward_to_facebook && (
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <FormControl fullWidth>
-                            <InputLabel>Event Name</InputLabel>
-                            <Select
-                              value={newTemplate.facebook_event_name}
-                              onChange={(e) => setNewTemplate({ 
-                                ...newTemplate, 
-                                facebook_event_name: e.target.value 
-                              })}
-                              label="Event Name"
-                            >
-                              <MenuItem value="Purchase">Purchase</MenuItem>
-                              <MenuItem value="Lead">Lead</MenuItem>
-                              <MenuItem value="CompleteRegistration">Complete Registration</MenuItem>
-                              <MenuItem value="Subscribe">Subscribe</MenuItem>
-                              <MenuItem value="AddToCart">Add To Cart</MenuItem>
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                      </Grid>
-                    )}
-                  </Paper>
-                  
-                  {/* Google Integration */}
-                  <Paper sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Box 
-                        sx={{ 
-                          backgroundColor: '#DB4437', 
-                          color: 'white',
-                          p: 1,
-                          borderRadius: 1,
-                          mr: 2
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faGoogle} />
-                      </Box>
-                      <Typography variant="h6">Google Ads Conversion</Typography>
-                      <Box sx={{ ml: 'auto' }}>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={newTemplate.forward_to_google}
-                              onChange={(e) => setNewTemplate({ 
-                                ...newTemplate, 
-                                forward_to_google: e.target.checked 
-                              })}
-                            />
-                          }
-                          label={newTemplate.forward_to_google ? "Enabled" : "Disabled"}
-                        />
-                      </Box>
-                    </Box>
-                    
-                    {newTemplate.forward_to_google && (
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            label="Google Conversion ID"
-                            value={newTemplate.google_conversion_id}
-                            onChange={(e) => setNewTemplate({ 
-                              ...newTemplate, 
-                              google_conversion_id: e.target.value 
-                            })}
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            label="Google Conversion Label"
-                            value={newTemplate.google_conversion_label}
-                            onChange={(e) => setNewTemplate({ 
-                              ...newTemplate, 
-                              google_conversion_label: e.target.value 
-                            })}
-                          />
-                        </Grid>
-                      </Grid>
-                    )}
-                  </Paper>
-                </CardContent>
-              </Card>
-            )}
-
             <Divider sx={{ my: 3 }} />
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={() => setOpenTemplateModal(false)} sx={{ mr: 2 }}>
@@ -1310,169 +1069,6 @@ const OfferSourcePage = () => {
               </Button>
               <Button variant="contained" color="primary" onClick={handleSaveTemplate}>
                 {editMode ? "Save Changes" : "Save Template"}
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
-        
-        {/* Conversion API Settings Dialog */}
-        <Modal
-          open={conversionApiDialogOpen}
-          onClose={() => setConversionApiDialogOpen(false)}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "700px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflow: "auto",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              Conversion API Settings
-              {selectedSource && (
-                <Typography variant="subtitle2" color="text.secondary">
-                  {selectedSource.source_name} ({selectedSource.source_type})
-                </Typography>
-              )}
-            </Typography>
-            
-            {/* Facebook Integration */}
-            <Paper sx={{ p: 2, mb: 3, mt: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Box 
-                  sx={{ 
-                    backgroundColor: '#4267B2', 
-                    color: 'white',
-                    p: 1,
-                    borderRadius: 1,
-                    mr: 2
-                  }}
-                >
-                  <FontAwesomeIcon icon={faFacebookF} />
-                </Box>
-                <Typography variant="h6">Facebook Conversions API</Typography>
-                <Box sx={{ ml: 'auto' }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={newTemplate.forward_to_facebook}
-                        onChange={(e) => setNewTemplate({ 
-                          ...newTemplate, 
-                          forward_to_facebook: e.target.checked 
-                        })}
-                      />
-                    }
-                    label={newTemplate.forward_to_facebook ? "Enabled" : "Disabled"}
-                  />
-                </Box>
-              </Box>
-              
-              {newTemplate.forward_to_facebook && (
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <FormControl fullWidth>
-                      <InputLabel>Event Name</InputLabel>
-                      <Select
-                        value={newTemplate.facebook_event_name}
-                        onChange={(e) => setNewTemplate({ 
-                          ...newTemplate, 
-                          facebook_event_name: e.target.value 
-                        })}
-                        label="Event Name"
-                      >
-                        <MenuItem value="Purchase">Purchase</MenuItem>
-                        <MenuItem value="Lead">Lead</MenuItem>
-                        <MenuItem value="CompleteRegistration">Complete Registration</MenuItem>
-                        <MenuItem value="Subscribe">Subscribe</MenuItem>
-                        <MenuItem value="AddToCart">Add To Cart</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
-              )}
-            </Paper>
-            
-            {/* Google Integration */}
-            <Paper sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Box 
-                  sx={{ 
-                    backgroundColor: '#DB4437', 
-                    color: 'white',
-                    p: 1,
-                    borderRadius: 1,
-                    mr: 2
-                  }}
-                >
-                  <FontAwesomeIcon icon={faGoogle} />
-                </Box>
-                <Typography variant="h6">Google Ads Conversion</Typography>
-                <Box sx={{ ml: 'auto' }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={newTemplate.forward_to_google}
-                        onChange={(e) => setNewTemplate({ 
-                          ...newTemplate, 
-                          forward_to_google: e.target.checked 
-                        })}
-                      />
-                    }
-                    label={newTemplate.forward_to_google ? "Enabled" : "Disabled"}
-                  />
-                </Box>
-              </Box>
-              
-              {newTemplate.forward_to_google && (
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Google Conversion ID"
-                      value={newTemplate.google_conversion_id}
-                      onChange={(e) => setNewTemplate({ 
-                        ...newTemplate, 
-                        google_conversion_id: e.target.value 
-                      })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Google Conversion Label"
-                      value={newTemplate.google_conversion_label}
-                      onChange={(e) => setNewTemplate({ 
-                        ...newTemplate, 
-                        google_conversion_label: e.target.value 
-                      })}
-                    />
-                  </Grid>
-                </Grid>
-              )}
-            </Paper>
-
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
-              <Button 
-                onClick={() => setConversionApiDialogOpen(false)} 
-                sx={{ mr: 2 }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                onClick={handleSaveConversionSettings}
-              >
-                Save Settings
               </Button>
             </Box>
           </Box>
