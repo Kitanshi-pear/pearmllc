@@ -34,15 +34,21 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+// Import regular icons from free-solid-svg-icons
 import {
   faCalendarAlt,
   faChevronLeft,
   faChevronRight,
   faExchangeAlt,
-  faFacebookF,
-  faGoogle,
   faCaretDown,
 } from "@fortawesome/free-solid-svg-icons";
+
+// Import brand icons from free-brands-svg-icons
+import {
+  faFacebookF,
+  faGoogle,
+} from "@fortawesome/free-brands-svg-icons";
 
 // Import our custom date components
 import DateRangePicker from "./DateRange";
@@ -50,6 +56,8 @@ import DateFormatter, { DATE_FORMAT } from "./DateFormat";
 
 // Create date formatter instance
 const dateFormatter = new DateFormatter();
+
+// Rest of your component code remains the same...
 
 // Enhanced Postback Macros - RedTrack style
 const POSTBACK_MACROS = {
