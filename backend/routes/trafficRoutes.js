@@ -470,101 +470,129 @@ router.get("/", async (req, res) => {
             });
         }
 
-        // Fetch all traffic channels
-        const channels = await TrafficChannel.findAll({
-            attributes: [
-                'id', 'channelName', 'aliasChannel', 'costUpdateDepth', 
-                'costUpdateFrequency', 'currency', 's2sPostbackUrl', 'status', 
-                'createdAt', 'updatedAt', 'isConnected', 'pixelId', 'apiAccessToken',
-                'googleAdsAccountId'
-            ],
-            order: [['id', 'ASC']],
-        });
+        // Get date range for metrics (default to last 30 days)
+        const { start_date, end_date } = req.query;
+        const endDate = end_date ? new Date(end_date) : new Date();
+        const startDate = start_date ? new Date(start_date) : new Date(new Date().setDate(endDate.getDate() - 30));
         
-        console.log(`Successfully fetched ${channels.length} channels`);
+        // Format dates for DB query
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = endDate.toISOString().split('T')[0];
+
+        // Fetch all traffic channels with safer error handling
+        let channels = [];
+        try {
+            channels = await TrafficChannel.findAll({
+                attributes: [
+                    'id', 'channelName', 'aliasChannel', 'costUpdateDepth', 
+                    'costUpdateFrequency', 'currency', 's2sPostbackUrl', 'status', 
+                    'createdAt', 'updatedAt', 'isConnected', 'pixelId', 'apiAccessToken',
+                    'googleAdsAccountId'
+                ],
+                order: [['id', 'ASC']],
+            });
+            
+            console.log(`Successfully fetched ${channels.length} channels`);
+        } catch (channelsError) {
+            console.error("❌ Error fetching channels from database:", channelsError);
+            return res.status(500).json({ 
+                error: "Failed to fetch channels from database", 
+                details: channelsError.message 
+            });
+        }
 
         // Return early if no channels found
         if (channels.length === 0) {
             return res.json([]);
         }
 
-        // Get date range for metrics (default to last 30 days)
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30);
+        // Initialize metrics array with empty objects
+        const metrics = new Array(channels.length).fill({});
         
-        // Format dates for DB query
-        const formattedStartDate = startDate.toISOString().split('T')[0];
-        const formattedEndDate = endDate.toISOString().split('T')[0];
-
-        // Get metrics for each channel - with error handling
-        let metrics = [];
-        try {
-            console.log("Fetching metrics for channels...");
-            
-            const metricsPromises = channels.map(channel => {
-                try {
-                    return MetricsService.getAggregatedMetrics(
-                        'traffic_channel', 
-                        channel.id, 
-                        formattedStartDate, 
-                        formattedEndDate
-                    ).catch(metricError => {
-                        console.error(`Error fetching metrics for channel ${channel.id}:`, metricError);
-                        // Return empty metrics instead of failing
-                        return {};
+        // Only try to fetch metrics if MetricsService is properly initialized
+        if (typeof MetricsService?.getAggregatedMetrics === 'function') {
+            try {
+                console.log("Fetching metrics for channels...");
+                
+                // Process channels in batches to avoid overwhelming the database
+                const batchSize = 5;
+                for (let i = 0; i < channels.length; i += batchSize) {
+                    const batch = channels.slice(i, i + batchSize);
+                    const batchPromises = batch.map((channel, batchIndex) => {
+                        return MetricsService.getAggregatedMetrics(
+                            'traffic_channel', 
+                            channel.id, 
+                            formattedStartDate, 
+                            formattedEndDate
+                        ).then(metric => {
+                            metrics[i + batchIndex] = metric || {};
+                        }).catch(metricError => {
+                            console.error(`Error fetching metrics for channel ${channel.id}:`, metricError);
+                            metrics[i + batchIndex] = {};
+                        });
                     });
-                } catch (promiseError) {
-                    console.error(`Error creating metric promise for channel ${channel.id}:`, promiseError);
-                    return Promise.resolve({});
+                    
+                    // Wait for each batch to complete before processing the next one
+                    await Promise.all(batchPromises);
                 }
-            });
-            
-            // Wait for all metrics to be fetched
-            metrics = await Promise.all(metricsPromises);
-            console.log("Successfully fetched metrics for all channels");
-        } catch (metricsError) {
-            console.error("❌ Error in metrics fetching process:", metricsError);
-            // Continue with empty metrics rather than failing
-            metrics = channels.map(() => ({}));
+                
+                console.log("Successfully fetched metrics for all channels");
+            } catch (metricsError) {
+                console.error("❌ Error in metrics fetching process:", metricsError);
+                // Continue with empty metrics rather than failing
+                console.log("Continuing with empty metrics due to error");
+            }
+        } else {
+            console.warn("⚠️ MetricsService.getAggregatedMetrics is not available. Skipping metrics fetch.");
         }
 
         // Map channels with their metrics - with error handling
-        const channelsWithMetrics = channels.map((channel, index) => {
-            try {
-                // Check if this channel should be marked as connected based on API tokens
-                const isChannelConnected = channel.isConnected || 
-                                        (channel.apiAccessToken && channel.aliasChannel === 'Facebook') || 
-                                        (channel.googleAdsAccountId && channel.aliasChannel === 'Google');
-                
-                return {
-                    ...channel.toJSON(),
-                    isConnected: isChannelConnected,
-                    metrics: metrics[index] || {}
-                };
-            } catch (mappingError) {
-                console.error(`Error mapping channel at index ${index}:`, mappingError);
-                // Return a basic object if mapping fails
-                return {
-                    id: channel.id || 'unknown',
-                    channelName: channel.channelName || 'Error processing channel',
-                    isConnected: false,
-                    metrics: {}
-                };
-            }
-        });
+        let channelsWithMetrics = [];
+        try {
+            channelsWithMetrics = channels.map((channel, index) => {
+                try {
+                    // Check if this channel should be marked as connected based on API tokens
+                    const isChannelConnected = channel.isConnected || 
+                                            (channel.apiAccessToken && channel.aliasChannel === 'Facebook') || 
+                                            (channel.googleAdsAccountId && channel.aliasChannel === 'Google');
+                    
+                    return {
+                        ...channel.toJSON(),
+                        isConnected: isChannelConnected,
+                        metrics: metrics[index] || {}
+                    };
+                } catch (mappingError) {
+                    console.error(`Error mapping channel at index ${index}:`, mappingError);
+                    // Return a basic object if mapping fails
+                    return {
+                        id: channel.id || 'unknown',
+                        channelName: channel.channelName || 'Error processing channel',
+                        isConnected: false,
+                        metrics: {}
+                    };
+                }
+            });
+        } catch (mappingError) {
+            console.error("❌ Error mapping channels with metrics:", mappingError);
+            return res.status(500).json({ 
+                error: "Failed to map channels with metrics", 
+                details: mappingError.message 
+            });
+        }
 
-        res.json(channelsWithMetrics);
+        // Send the response
+        return res.json(channelsWithMetrics);
     } catch (error) {
         console.error("❌ Error fetching channels:", error);
         console.error("Error details:", error.message);
         console.error("Stack trace:", error.stack);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             error: "Failed to fetch traffic channels",
             details: process.env.NODE_ENV !== 'production' ? error.message : undefined
         });
     }
 });
+
 
 // Get a single traffic channel by ID with metrics
 router.get("/:id", async (req, res) => {
