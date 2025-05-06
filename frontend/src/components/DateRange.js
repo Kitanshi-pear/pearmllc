@@ -315,22 +315,6 @@ const DateRange = ({ onDateRangeChange }) => {
           />
         </Button>
         <Button
-          variant="outlined"
-          sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1, height: 40 }}
-          aria-label="Previous"
-          onClick={handlePrevious}
-        >
-          <FontAwesomeIcon icon={faChevronLeft} style={{ color: "#374151" }} />
-        </Button>
-        <Button
-          variant="outlined"
-          sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1, height: 40 }}
-          aria-label="Next"
-          onClick={handleNext}
-        >
-          <FontAwesomeIcon icon={faChevronRight} style={{ color: "#374151" }} />
-        </Button>
-        <Button
           sx={{
             bgcolor: "#d1d5db",
             "&:hover": { bgcolor: "#9ca3af" },
