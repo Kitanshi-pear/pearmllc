@@ -1,3 +1,4 @@
+// OfferSourcePage.jsx - Enhanced with RedTrack-like functionality
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
@@ -39,18 +40,28 @@ import {
   faChevronLeft,
   faChevronRight,
   faExchangeAlt,
+  faFacebookF,
+  faGoogle,
   faCaretDown,
 } from "@fortawesome/free-solid-svg-icons";
 
-// Simplified Postback Macros - focusing only on click_id and payout
+// Enhanced Postback Macros - RedTrack style
 const POSTBACK_MACROS = {
   CLICKID: '{click_id}',
-  PAYOUT: '{payout}'
+  PAYOUT: '{payout}',
+  STATUS: '{status}',
+  SOURCE: '{source}',
+  CAMPAIGN: '{campaign}',
+  REVENUE: '{revenue}',
+  OFFER_ID: '{offer_id}',
+  CUSTOM1: '{custom1}',
+  CUSTOM2: '{custom2}',
+  CUSTOM3: '{custom3}'
 };
 
-// Generate postback URL format with simplified parameters
+// Generate RedTrack-style postback URL format
 const generatePostbackTemplate = (baseUrl = window.location.origin, sourceType = '') => {
-  const apiPostbackUrl = `${baseUrl}/api/postback?click_id=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}`;
+  const apiPostbackUrl = `${baseUrl}/api/postback?click_id=${POSTBACK_MACROS.CLICKID}&payout=${POSTBACK_MACROS.PAYOUT}&status=${POSTBACK_MACROS.STATUS}`;
   return apiPostbackUrl;
 };
 
@@ -83,16 +94,25 @@ const OfferSourcePage = () => {
   const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [conversionApiDialogOpen, setConversionApiDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
   
-  // Postback testing state - simplified to focus on click_id and payout
+  // Enhanced postback testing state
   const [testPostbackData, setTestPostbackData] = useState({
     click_id: 'test_' + Math.random().toString(36).substring(2, 10),
-    payout: '10.00'
+    payout: '10.00',
+    status: 'approved',
+    source: '',
+    campaign: 'test_campaign',
+    revenue: '12.50',
+    offer_id: '123',
+    custom1: 'test1',
+    custom2: 'test2',
+    custom3: 'test3'
   });
   const [processedUrl, setProcessedUrl] = useState('');
   const [testResult, setTestResult] = useState(null);
@@ -131,6 +151,7 @@ const OfferSourcePage = () => {
     "Other"
   ];
 
+  // Enhanced template with conversion API settings
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     alias: "",
@@ -138,13 +159,19 @@ const OfferSourcePage = () => {
     sourceType: "",
     currency: "USD",
     offerUrl: "",
-    clickid: "", // Default to "click_id" parameter name
-    sum: "", // Default to "payout" parameter name 
+    clickid: "click_id", 
+    sum: "payout",
     parameter: "",
     token: "",
     description: "",
     role: "",
-    is_active: true, // Active status
+    is_active: true,
+    // Conversion API settings
+    forward_to_facebook: false,
+    forward_to_google: false,
+    facebook_event_name: "Purchase",
+    google_conversion_id: "",
+    google_conversion_label: ""
   });
 
   const handleDateChange = (e) => {
@@ -189,6 +216,12 @@ const OfferSourcePage = () => {
         profit: item.profit || 0,
         total_roi: item.total_roi || 0,
         lp_views: item.lp_views || 0,
+        // Conversion API attributes
+        forward_to_facebook: item.forward_to_facebook || false,
+        forward_to_google: item.forward_to_google || false,
+        facebook_event_name: item.facebook_event_name || "Purchase",
+        google_conversion_id: item.google_conversion_id || "",
+        google_conversion_label: item.google_conversion_label || ""
       }));
 
       setRows(formatted);
@@ -223,13 +256,19 @@ const OfferSourcePage = () => {
       sourceType: row.source_type || "Other",
       currency: row.currency || "USD",
       offerUrl: row.offer_url || "",
-      clickid: row.clickid || "",
-      sum: row.sum || "",
+      clickid: row.clickid || "click_id",
+      sum: row.sum || "payout",
       parameter: row.parameter || "",
       token: row.token || "",
       description: row.description || "",
       role: row.role || "",
-      is_active: row.is_active !== false
+      is_active: row.is_active !== false,
+      // Conversion API settings
+      forward_to_facebook: row.forward_to_facebook || false,
+      forward_to_google: row.forward_to_google || false,
+      facebook_event_name: row.facebook_event_name || "Purchase",
+      google_conversion_id: row.google_conversion_id || "",
+      google_conversion_label: row.google_conversion_label || ""
     });
     setOpenTemplateModal(true);
   };
@@ -237,6 +276,53 @@ const OfferSourcePage = () => {
   const handleDeleteClick = (row) => {
     setSelectedRowId(row.id);
     setDeleteConfirmOpen(true);
+  };
+
+  const handleOpenConversionSettings = (row) => {
+    setSelectedRowId(row.id);
+    setSelectedSource(row);
+    setNewTemplate({
+      ...newTemplate,
+      forward_to_facebook: row.forward_to_facebook || false,
+      forward_to_google: row.forward_to_google || false,
+      facebook_event_name: row.facebook_event_name || "Purchase",
+      google_conversion_id: row.google_conversion_id || "",
+      google_conversion_label: row.google_conversion_label || ""
+    });
+    setConversionApiDialogOpen(true);
+  };
+
+  const handleSaveConversionSettings = async () => {
+    try {
+      const payload = {
+        forward_to_facebook: newTemplate.forward_to_facebook,
+        forward_to_google: newTemplate.forward_to_google,
+        facebook_event_name: newTemplate.facebook_event_name,
+        google_conversion_id: newTemplate.google_conversion_id,
+        google_conversion_label: newTemplate.google_conversion_label
+      };
+
+      await axios.put(
+        `https://pearmllc.onrender.com/offersource/${selectedRowId}/conversion-settings`,
+        payload
+      );
+      
+      setSnackbar({
+        open: true,
+        message: 'Conversion settings updated successfully',
+        severity: 'success'
+      });
+      
+      fetchOfferSources();
+      setConversionApiDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving conversion settings:", error.message);
+      setSnackbar({
+        open: true,
+        message: 'Failed to save conversion settings: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -279,7 +365,13 @@ const OfferSourcePage = () => {
         token: newTemplate.token,
         description: newTemplate.description,
         role: newTemplate.role,
-        is_active: newTemplate.is_active
+        is_active: newTemplate.is_active,
+        // Include conversion API settings
+        forward_to_facebook: newTemplate.forward_to_facebook,
+        forward_to_google: newTemplate.forward_to_google,
+        facebook_event_name: newTemplate.facebook_event_name,
+        google_conversion_id: newTemplate.google_conversion_id,
+        google_conversion_label: newTemplate.google_conversion_label
       };
 
       if (editMode && selectedRowId) {
@@ -321,7 +413,12 @@ const OfferSourcePage = () => {
         token: "",
         description: "",
         role: "",
-        is_active: true
+        is_active: true,
+        forward_to_facebook: false,
+        forward_to_google: false,
+        facebook_event_name: "Purchase",
+        google_conversion_id: "",
+        google_conversion_label: ""
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
@@ -370,7 +467,8 @@ const OfferSourcePage = () => {
     setSelectedSource(source);
     setTestPostbackData(prev => ({
       ...prev,
-      source: source.source_name || ''
+      source: source.source_name || '',
+      click_id: 'test_' + Math.random().toString(36).substring(2, 10)
     }));
     setPostbackTestDialogOpen(true);
   };
@@ -381,7 +479,7 @@ const OfferSourcePage = () => {
     setTestResult(null);
   };
 
-  // Postback testing functions
+  // Enhanced postback testing functions
   const handleTestDataChange = (e) => {
     const { name, value } = e.target;
     setTestPostbackData(prev => ({
@@ -424,12 +522,13 @@ const OfferSourcePage = () => {
     }
   };
 
+  // Enhanced columns with conversion API settings
   const columns = [
-    { field: "serial_no", headerName: "Serial No", width: 100, align: "center" },
+    { field: "serial_no", headerName: "Serial No", width: 80, align: "center" },
     {
       field: "source_name",
       headerName: "Source Name",
-      width: 200,
+      width: 180,
       renderCell: (params) => (
         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
           <Typography sx={{ flexGrow: 1 }}>{params.value}</Typography>
@@ -454,7 +553,7 @@ const OfferSourcePage = () => {
     { 
       field: "source_type", 
       headerName: "Type", 
-      width: 120,
+      width: 100,
       renderCell: (params) => (
         <Tooltip title={`${params.value} source`}>
           <Box sx={{ 
@@ -470,7 +569,7 @@ const OfferSourcePage = () => {
     {
       field: "is_active",
       headerName: "Status",
-      width: 120,
+      width: 100,
       renderCell: (params) => (
         <Box
           sx={{
@@ -484,13 +583,6 @@ const OfferSourcePage = () => {
           {params.value ? "Active" : "Inactive"}
         </Box>
       ),
-    },
-    {
-      field: "timestamp",
-      headerName: "Timestamp",
-      width: 200,
-      valueGetter: (params) =>
-        params?.value ? new Date(params?.value).toLocaleString() : "N/A",
     },
     { 
       field: "postback", 
@@ -540,13 +632,52 @@ const OfferSourcePage = () => {
         </Box>
       )
     },
-    { field: "clicks", headerName: "Clicks", width: 100, type: "number" },
-    { field: "lp_clicks", headerName: "LP Clicks", width: 120, type: "number" },
-    { field: "conversion", headerName: "Conversions", width: 150, type: "number" },
+    {
+      field: "integration",
+      headerName: "Conversions",
+      width: 130,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Tooltip title={params.row.forward_to_facebook ? "Facebook Integration Active" : "Facebook Integration Inactive"}>
+            <Box 
+              sx={{ 
+                color: params.row.forward_to_facebook ? "#4267B2" : "#bdbdbd",
+                mr: 1
+              }}
+            >
+              <FontAwesomeIcon icon={faFacebookF} />
+            </Box>
+          </Tooltip>
+          <Tooltip title={params.row.forward_to_google ? "Google Integration Active" : "Google Integration Inactive"}>
+            <Box 
+              sx={{ 
+                color: params.row.forward_to_google ? "#DB4437" : "#bdbdbd",
+                mr: 1
+              }}
+            >
+              <FontAwesomeIcon icon={faGoogle} />
+            </Box>
+          </Tooltip>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenConversionSettings(params.row);
+            }}
+            sx={{ fontSize: '0.7rem', py: 0.3 }}
+          >
+            Settings
+          </Button>
+        </Box>
+      )
+    },
+    { field: "clicks", headerName: "Clicks", width: 80, type: "number" },
+    { field: "conversion", headerName: "Conv", width: 80, type: "number" },
     { 
       field: "total_cpa", 
-      headerName: "Total CPA ($)", 
-      width: 150, 
+      headerName: "CPA ($)", 
+      width: 100, 
       type: "number",
       valueFormatter: (params) => {
         if (params.value == null) {
@@ -558,19 +689,7 @@ const OfferSourcePage = () => {
     { 
       field: "epc", 
       headerName: "EPC ($)", 
-      width: 120, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
-      }
-    },
-    {
-      field: "total_revenue",
-      headerName: "Total Revenue ($)",
-      width: 180,
+      width: 100, 
       type: "number",
       valueFormatter: (params) => {
         if (params.value == null) {
@@ -580,9 +699,9 @@ const OfferSourcePage = () => {
       }
     },
     { 
-      field: "cost", 
-      headerName: "Cost ($)", 
-      width: 150, 
+      field: "total_revenue", 
+      headerName: "Revenue ($)", 
+      width: 120, 
       type: "number",
       valueFormatter: (params) => {
         if (params.value == null) {
@@ -594,7 +713,7 @@ const OfferSourcePage = () => {
     { 
       field: "profit", 
       headerName: "Profit ($)", 
-      width: 150, 
+      width: 100, 
       type: "number",
       valueFormatter: (params) => {
         if (params.value == null) {
@@ -605,8 +724,8 @@ const OfferSourcePage = () => {
     },
     { 
       field: "total_roi", 
-      headerName: "Total ROI (%)", 
-      width: 150, 
+      headerName: "ROI (%)", 
+      width: 100, 
       type: "number",
       valueFormatter: (params) => {
         if (params.value == null) {
@@ -615,10 +734,9 @@ const OfferSourcePage = () => {
         return params.value.toFixed(2) + '%';
       }
     },
-    { field: "lp_views", headerName: "LP Views", width: 150, type: "number" },
   ];
 
-  // Date grid component from the image, converted to React + MUI + Tailwind style
+  // DateGrid component for date filtering
   const DateGrid = () => {
     return (
       <Box className="max-w-full p-4 bg-white font-sans text-gray-800">
@@ -737,7 +855,12 @@ const OfferSourcePage = () => {
                   token: "",
                   description: "",
                   role: "",
-                  is_active: true
+                  is_active: true,
+                  forward_to_facebook: false,
+                  forward_to_google: false,
+                  facebook_event_name: "Purchase",
+                  google_conversion_id: "",
+                  google_conversion_label: ""
                 });
               }}
             >
@@ -813,7 +936,7 @@ const OfferSourcePage = () => {
           )}
         </Box>
 
-        {/* Modified Modal Component with only two tabs */}
+        {/* Source Modal with 3 tabs - Basic Details, Postback URL, Conversion API */}
         <Modal open={openTemplateModal} onClose={() => setOpenTemplateModal(false)}>
           <Box
             sx={{
@@ -839,6 +962,7 @@ const OfferSourcePage = () => {
               <Tabs value={tabValue} onChange={handleTabChange}>
                 <Tab label="Basic Details" />
                 <Tab label="Postback URL" />
+                <Tab label="Conversion API" />
               </Tabs>
             </Box>
 
@@ -939,7 +1063,7 @@ const OfferSourcePage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Postback Parameters - Simplified to focus on click_id and payout */}
+                {/* Postback Parameters - Enhanced for RedTrack */}
                 <Card sx={{ mb: 2 }}>
                   <CardContent>
                     <Typography variant="subtitle1">Postback Parameters</Typography>
@@ -1030,7 +1154,7 @@ const OfferSourcePage = () => {
               </>
             )}
 
-            {/* Tab 2: Postback URL Editor - Simplified for click_id and payout */}
+            {/* Tab 2: Postback URL Editor - Enhanced for RedTrack */}
             {tabValue === 1 && (
               <Card sx={{ mb: 2 }}>
                 <CardContent>
@@ -1038,7 +1162,7 @@ const OfferSourcePage = () => {
                     Postback URL Configuration
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Create a postback URL template with click_id and payout parameters. Traffic sources will use this URL to notify your system about conversions.
+                    Create a postback URL template with tracking parameters. Traffic sources will use this URL to notify your system about conversions.
                   </Typography>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -1088,14 +1212,145 @@ const OfferSourcePage = () => {
                     disabled
                     value={parsePostbackUrl(newTemplate.postbackUrl, {
                       click_id: 'abc123',
-                      payout: '10.00'
+                      payout: '10.00',
+                      status: 'approved'
                     })}
                   />
                   
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                     This URL will be used to receive conversion data from your traffic sources. The system will track
-                    clicks using the {'{click_id}'} parameter and payout values using the {'{payout}'} parameter.
+                    clicks using the {'{click_id}'} parameter, payout values using the {'{payout}'} parameter, and
+                    conversion status with the {'{status}'} parameter.
                   </Typography>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tab 3: Conversion API Settings */}
+            {tabValue === 2 && (
+              <Card sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Conversion Tracking Integration
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Configure conversion forwarding to external platforms to track your campaign performance.
+                  </Typography>
+                  
+                  {/* Facebook Integration */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Box 
+                        sx={{ 
+                          backgroundColor: '#4267B2', 
+                          color: 'white',
+                          p: 1,
+                          borderRadius: 1,
+                          mr: 2
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faFacebookF} />
+                      </Box>
+                      <Typography variant="h6">Facebook Conversions API</Typography>
+                      <Box sx={{ ml: 'auto' }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={newTemplate.forward_to_facebook}
+                              onChange={(e) => setNewTemplate({ 
+                                ...newTemplate, 
+                                forward_to_facebook: e.target.checked 
+                              })}
+                            />
+                          }
+                          label={newTemplate.forward_to_facebook ? "Enabled" : "Disabled"}
+                        />
+                      </Box>
+                    </Box>
+                    
+                    {newTemplate.forward_to_facebook && (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <FormControl fullWidth>
+                            <InputLabel>Event Name</InputLabel>
+                            <Select
+                              value={newTemplate.facebook_event_name}
+                              onChange={(e) => setNewTemplate({ 
+                                ...newTemplate, 
+                                facebook_event_name: e.target.value 
+                              })}
+                              label="Event Name"
+                            >
+                              <MenuItem value="Purchase">Purchase</MenuItem>
+                              <MenuItem value="Lead">Lead</MenuItem>
+                              <MenuItem value="CompleteRegistration">Complete Registration</MenuItem>
+                              <MenuItem value="Subscribe">Subscribe</MenuItem>
+                              <MenuItem value="AddToCart">Add To Cart</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </Grid>
+                    )}
+                  </Paper>
+                  
+                  {/* Google Integration */}
+                  <Paper sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Box 
+                        sx={{ 
+                          backgroundColor: '#DB4437', 
+                          color: 'white',
+                          p: 1,
+                          borderRadius: 1,
+                          mr: 2
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faGoogle} />
+                      </Box>
+                      <Typography variant="h6">Google Ads Conversion</Typography>
+                      <Box sx={{ ml: 'auto' }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={newTemplate.forward_to_google}
+                              onChange={(e) => setNewTemplate({ 
+                                ...newTemplate, 
+                                forward_to_google: e.target.checked 
+                              })}
+                            />
+                          }
+                          label={newTemplate.forward_to_google ? "Enabled" : "Disabled"}
+                        />
+                      </Box>
+                    </Box>
+                    
+                    {newTemplate.forward_to_google && (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="Google Conversion ID"
+                            value={newTemplate.google_conversion_id}
+                            onChange={(e) => setNewTemplate({ 
+                              ...newTemplate, 
+                              google_conversion_id: e.target.value 
+                            })}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="Google Conversion Label"
+                            value={newTemplate.google_conversion_label}
+                            onChange={(e) => setNewTemplate({ 
+                              ...newTemplate, 
+                              google_conversion_label: e.target.value 
+                            })}
+                          />
+                        </Grid>
+                      </Grid>
+                    )}
+                  </Paper>
                 </CardContent>
               </Card>
             )}
@@ -1112,7 +1367,170 @@ const OfferSourcePage = () => {
           </Box>
         </Modal>
         
-        {/* Postback Testing Dialog - Simplified for click_id and payout */}
+        {/* Conversion API Settings Dialog */}
+        <Modal
+          open={conversionApiDialogOpen}
+          onClose={() => setConversionApiDialogOpen(false)}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "700px",
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              overflow: "auto",
+              bgcolor: "background.paper",
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" gutterBottom>
+              Conversion API Settings
+              {selectedSource && (
+                <Typography variant="subtitle2" color="text.secondary">
+                  {selectedSource.source_name} ({selectedSource.source_type})
+                </Typography>
+              )}
+            </Typography>
+            
+            {/* Facebook Integration */}
+            <Paper sx={{ p: 2, mb: 3, mt: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box 
+                  sx={{ 
+                    backgroundColor: '#4267B2', 
+                    color: 'white',
+                    p: 1,
+                    borderRadius: 1,
+                    mr: 2
+                  }}
+                >
+                  <FontAwesomeIcon icon={faFacebookF} />
+                </Box>
+                <Typography variant="h6">Facebook Conversions API</Typography>
+                <Box sx={{ ml: 'auto' }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={newTemplate.forward_to_facebook}
+                        onChange={(e) => setNewTemplate({ 
+                          ...newTemplate, 
+                          forward_to_facebook: e.target.checked 
+                        })}
+                      />
+                    }
+                    label={newTemplate.forward_to_facebook ? "Enabled" : "Disabled"}
+                  />
+                </Box>
+              </Box>
+              
+              {newTemplate.forward_to_facebook && (
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Event Name</InputLabel>
+                      <Select
+                        value={newTemplate.facebook_event_name}
+                        onChange={(e) => setNewTemplate({ 
+                          ...newTemplate, 
+                          facebook_event_name: e.target.value 
+                        })}
+                        label="Event Name"
+                      >
+                        <MenuItem value="Purchase">Purchase</MenuItem>
+                        <MenuItem value="Lead">Lead</MenuItem>
+                        <MenuItem value="CompleteRegistration">Complete Registration</MenuItem>
+                        <MenuItem value="Subscribe">Subscribe</MenuItem>
+                        <MenuItem value="AddToCart">Add To Cart</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              )}
+            </Paper>
+            
+            {/* Google Integration */}
+            <Paper sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box 
+                  sx={{ 
+                    backgroundColor: '#DB4437', 
+                    color: 'white',
+                    p: 1,
+                    borderRadius: 1,
+                    mr: 2
+                  }}
+                >
+                  <FontAwesomeIcon icon={faGoogle} />
+                </Box>
+                <Typography variant="h6">Google Ads Conversion</Typography>
+                <Box sx={{ ml: 'auto' }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={newTemplate.forward_to_google}
+                        onChange={(e) => setNewTemplate({ 
+                          ...newTemplate, 
+                          forward_to_google: e.target.checked 
+                        })}
+                      />
+                    }
+                    label={newTemplate.forward_to_google ? "Enabled" : "Disabled"}
+                  />
+                </Box>
+              </Box>
+              
+              {newTemplate.forward_to_google && (
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Google Conversion ID"
+                      value={newTemplate.google_conversion_id}
+                      onChange={(e) => setNewTemplate({ 
+                        ...newTemplate, 
+                        google_conversion_id: e.target.value 
+                      })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Google Conversion Label"
+                      value={newTemplate.google_conversion_label}
+                      onChange={(e) => setNewTemplate({ 
+                        ...newTemplate, 
+                        google_conversion_label: e.target.value 
+                      })}
+                    />
+                  </Grid>
+                </Grid>
+              )}
+            </Paper>
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
+              <Button 
+                onClick={() => setConversionApiDialogOpen(false)} 
+                sx={{ mr: 2 }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={handleSaveConversionSettings}
+              >
+                Save Settings
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+        
+        {/* Enhanced Postback Testing Dialog */}
         <Modal 
           open={postbackTestDialogOpen} 
           onClose={handleClosePostbackTest}
@@ -1174,6 +1592,30 @@ const OfferSourcePage = () => {
                       label="Payout"
                       name="payout"
                       value={testPostbackData.payout}
+                      onChange={handleTestDataChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Status</InputLabel>
+                      <Select
+                        name="status"
+                        value={testPostbackData.status}
+                        onChange={handleTestDataChange}
+                        label="Status"
+                      >
+                        <MenuItem value="approved">Approved</MenuItem>
+                        <MenuItem value="pending">Pending</MenuItem>
+                        <MenuItem value="rejected">Rejected</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Revenue"
+                      name="revenue"
+                      value={testPostbackData.revenue}
                       onChange={handleTestDataChange}
                     />
                   </Grid>
