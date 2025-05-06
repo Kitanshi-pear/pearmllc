@@ -358,12 +358,7 @@ const DateRange = ({ onDateRangeChange }) => {
             justifyContent: "center",
           }}
         >
-          <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-            Time zone
-          </Typography>
-          <Typography variant="body1" sx={{ fontWeight: "600" }}>
-            {timeZone}
-          </Typography>
+          
         </Box>
       </Box>
       
