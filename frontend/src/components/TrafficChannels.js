@@ -13,11 +13,11 @@ import {
 } from 'react-feather';
 import DateRangePicker from 'react-bootstrap-daterangepicker';
 import 'bootstrap-daterangepicker/daterangepicker.css';
-import Layout from "./Layout";
+import Layout from './Layout';
 import './TrafficChannels.css';
 
-// Using the correct API endpoint
-const API_BASE_URL = 'https://pearmllc.onrender.com/api/traffic';
+// Using the correct API endpoint as specified
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://pearmllc.onrender.com/api/traffic';
 
 const TrafficChannelsPage = () => {
   // State variables
