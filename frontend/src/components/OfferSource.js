@@ -1,4 +1,3 @@
-// OfferSourcePage.jsx - Enhanced with RedTrack-like functionality
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
@@ -45,6 +44,13 @@ import {
   faCaretDown,
 } from "@fortawesome/free-solid-svg-icons";
 
+// Import our custom date components
+import DateRangePicker from "./DateRangePicker";
+import DateFormatter, { DATE_FORMAT } from "./DateFormatter";
+
+// Create date formatter instance
+const dateFormatter = new DateFormatter();
+
 // Enhanced Postback Macros - RedTrack style
 const POSTBACK_MACROS = {
   CLICKID: '{click_id}',
@@ -82,13 +88,20 @@ const parsePostbackUrl = (template, data) => {
 };
 
 const OfferSourcePage = () => {
+  // State for dates
+  const [dateRange, setDateRange] = useState({
+    startDate: dateFormatter.prepareDate(dateFormatter.getDateRange('today').startDate),
+    endDate: dateFormatter.prepareDate(dateFormatter.getDateRange('today').endDate),
+    label: 'Today',
+    timeInterval: ''
+  });
+  
   const [openTemplateModal, setOpenTemplateModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filterText, setFilterText] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [titleText, setTitle] = useState("");
   const [tabValue, setTabValue] = useState(0);
   const [postbackTestDialogOpen, setPostbackTestDialogOpen] = useState(false);
@@ -174,19 +187,33 @@ const OfferSourcePage = () => {
     google_conversion_label: ""
   });
 
-  const handleDateChange = (e) => {
-    setDate(e.target.value);
+  // Handle date range change
+  const handleDateRangeChange = (newRange) => {
+    setDateRange(newRange);
+    // Auto-fetch when date range changes
+    fetchOfferSources(newRange);
   };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  const fetchOfferSources = async () => {
+  const fetchOfferSources = async (dateRangeToUse = null) => {
     setLoading(true);
     try {
+      // Use provided date range or current state
+      const dateParams = dateRangeToUse || dateRange;
+      
+      // Include date range in the API request
       const response = await axios.get(
-        "https://pearmllc.onrender.com/offersource/list"
+        "https://pearmllc.onrender.com/offersource/list", {
+          params: {
+            date_from: dateParams.startDate,
+            date_to: dateParams.endDate,
+            time_interval: dateParams.timeInterval,
+            title: titleText || undefined
+          }
+        }
       );
       const data = response.data;
 
@@ -243,6 +270,7 @@ const OfferSourcePage = () => {
   };
 
   useEffect(() => {
+    // Initial fetch
     fetchOfferSources();
   }, []);
 
@@ -736,82 +764,6 @@ const OfferSourcePage = () => {
     },
   ];
 
-  // DateGrid component for date filtering
-  const DateGrid = () => {
-    return (
-      <Box className="max-w-full p-4 bg-white font-sans text-gray-800">
-        <Box className="flex space-x-2 mb-6 flex-wrap">
-          <Button
-            variant="outlined"
-            className="flex items-center w-48 justify-start"
-            sx={{ borderColor: "#d1d5db", textTransform: "none" }}
-          >
-            <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-              <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-                Date {new Date().toISOString().split('T')[0]}
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: "400" }}>
-                Today
-              </Typography>
-            </Box>
-            <FontAwesomeIcon
-              icon={faCalendarAlt}
-              style={{ marginLeft: "auto", color: "#374151", fontSize: "1.125rem" }}
-            />
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1 }}
-            aria-label="Previous"
-          >
-            <FontAwesomeIcon icon={faChevronLeft} style={{ color: "#374151" }} />
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ borderColor: "#d1d5db", minWidth: 40, px: 1 }}
-            aria-label="Next"
-          >
-            <FontAwesomeIcon icon={faChevronRight} style={{ color: "#374151" }} />
-          </Button>
-          <Button
-            sx={{
-              bgcolor: "#d1d5db",
-              "&:hover": { bgcolor: "#9ca3af" },
-              minWidth: 40,
-              width: 40,
-              height: 40,
-              borderRadius: "9999px",
-              ml: 2,
-            }}
-            aria-label="Swap Dates"
-          >
-            <FontAwesomeIcon icon={faExchangeAlt} style={{ color: "#374151" }} />
-          </Button>
-          <Box
-            sx={{
-              border: "1px solid #d1d5db",
-              borderRadius: 1,
-              px: 2,
-              py: 1,
-              width: 240,
-              ml: 4,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-            }}
-          >
-            <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
-              Time zone
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: "600" }}>
-              America/New_York
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    );
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -872,16 +824,6 @@ const OfferSourcePage = () => {
         <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
           <Grid item xs={6} sm={2}>
             <TextField
-              label="Date"
-              type="date"
-              value={date}
-              onChange={handleDateChange}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-          <Grid item xs={6} sm={2}>
-            <TextField
               label="Title"
               value={titleText}
               onChange={(e) => setTitle(e.target.value)}
@@ -893,15 +835,15 @@ const OfferSourcePage = () => {
               variant="contained"
               color="primary"
               fullWidth
-              onClick={() => setFilterText("")}
+              onClick={() => fetchOfferSources()}
             >
               Apply
             </Button>
           </Grid>
         </Grid>
 
-        {/* DateGrid component */}
-        <DateGrid />
+        {/* DateRangePicker component for improved date selection */}
+        <DateRangePicker onDateRangeChange={handleDateRangeChange} />
 
         <Box
           sx={{
