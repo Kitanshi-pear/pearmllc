@@ -329,6 +329,21 @@ const DateRange = ({ onDateRangeChange }) => {
         >
           <FontAwesomeIcon icon={faExchangeAlt} style={{ color: "#374151" }} />
         </Button>
+        <Button
+          variant="outlined"
+          className="flex items-center w-48 justify-start"
+          sx={{ borderColor: "#d1d5db", textTransform: "none", height: 40 }}
+          onClick={handleClick}
+        >
+          <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ userSelect: "none" }}>
+              {selectedRange ? `${dateFormatter.formatForDisplay(selectedRange.startDate)} - ${dateFormatter.formatForDisplay(selectedRange.endDate)}` : 'Select date range'}
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: "400" }}>
+              {selectedRange ? selectedRange.label : 'Today'}
+            </Typography>
+          </Box>
+        </Button>
       </Box>
       
       {/* Date Range Popover */}
