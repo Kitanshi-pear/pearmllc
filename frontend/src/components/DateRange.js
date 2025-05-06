@@ -332,7 +332,7 @@ const DateRange = ({ onDateRangeChange }) => {
         <Button
           variant="outlined"
           className="flex items-center w-48 justify-start"
-          sx={{ borderColor: "#d1d5db", textTransform: "none", height: 40 }}
+          sx={{ borderColor: "#d1d5db", textTransform: "none", height: 40, ml: 2 }}
           onClick={handleClick}
         >
           <Box sx={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
@@ -343,6 +343,7 @@ const DateRange = ({ onDateRangeChange }) => {
               {selectedRange ? selectedRange.label : 'Today'}
             </Typography>
           </Box>
+
         </Button>
       </Box>
       
