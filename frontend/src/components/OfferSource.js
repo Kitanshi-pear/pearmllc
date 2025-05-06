@@ -98,8 +98,7 @@ const OfferSourcePage = () => {
   const [dateRange, setDateRange] = useState({
     startDate: dateFormatter.prepareDate(dateFormatter.getDateRange('today').startDate),
     endDate: dateFormatter.prepareDate(dateFormatter.getDateRange('today').endDate),
-    label: 'Today',
-    timeInterval: ''
+    label: 'Today'
   });
   
   const [openTemplateModal, setOpenTemplateModal] = useState(false);
@@ -215,8 +214,7 @@ const OfferSourcePage = () => {
         "https://pearmllc.onrender.com/offersource/list", {
           params: {
             date_from: dateParams.startDate,
-            date_to: dateParams.endDate,
-            time_interval: dateParams.timeInterval
+            date_to: dateParams.endDate
           }
         }
       );
