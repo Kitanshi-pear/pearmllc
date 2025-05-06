@@ -831,7 +831,7 @@ const OfferSourcePage = () => {
                           disabled
                         />
                       </Grid>
-                      <Grid item md={6}>
+                      <Grid item xs={12} md={6} width={"60%"}>
                         <FormControl fullWidth>
                           <InputLabel>Source Type</InputLabel>
                           <Select
