@@ -1,1617 +1,841 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { 
-  Container, Row, Col, Card, Table, Button, 
-  Modal, Form, Tabs, Tab, Badge, Spinner, Alert, 
-  OverlayTrigger, Tooltip 
-} from 'react-bootstrap';
-import { 
-  PlusCircle, Pencil, Trash2, RefreshCw, 
-  Facebook, Google, Link, Calendar,
-  BarChart2, Settings, ExternalLink, 
-  DollarSign, Activity, List, Key 
-} from 'react-feather';
-import DateRangePicker from 'react-bootstrap-daterangepicker';
-import 'bootstrap-daterangepicker/daterangepicker.css';
-import Layout from './Layout';
-import './TrafficChannels.css';
+import React, { useState, useEffect } from "react";
+import {useNavigate } from "react-router-dom"
+import {
+  DataGrid
+} from "@mui/x-data-grid";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import { Button, InputLabel, CircularProgress, Typography, Box, Modal, Card, CardContent, Grid, TextField, FormControl, Select, MenuItem, Stack, Switch, Tooltip, InputAdornment} from "@mui/material";
+import Layout from "./Layout"; // Importing Layout component
+import axios from "axios"; // Import  axios for API calls
 
-// Using the correct API endpoint as specified
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://pearmllc.onrender.com/api/traffic';
+const API_URL = process.env.REACT_APP_API_URL ;
 
-const TrafficChannelsPage = () => {
-  // State variables
-  const [channels, setChannels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [currentChannel, setCurrentChannel] = useState(null);
-  const [channelForm, setChannelForm] = useState({
-    channelName: '',
-    aliasChannel: 'Custom',
-    costUpdateDepth: 30,
-    costUpdateFrequency: 'daily',
-    currency: 'USD',
-    s2sPostbackUrl: '',
-    clickRefId: '',
-    externalId: '',
-    pixelId: '',
-    apiAccessToken: '',
-    defaultEventName: 'Purchase',
-    customConversionMatching: false,
-    googleAdsAccountId: '',
-    googleMccAccountId: '',
-  });
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
-    endDate: new Date()
-  });
-  const [authStatus, setAuthStatus] = useState({
-    facebook: { connected: false },
-    google: { connected: false }
-  });
+const TrafficChannels = () => {
+  const [isFacebookConnected, setIsFacebookConnected] = useState(false);
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [rows, setRows] = useState([]);
+  const [data, setData] = useState([]); 
+  const [filterText, setFilterText] = useState("");
+  const navigate = useNavigate();
+  const [openModal, setOpenModal] = useState(false);
+  const [openSecondModal, setOpenSecondModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [channelMetrics, setChannelMetrics] = useState([]);
-  const [showConversionSettingsModal, setShowConversionSettingsModal] = useState(false);
-  const [conversionSettings, setConversionSettings] = useState({
-    forward_to_facebook: false,
-    forward_to_google: false,
-    conversion_id: '',
-    conversion_label: '',
-    default_event_name: 'Purchase'
-  });
+  const [formData, setFormData] = useState({ channelName: "", aliasChannel: "", costUpdateDepth: "", costUpdateFrequency: "5 minutes", currency: "USD", s2sPostbackUrl: "", clickRefId: "", externalId: "", pixelId: "", apiAccessToken: "", defaultEventName: "", customConversionMatching: false, googleAdsAccountId: "", googleMccAccountId: "", }); const [loading, setLoading] = useState({ facebook: false, google: false }); const [error, setError] = useState("");
+  // Define your columns here
 
-  // Channel alias options (traffic sources)
-  const channelAliasOptions = [
-    { value: 'Custom', label: 'Custom' },
-    { value: 'Facebook', label: 'Facebook' },
-    { value: 'Google', label: 'Google Ads' },
-    { value: 'TikTok', label: 'TikTok' },
-    { value: 'Taboola', label: 'Taboola' },
-    { value: 'Outbrain', label: 'Outbrain' },
-    { value: 'Twitter', label: 'Twitter Ads' },
-    { value: 'Snapchat', label: 'Snapchat' },
-    { value: 'Pinterest', label: 'Pinterest' },
-  ];
-
-  // Fetch all traffic channels
-  const fetchChannels = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API_BASE_URL}`);
-      setChannels(response.data);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching traffic channels:', err);
-      setError('Failed to load traffic channels. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check OAuth status
-  const checkAuthStatus = async () => {
-    try {
-      // Get session token from localStorage if available
-      const sessionToken = localStorage.getItem('sessionToken');
-      
-      if (sessionToken) {
-        const response = await axios.get(`${API_BASE_URL}/auth/status`, {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`
-          }
+    // Fetching data from the API
+    useEffect(() => {
+      axios.get('/api/traffic') // Adjust the API URL as needed
+        .then((response) => {
+          setData(response.data);  // Set the fetched data into state
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error('Error fetching data:', error);
+          setLoading(false);
         });
-        
-        setAuthStatus(response.data);
-      }
-    } catch (err) {
-      console.error('Error checking auth status:', err);
-    }
-  };
+    }, []);
+  // Example using first entry's metrics to determine columns
+  const metricFields = data[0]?.Metrics
+  ? Object.keys(data[0].Metrics).map((key) => ({
+      field: key,
+      headerName: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      width: 120,
+    }))
+  : [];
 
-  // Fetch channel details
-  const fetchChannelDetails = async (id) => {
+const staticColumns = [
+  { field: "id", headerName: "ID", width: 90 },
+  { field: "channelName", headerName: "Channel Name", width: 150 },
+  { field: "aliasChannel", headerName: "Alias Channel", width: 150 },
+  { field: "costUpdateFrequency", headerName: "Cost Update Frequency", width: 180 },
+  { field: "currency", headerName: "Currency", width: 100 },
+  { field: "pixelId", headerName: "Pixel ID", width: 150 },
+];
+
+const columns = [...staticColumns, ...metricFields];
+
+const mappedRows = data.map(item => ({
+  ...item,
+  ...item.Metrics,
+}));
+
+
+
+  const filteredRows = mappedRows.filter((row) =>
+    Object.values(row).some((value) =>
+      value?.toString().toLowerCase().includes(filterText.toLowerCase())
+    )
+  );
+
+  const handleAuth = (platform) => {
+    setLoading((prev) => ({ ...prev, [platform]: true }));
+    setError("");
+
     try {
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
-      setSelectedChannel(response.data);
-      
-      // Fetch channel metrics
-      const metricsResponse = await axios.get(
-        `${API_BASE_URL}/${id}/metrics`,
-        {
-          params: {
-            start_date: dateRange.startDate.toISOString().split('T')[0],
-            end_date: dateRange.endDate.toISOString().split('T')[0],
-            dimension: 'day'
-          }
-        }
-      );
-      
-      setChannelMetrics(metricsResponse.data);
+      const authUrl = platform === "google" 
+        ? `${API_URL}/api/traffic/auth/google`
+        : `${API_URL}/api/traffic/facebook/auth`;
+      console.log(`Fetching: ${authUrl}`);
+      window.location.href = authUrl;
     } catch (err) {
-      console.error('Error fetching channel details:', err);
-      setError('Failed to load channel details. Please try again.');
+      console.error(`${platform} OAuth Error:`, err);
+      setError(`Error: Unable to connect to ${platform} API`);
+    } finally {
+      setLoading((prev) => ({ ...prev, [platform]: false }));
     }
   };
 
-  // Fetch conversion settings
-  const fetchConversionSettings = async (id) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/${id}/conversion-settings`);
-      
-      setConversionSettings({
-        forward_to_facebook: response.data.facebook.enabled,
-        forward_to_google: response.data.google.enabled,
-        conversion_id: response.data.google.conversion_id,
-        conversion_label: response.data.google.conversion_label,
-        default_event_name: response.data.facebook.default_event_name
-      });
-    } catch (err) {
-      console.error('Error fetching conversion settings:', err);
-    }
-  };
-
-  // Initial data fetch
   useEffect(() => {
-    fetchChannels();
-    checkAuthStatus();
-    
-    // Check URL for OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
-      const platform = urlParams.get('platform');
-      const sessionToken = urlParams.get('session');
+    if (urlParams.get("success") === "true") {
+      alert("Google account successfully connected!");
       
-      if (sessionToken) {
-        localStorage.setItem('sessionToken', sessionToken);
-      }
-      
-      // Show success message
-      setError(`Successfully connected to ${platform}!`);
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Refresh auth status
-      checkAuthStatus();
+      // Optional: Set state if needed
+      setIsGoogleConnected(true);
+  
+      // Redirect to another page after a delay (e.g., dashboard)
+      setTimeout(() => navigate("/tarffic-channel"), 2000);
     }
   }, []);
 
-  // Handle adding a new channel
-  const handleAddChannel = async () => {
+  const fetchFacebookData = async (code) => {
     try {
-      const response = await axios.post(API_BASE_URL, channelForm);
-      setChannels([...channels, response.data]);
-      setShowAddModal(false);
-      resetChannelForm();
-    } catch (err) {
-      console.error('Error adding channel:', err);
-      setError('Failed to add channel. Please try again.');
+      const response = await axios.get(`${API_URL}/auth/callback?code=${code}`);
+      setFormData((prev) => ({
+        ...prev,
+        pixelId: response.data.pixelId,
+        apiAccessToken: response.data.access_token,
+      }));
+      alert("Facebook Connected successfully!");
+      setIsFacebookConnected(true); // Update state on successful connection
+    } catch (error) {
+      console.error("Error fetching Facebook Pixel ID:", error);
+      alert("Error connecting to Facebook: " + error.message);
     }
   };
 
-  // Handle updating a channel
-  const handleUpdateChannel = async () => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/${currentChannel.id}`, 
-        channelForm
-      );
-      
-      setChannels(channels.map(channel => 
-        channel.id === currentChannel.id ? response.data : channel
-      ));
-      
-      setShowEditModal(false);
-      resetChannelForm();
-    } catch (err) {
-      console.error('Error updating channel:', err);
-      setError('Failed to update channel. Please try again.');
-    }
+  const handleOpenModal = () => {
+    setOpenModal(true);
   };
 
-  // Handle deleting a channel
-  const handleDeleteChannel = async () => {
-    try {
-      await axios.delete(`${API_BASE_URL}/${currentChannel.id}`);
-      setChannels(channels.filter(channel => channel.id !== currentChannel.id));
-      setShowDeleteModal(false);
-    } catch (err) {
-      console.error('Error deleting channel:', err);
-      setError('Failed to delete channel. Please try again.');
-    }
+  const handleCloseModal = () => {
+    setOpenModal(false);
   };
 
-  // Handle saving conversion settings
-  const handleSaveConversionSettings = async () => {
+  const handleOpenSecondModal = (channelName) => {
+    setSelectedChannel(channelName);
+    setOpenSecondModal(true);
+  };
+
+  const handleCloseSecondModal = () => {
+    setOpenSecondModal(false);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevState) => ({ ...prevState, [name]: value }));
+  };
+
+  const handleRowClick = (channelName) => {
+    setSelectedChannel(channelName ?? null); // Ensure safe assignment
+    setOpenModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+  
     try {
-      await axios.put(
-        `${API_BASE_URL}/${currentChannel.id}/conversion-settings`,
-        conversionSettings
-      );
-      
-      setShowConversionSettingsModal(false);
-      
-      // Refresh channel details if needed
-      if (selectedChannel && selectedChannel.id === currentChannel.id) {
-        fetchChannelDetails(currentChannel.id);
+      // Send data to backend
+      const response = await axios.post(`${API_URL}/api/traffic-channels`, formData);// 🔁 change the endpoint if needed
+  
+      // Optionally update local state
+      setRows((prevRows) => [...prevRows, response.data]);
+  
+      // Reset form
+      setOpenSecondModal(false);
+      setFormData({
+        channelName: "",
+        aliasChannel: "",
+        costUpdateDepth: "",
+        costUpdateFrequency: "5 minutes",
+        currency: "USD",
+        s2sPostbackUrl: "",
+        clickRefId: "",
+        externalId: "",
+        pixelId: "",
+        apiAccessToken: "",
+        defaultEventName: "",
+        customConversionMatching: false,
+        googleAdsAccountId: "",
+        googleMccAccountId: "",
+      });
+  
+    } catch (error) {
+      console.error("Error saving channel:", error);
+      alert("Failed to save channel. Check the console for details.");
+    }
+  };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/traffic-channels`);
+        setRows(response.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
       }
-    } catch (err) {
-      console.error('Error saving conversion settings:', err);
-      setError('Failed to save conversion settings. Please try again.');
-    }
-  };
-
-  // Reset form state
-  const resetChannelForm = () => {
-    setChannelForm({
-      channelName: '',
-      aliasChannel: 'Custom',
-      costUpdateDepth: 30,
-      costUpdateFrequency: 'daily',
-      currency: 'USD',
-      s2sPostbackUrl: '',
-      clickRefId: '',
-      externalId: '',
-      pixelId: '',
-      apiAccessToken: '',
-      defaultEventName: 'Purchase',
-      customConversionMatching: false,
-      googleAdsAccountId: '',
-      googleMccAccountId: '',
-    });
-  };
-
-  // Handle edit button click
-  const handleEditClick = (channel) => {
-    setCurrentChannel(channel);
-    setChannelForm({
-      channelName: channel.channelName,
-      aliasChannel: channel.aliasChannel,
-      costUpdateDepth: channel.costUpdateDepth,
-      costUpdateFrequency: channel.costUpdateFrequency,
-      currency: channel.currency,
-      s2sPostbackUrl: channel.s2sPostbackUrl,
-      clickRefId: channel.clickRefId,
-      externalId: channel.externalId,
-      pixelId: channel.pixelId,
-      apiAccessToken: channel.apiAccessToken,
-      defaultEventName: channel.defaultEventName,
-      customConversionMatching: channel.customConversionMatching,
-      googleAdsAccountId: channel.googleAdsAccountId,
-      googleMccAccountId: channel.googleMccAccountId,
-    });
-    setShowEditModal(true);
-  };
-
-  // Handle delete button click
-  const handleDeleteClick = (channel) => {
-    setCurrentChannel(channel);
-    setShowDeleteModal(true);
-  };
-
-  // Handle channel selection for details view
-  const handleChannelSelect = (channel) => {
-    setSelectedChannel(null); // Clear previous selection
-    setActiveTab('overview');
-    fetchChannelDetails(channel.id);
-  };
-
-  // Handle date range change
-  const handleDateRangeChange = (event, picker) => {
-    setDateRange({
-      startDate: picker.startDate.toDate(),
-      endDate: picker.endDate.toDate()
-    });
-    
-    // Refresh metrics if a channel is selected
-    if (selectedChannel) {
-      fetchChannelDetails(selectedChannel.id);
-    }
-  };
-
-  // Handle conversion settings button click
-  const handleConversionSettingsClick = (channel) => {
-    setCurrentChannel(channel);
-    fetchConversionSettings(channel.id);
-    setShowConversionSettingsModal(true);
-  };
-
-  // OAuth connection handlers
-  const connectFacebook = () => {
-    window.location.href = `${API_BASE_URL}/auth/facebook`;
-  };
-
-  const connectGoogle = () => {
-    window.location.href = `${API_BASE_URL}/auth/google`;
-  };
-
-  const disconnectGoogle = async () => {
-    try {
-      const sessionToken = localStorage.getItem('sessionToken');
-      
-      if (sessionToken) {
-        await axios.post(
-          `${API_BASE_URL}/auth/google/disconnect`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${sessionToken}`
-            }
-          }
-        );
-        
-        // Update auth status
-        setAuthStatus({
-          ...authStatus,
-          google: { connected: false }
-        });
-        
-        // Clear session if needed
-        if (sessionToken.startsWith('google_')) {
-          localStorage.removeItem('sessionToken');
-        }
-      }
-    } catch (err) {
-      console.error('Error disconnecting Google:', err);
-      setError('Failed to disconnect Google. Please try again.');
-    }
-  };
-
-  // Format currency
-  const formatCurrency = (value, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2
-    }).format(value || 0);
-  };
-
-  // Format number
-  const formatNumber = (value) => {
-    return new Intl.NumberFormat('en-US').format(value || 0);
-  };
-
-  // Calculate metrics
-  const calculateMetrics = (channel) => {
-    const metrics = channel.metrics || {};
-    
-    return {
-      clicks: metrics.clicks || 0,
-      conversions: metrics.conversions || 0,
-      cr: ((metrics.conversions || 0) / (metrics.clicks || 1)) * 100,
-      cost: metrics.cost || 0,
-      revenue: metrics.revenue || 0,
-      profit: (metrics.revenue || 0) - (metrics.cost || 0),
-      roi: (((metrics.revenue || 0) - (metrics.cost || 0)) / (metrics.cost || 1)) * 100,
-      cpc: (metrics.cost || 0) / (metrics.clicks || 1),
-      cpa: (metrics.cost || 0) / (metrics.conversions || 1),
-      epc: (metrics.revenue || 0) / (metrics.clicks || 1),
-      rpm: ((metrics.revenue || 0) / (metrics.clicks || 1)) * 1000
     };
-  };
+    fetchData();
+  }, []);  
 
   return (
     <Layout>
-      <Container fluid className="traffic-channels-container">
-        {/* Header with date range picker */}
-        <Row className="header-row my-3">
-          <Col md={6}>
-            <h2>Traffic Channels</h2>
-            <p className="text-muted">Manage your traffic sources and integrations</p>
-          </Col>
-          <Col md={6} className="text-right">
-            <div className="d-flex justify-content-end align-items-center">
-              <DateRangePicker
-                initialSettings={{
-                  startDate: dateRange.startDate,
-                  endDate: dateRange.endDate,
-                  ranges: {
-                    'Today': [new Date(), new Date()],
-                    'Yesterday': [new Date(new Date().setDate(new Date().getDate() - 1)), new Date(new Date().setDate(new Date().getDate() - 1))],
-                    'Last 7 Days': [new Date(new Date().setDate(new Date().getDate() - 6)), new Date()],
-                    'Last 30 Days': [new Date(new Date().setDate(new Date().getDate() - 29)), new Date()],
-                    'This Month': [new Date(new Date().setDate(1)), new Date()]
-                  }
-                }}
-                onApply={handleDateRangeChange}
-              >
-                <Button variant="outline-secondary">
-                  <Calendar className="mr-2" size={16} />
-                  {dateRange.startDate.toLocaleDateString()} - {dateRange.endDate.toLocaleDateString()}
-                </Button>
-              </DateRangePicker>
-              
-              <Button 
-                variant="primary" 
-                className="ml-2" 
-                onClick={() => setShowAddModal(true)}
-              >
-                <PlusCircle size={16} className="mr-1" /> Add Channel
-              </Button>
-            </div>
-          </Col>
-        </Row>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          p: 3,
+          bgcolor: "#f5f5f5",
+          minHeight: "calc(100vh - 80px)",
+          position: "relative",
+        }}
+      >
+        {/* HEADER WITH PERSISTENT BUTTONS */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            bgcolor: "#f5f5f5",
+            py: 1,
+            px: 2,
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h5" fontWeight="bold" sx={{ lineHeight: 1.2, marginRight: 1 }}>
+            Traffic Channels
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button variant="contained" color="primary" onClick={handleOpenModal}>
+              New From Template
+            </Button>
+            <Button variant="contained" color="secondary">
+              New From Scratch
+            </Button>
+          </Stack>
+        </Box>
 
-        {/* Error message */}
-        {error && (
-          <Alert 
-            variant={error.includes('Successfully') ? 'success' : 'danger'} 
-            dismissible 
-            onClose={() => setError(null)}
+        {/* FILTER FIELD */}
+        <Stack direction="row" spacing={2} alignItems="center">
+          <TextField
+            label="Filter"
+            variant="outlined"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            sx={{ width: "300px" }}
+          />
+          <Button variant="contained" color="primary">
+            Apply
+          </Button>
+        </Stack>
+
+        {/* DataGrid */}
+        <Box sx={{ height: 600, width: "100%" }}>
+          <DataGrid
+            rows={filteredRows}
+            columns={columns}
+            getRowId={(row) => row?.serial_no ?? Math.random()}
+            pageSize={10}
+            rowsPerPageOptions={[10, 20, 50]}
+            checkboxSelection
+            disableSelectionOnClick
+            onRowClick={(params) => handleRowClick(params?.row ?? {})}
+            sx={{
+              "& .MuiDataGrid-columnHeader": { backgroundColor: "#f0f0f0", fontWeight: "bold" },
+              "& .MuiDataGrid-row:hover": { backgroundColor: "#f1f1f1" },
+            }}
+          />
+        </Box>
+
+        {/* Modal for New From Template */}
+        <Modal open={openModal} onClose={handleCloseModal}>
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              bgcolor: "white",
+              borderRadius: 2,
+              boxShadow: 3,
+              p: 4,
+              width: "60%",
+            }}
           >
-            {error}
-          </Alert>
-        )}
-
-        {/* Main content */}
-        <Row>
-          {/* First view: Channels list */}
-          {!selectedChannel && (
-            <Col md={12}>
-              <Card>
-                <Card.Body>
-                  {loading ? (
-                    <div className="text-center py-5">
-                      <Spinner animation="border" variant="primary" />
-                      <p className="mt-3">Loading traffic channels...</p>
-                    </div>
-                  ) : channels.length === 0 ? (
-                    <div className="text-center py-5">
-                      <div className="empty-state mb-4">
-                        <Activity size={48} className="text-muted" />
-                      </div>
-                      <h4>No Traffic Channels Found</h4>
-                      <p className="text-muted">Create your first traffic channel to start tracking</p>
-                      <Button 
-                        variant="primary" 
-                        onClick={() => setShowAddModal(true)}
-                      >
-                        <PlusCircle size={16} className="mr-1" /> Add Channel
-                      </Button>
-                    </div>
-                  ) : (
-                    <Table responsive hover className="channels-table">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Type</th>
-                          <th>Clicks</th>
-                          <th>Conversions</th>
-                          <th>CR %</th>
-                          <th>Cost</th>
-                          <th>Revenue</th>
-                          <th>Profit</th>
-                          <th>ROI %</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {channels.map(channel => {
-                          const metrics = calculateMetrics(channel);
-                          
-                          return (
-                            <tr key={channel.id}>
-                              <td>
-                                <a
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleChannelSelect(channel);
-                                  }}
-                                  className="channel-name-link"
-                                >
-                                  {channel.channelName}
-                                </a>
-                                {channel.status === 'Inactive' && (
-                                  <Badge variant="secondary" className="ml-2">Inactive</Badge>
-                                )}
-                              </td>
-                              <td>
-                                {channel.aliasChannel === 'Facebook' ? (
-                                  <Badge variant="primary" className="source-badge">
-                                    <Facebook size={12} className="mr-1" /> {channel.aliasChannel}
-                                  </Badge>
-                                ) : channel.aliasChannel === 'Google' ? (
-                                  <Badge variant="danger" className="source-badge">
-                                    <Google size={12} className="mr-1" /> {channel.aliasChannel}
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="source-badge">
-                                    {channel.aliasChannel}
-                                  </Badge>
-                                )}
-                              </td>
-                              <td>{formatNumber(metrics.clicks)}</td>
-                              <td>{formatNumber(metrics.conversions)}</td>
-                              <td>{metrics.cr.toFixed(2)}%</td>
-                              <td>{formatCurrency(metrics.cost, channel.currency)}</td>
-                              <td>{formatCurrency(metrics.revenue, channel.currency)}</td>
-                              <td className={metrics.profit >= 0 ? 'text-success' : 'text-danger'}>
-                                {formatCurrency(metrics.profit, channel.currency)}
-                              </td>
-                              <td className={metrics.roi >= 0 ? 'text-success' : 'text-danger'}>
-                                {metrics.roi.toFixed(2)}%
-                              </td>
-                              <td className="actions-cell">
-                                <Button
-                                  variant="light"
-                                  size="sm"
-                                  className="action-btn"
-                                  onClick={() => handleEditClick(channel)}
-                                  title="Edit Channel"
-                                >
-                                  <Pencil size={16} />
-                                </Button>
-                                
-                                <Button
-                                  variant="light"
-                                  size="sm"
-                                  className="action-btn"
-                                  onClick={() => handleConversionSettingsClick(channel)}
-                                  title="Conversion Settings"
-                                >
-                                  <Settings size={16} />
-                                </Button>
-                                
-                                <Button
-                                  variant="light"
-                                  size="sm"
-                                  className="action-btn"
-                                  onClick={() => handleDeleteClick(channel)}
-                                  title="Delete Channel"
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </Table>
-                  )}
-                </Card.Body>
-              </Card>
-              
-              {/* API Integrations Card */}
-              <Card className="mt-4">
-                <Card.Header>
-                  <h5 className="mb-0">API Integrations</h5>
-                </Card.Header>
-                <Card.Body>
-                  <Row>
-                    <Col md={6}>
-                      <Card className="integration-card">
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <Facebook size={24} className="text-primary mb-2" />
-                              <h5>Facebook Ads</h5>
-                              <p className="text-muted mb-0">
-                                {authStatus.facebook.connected ? (
-                                  <>Connected as {authStatus.facebook.email}</>
-                                ) : (
-                                  <>Connect to import costs and push conversions</>
-                                )}
-                              </p>
-                            </div>
-                            
-                            <Button
-                              variant={authStatus.facebook.connected ? "outline-secondary" : "outline-primary"}
-                              onClick={connectFacebook}
-                            >
-                              {authStatus.facebook.connected ? "Reconnect" : "Connect"}
-                            </Button>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                    
-                    <Col md={6}>
-                      <Card className="integration-card">
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <Google size={24} className="text-danger mb-2" />
-                              <h5>Google Ads</h5>
-                              <p className="text-muted mb-0">
-                                {authStatus.google.connected ? (
-                                  <>Connected as {authStatus.google.email}</>
-                                ) : (
-                                  <>Connect to import costs and push conversions</>
-                                )}
-                              </p>
-                            </div>
-                            
-                            {authStatus.google.connected ? (
-                              <div>
-                                <Button
-                                  variant="outline-secondary"
-                                  className="mr-2"
-                                  onClick={connectGoogle}
-                                >
-                                  Reconnect
-                                </Button>
-                                <Button
-                                  variant="outline-danger"
-                                  onClick={disconnectGoogle}
-                                >
-                                  Disconnect
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="outline-danger"
-                                onClick={connectGoogle}
-                              >
-                                Connect
-                              </Button>
-                            )}
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            </Col>
-          )}
-          
-          {/* Second view: Channel details */}
-          {selectedChannel && (
-            <>
-              <Col md={12} className="mb-3">
-                <Button 
-                  variant="link" 
-                  className="p-0" 
-                  onClick={() => setSelectedChannel(null)}
+            <Typography variant="h6" align="center" sx={{ mb: 3 }}>
+              Choose Your Ad Template
+            </Typography>
+            <Grid container spacing={3} justifyContent="center">
+              {/* Facebook Ads Box */}
+              <Grid item xs={5}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    border: "1px solid #ddd",
+                    borderRadius: 2,
+                    p: 2,
+                    textAlign: "center",
+                  }}
                 >
-                  &lt; Back to Traffic Channels
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg"
+                    alt="Facebook Ads"
+                    style={{ width: "80px", height: "80px" }}
+                  />
+                  <Typography variant="h6" sx={{ mt: 2 }}>
+                    Facebook Ads
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    API Integrations:
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2, alignItems: "flex-start" }}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Cost update
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Campaign pause
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Pause creative
+                    </Typography>
+                  </Box>
+                  <Button variant="outlined" color="primary" sx={{ mt: 1 }} onClick={() => handleOpenSecondModal("Facebook")}>
+                    + Add
+                  </Button>
+                </Box>
+              </Grid>
+
+              {/* Google Ads Box */}
+              <Grid item xs={5}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    border: "1px solid #ddd",
+                    borderRadius: 2,
+                    p: 2,
+                    textAlign: "center",
+                  }}
+                >
+                  <img
+                    src="https://developers.google.com/static/ads/images/ads_192px_clr.svg"
+                    alt="Google Ads"
+                    style={{ width: "80px", height: "80px" }}
+                  />
+                  <Typography variant="h6" sx={{ mt: 2 }}>
+                    Google Ads
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    API Integrations:
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2, alignItems: "flex-start" }}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Cost update
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Campaign pause
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      Pause creative
+                    </Typography>
+                  </Box>
+                  <Button variant="outlined" color="primary" sx={{ mt: 1 }} onClick={() => handleOpenSecondModal("Google")}>
+                    + Add
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+        </Modal>
+
+        {/* Second Modal for Facebook/Google Ads */}
+        <Modal open={openSecondModal} onClose={handleCloseSecondModal}>
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              bgcolor: "white",
+              borderRadius: 2,
+              boxShadow: 3,
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            <Box
+              sx={{
+                position: "sticky",
+                top: 0,
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                p: 2,
+                boxShadow: 2,
+                zIndex: 10,
+                backgroundColor: "white",
+              }}
+            >
+              <Typography variant="h6">New Traffic Channel</Typography>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 2 }}>
+                <Button variant="outlined" onClick={handleCloseSecondModal}>
+                  Cancel
                 </Button>
-              </Col>
-              
-              <Col md={12}>
-                <Card className="channel-details-card">
-                  <Card.Header>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <div>
-                        <h4 className="mb-0">
-                          {selectedChannel.channelName}
-                          {selectedChannel.status === 'Inactive' && (
-                            <Badge variant="secondary" className="ml-2">Inactive</Badge>
-                          )}
-                        </h4>
-                        <div className="mt-1">
-                          {selectedChannel.aliasChannel === 'Facebook' ? (
-                            <Badge variant="primary" className="source-badge">
-                              <Facebook size={12} className="mr-1" /> {selectedChannel.aliasChannel}
-                            </Badge>
-                          ) : selectedChannel.aliasChannel === 'Google' ? (
-                            <Badge variant="danger" className="source-badge">
-                              <Google size={12} className="mr-1" /> {selectedChannel.aliasChannel}
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="source-badge">
-                              {selectedChannel.aliasChannel}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <Button
-                          variant="outline-secondary"
-                          className="mr-2"
-                          onClick={() => {
-                            handleEditClick(selectedChannel);
-                          }}
+                <Button variant="contained" color="primary" type="submit">
+                  Save
+                </Button>
+              </Box>
+            </Box>
+
+            <form onSubmit={handleSubmit}>
+              <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    {/* Channel Name & Alias Channel in one row */}
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="Channel Name"
+                        name="channelName"
+                        value={ formData.channelName}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="Alias Channel"
+                        name="aliasChannel"
+                        value={selectedChannel || formData.channelName}
+                        onChange={handleFormChange}
+                        required
+                      />
+                    </Grid>
+
+                    {/* Cost Update Depth with description */}
+                    <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
+                      <Typography sx={{ width: "50%" }}>Cost Update Depth:</Typography>
+                      <FormControl fullWidth>
+                        <Select
+                          name="costUpdateDepth"
+                          value={formData.costUpdateDepth}
+                          onChange={handleFormChange}
+                          required
                         >
-                          <Pencil size={16} className="mr-1" /> Edit
-                        </Button>
-                        
-                        <Button
-                          variant="outline-primary"
-                          onClick={() => {
-                            handleConversionSettingsClick(selectedChannel);
-                          }}
+                          <MenuItem value="None">None</MenuItem>
+                          <MenuItem value="Campaign Level">Campaign Level</MenuItem>
+                          <MenuItem value="Adset Level">Adset Level</MenuItem>
+                          <MenuItem value="Ad Level">Ad Level</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: -1 }}>
+                        Please select the cost update depth from the available ones from the drop-down list.
+                        The default setting is the maximum depth available for your account plan.
+                      </Typography>
+                    </Grid>
+
+                    {/* Cost Update Frequency */}
+                    <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
+                      <Typography sx={{ width: "50%" }}>Cost Update Frequency:</Typography>
+                      <FormControl fullWidth>
+                        <Select
+                          name="costUpdateFrequency"
+                          value={formData.costUpdateFrequency}
+                          onChange={handleFormChange}
+                          required
                         >
-                          <Settings size={16} className="mr-1" /> Conversion Settings
-                        </Button>
-                      </div>
-                    </div>
-                  </Card.Header>
-                  
-                  <Card.Body>
-                    {/* Metrics summary */}
-                    <div className="metrics-summary mb-4">
-                      <Row>
-                        {[
-                          { label: 'Clicks', value: formatNumber(selectedChannel.metrics?.clicks || 0), icon: <ExternalLink size={20} /> },
-                          { label: 'Conversions', value: formatNumber(selectedChannel.metrics?.conversions || 0), icon: <Activity size={20} /> },
-                          { label: 'Cost', value: formatCurrency(selectedChannel.metrics?.cost || 0, selectedChannel.currency), icon: <DollarSign size={20} /> },
-                          { label: 'Revenue', value: formatCurrency(selectedChannel.metrics?.revenue || 0, selectedChannel.currency), icon: <DollarSign size={20} /> },
-                          { label: 'Profit', value: formatCurrency((selectedChannel.metrics?.revenue || 0) - (selectedChannel.metrics?.cost || 0), selectedChannel.currency), 
-                            className: (selectedChannel.metrics?.revenue || 0) - (selectedChannel.metrics?.cost || 0) >= 0 ? 'text-success' : 'text-danger',
-                            icon: <DollarSign size={20} /> 
-                          },
-                          { 
-                            label: 'ROI', 
-                            value: `${(((selectedChannel.metrics?.revenue || 0) - (selectedChannel.metrics?.cost || 0)) / (selectedChannel.metrics?.cost || 1) * 100).toFixed(2)}%`,
-                            className: ((selectedChannel.metrics?.revenue || 0) - (selectedChannel.metrics?.cost || 0)) / (selectedChannel.metrics?.cost || 1) * 100 >= 0 ? 'text-success' : 'text-danger',
-                            icon: <BarChart2 size={20} />
-                          }
-                        ].map((metric, index) => (
-                          <Col md={2} key={index}>
-                            <Card className="metric-card">
-                              <Card.Body>
-                                <div className="d-flex align-items-center">
-                                  <div className="metric-icon mr-3">
-                                    {metric.icon}
-                                  </div>
-                                  <div>
-                                    <div className="metric-label">{metric.label}</div>
-                                    <div className={`metric-value ${metric.className || ''}`}>{metric.value}</div>
-                                  </div>
-                                </div>
-                              </Card.Body>
-                            </Card>
-                          </Col>
-                        ))}
-                      </Row>
-                    </div>
-                    
-                    {/* Tabs for different sections */}
-                    <Tabs
-                      activeKey={activeTab}
-                      onSelect={(key) => setActiveTab(key)}
-                      className="mb-4"
-                    >
-                      <Tab eventKey="overview" title="Overview">
-                        <Card>
-                          <Card.Body>
-                            <h5>Performance Over Time</h5>
-                            {/* Placeholder for chart - would use a library like Chart.js or Recharts */}
-                            <div className="chart-placeholder">
-                              {channelMetrics.length > 0 ? (
-                                <p>Chart would be rendered here with {channelMetrics.length} data points</p>
-                              ) : (
-                                <p>No data available for the selected date range</p>
-                              )}
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Tab>
-                      
-                      <Tab eventKey="campaigns" title="Campaigns">
-                        <Card>
-                          <Card.Body>
-                            <h5>Associated Campaigns</h5>
-                            {selectedChannel.campaigns && selectedChannel.campaigns.length > 0 ? (
-                              <Table responsive hover>
-                                <thead>
-                                  <tr>
-                                    <th>Campaign</th>
-                                    <th>Status</th>
-                                    <th>Clicks</th>
-                                    <th>Conversions</th>
-                                    <th>CR %</th>
-                                    <th>Cost</th>
-                                    <th>Revenue</th>
-                                    <th>Profit</th>
-                                    <th>ROI %</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {selectedChannel.campaigns.map(campaign => (
-                                    <tr key={campaign.id}>
-                                      <td>{campaign.name}</td>
-                                      <td>
-                                        <Badge variant={campaign.status === 'Active' ? 'success' : 'secondary'}>
-                                          {campaign.status}
-                                        </Badge>
-                                      </td>
-                                      <td>{formatNumber(campaign.metrics?.clicks || 0)}</td>
-                                      <td>{formatNumber(campaign.metrics?.conversions || 0)}</td>
-                                      <td>
-                                        {((campaign.metrics?.conversions || 0) / (campaign.metrics?.clicks || 1) * 100).toFixed(2)}%
-                                      </td>
-                                      <td>{formatCurrency(campaign.metrics?.cost || 0, selectedChannel.currency)}</td>
-                                      <td>{formatCurrency(campaign.metrics?.revenue || 0, selectedChannel.currency)}</td>
-                                      <td className={(campaign.metrics?.revenue || 0) - (campaign.metrics?.cost || 0) >= 0 ? 'text-success' : 'text-danger'}>
-                                        {formatCurrency((campaign.metrics?.revenue || 0) - (campaign.metrics?.cost || 0), selectedChannel.currency)}
-                                      </td>
-                                      <td className={((campaign.metrics?.revenue || 0) - (campaign.metrics?.cost || 0)) / (campaign.metrics?.cost || 1) * 100 >= 0 ? 'text-success' : 'text-danger'}>
-                                        {(((campaign.metrics?.revenue || 0) - (campaign.metrics?.cost || 0)) / (campaign.metrics?.cost || 1) * 100).toFixed(2)}%
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </Table>
-                            ) : (
-                              <div className="text-center py-4">
-                                <p>No campaigns associated with this traffic channel</p>
-                              </div>
-                            )}
-                          </Card.Body>
-                        </Card>
-                      </Tab>
-                      
-                      <Tab eventKey="macros" title="Tracking Macros">
-                        <Card>
-                          <Card.Body>
-                            <h5>Tracking Macros</h5>
-                            <p className="text-muted">Use these macros in your traffic source URL parameters</p>
-                            
-                            <h6 className="mt-4">System Macros</h6>
-                            <Table responsive>
-                              <thead>
-                                <tr>
-                                  <th>Name</th>
-                                  <th>Token</th>
-                                  <th>Description</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td>Click ID</td>
-                                  <td><code>{'{click_id}'}</code></td>
-                                  <td>Unique identifier for the click</td>
-                                </tr>
-                                <tr>
-                                  <td>Campaign ID</td>
-                                  <td><code>{'{campaign_id}'}</code></td>
-                                  <td>Campaign identifier</td>
-                                </tr>
-                                <tr>
-                                  <td>Campaign Name</td>
-                                  <td><code>{'{campaign_name}'}</code></td>
-                                  <td>Campaign name</td>
-                                </tr>
-                                <tr>
-                                  <td>Payout</td>
-                                  <td><code>{'{payout}'}</code></td>
-                                  <td>Conversion payout amount</td>
-                                </tr>
-                              </tbody>
-                            </Table>
-                            
-                            <h6 className="mt-4">Custom Parameters</h6>
-                            <Table responsive>
-                              <thead>
-                                <tr>
-                                  <th>Name</th>
-                                  <th>Token</th>
-                                  <th>Description</th>
-                                  <th>Sample Values</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {selectedChannel.macros && selectedChannel.macros.length > 0 ? (
-                                  selectedChannel.macros.map((macro, index) => (
-                                    <tr key={index}>
-                                      <td>{macro.name}</td>
-                                      <td><code>{`{${macro.name}}`}</code></td>
-                                      <td>Custom parameter {macro.name}</td>
-                                      <td>
-                                        {macro.samples && macro.samples.map((sample, i) => (
-                                          <Badge variant="light" key={i} className="mr-1">{sample}</Badge>
-                                        ))}
-                                      </td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td colSpan="4" className="text-center">No custom parameters detected yet</td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </Table>
-                            
-                            <h6 className="mt-4">Postback URL</h6>
-                            <div className="postback-url-box p-3 bg-light rounded">
-                              <p className="mb-0">
-                                <small className="text-muted">S2S Postback URL:</small><br />
-                                {selectedChannel.s2sPostbackUrl || 'Not configured'}
-                              </p>
-                            </div>
-                            
-                            <h6 className="mt-4">Example Tracking URL</h6>
-                            <div className="tracking-url-box p-3 bg-light rounded">
-                              <code>
-                                https://yourdomain.com/track?tid={selectedChannel.id}&cid={'{campaign_id}'}&clickid={'{click_id}'}
-                                {selectedChannel.macros && selectedChannel.macros.length > 0 && 
-                                  selectedChannel.macros.map(macro => `&${macro.name}={${macro.name}}`).join('')
-                                }
-                              </code>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Tab>
-                      
-                      <Tab eventKey="conversions" title="Conversions">
-                        <Card>
-                          <Card.Body>
-                            <h5>Recent Conversions</h5>
-                            {/* Placeholder for conversions table */}
-                            <div className="text-center py-4">
-                              <Button variant="outline-primary">
-                                <RefreshCw size={16} className="mr-1" /> Load Conversions
+                          <MenuItem value="None">None</MenuItem>
+                          <MenuItem value="60 Minutes">60 Minutes</MenuItem>
+                          <MenuItem value="30 Minutes">30 Minutes</MenuItem>
+                          <MenuItem value="15 Minutes">15 Minutes</MenuItem>
+                          <MenuItem value="5 Minutes">5 Minutes</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: -1 }}>
+                        These are the current settings for your account. If you would like to change the frequency of
+                        cost updates - please contact{" "}
+                        <a href="mailto:support@redtrack.io">abc@gmail.com</a>.
+                      </Typography>
+                    </Grid>
+
+                    {/* Currency */}
+                    <Grid item xs={12} sx={{ display: "flex", alignItems: "center" }}>
+                      <Typography sx={{ width: "50%" }}>Currency:</Typography>
+                      <FormControl fullWidth>
+                        <Select
+                          name="currency"
+                          value={formData.currency}
+                          onChange={handleFormChange}
+                          required
+                        >
+                          <MenuItem value="None">None</MenuItem>
+                          <MenuItem value="USD">USD</MenuItem>
+                          <MenuItem value="EUR">EUR</MenuItem>
+                          <MenuItem value="GBP">GBP</MenuItem>
+                          <MenuItem value="INR">INR</MenuItem>
+                          <MenuItem value="JPY">JPY</MenuItem>
+                          <MenuItem value="AUD">AUD</MenuItem>
+                          <MenuItem value="CAD">CAD</MenuItem>
+                          <MenuItem value="CHF">CHF</MenuItem>
+                          <MenuItem value="CNY">CNY</MenuItem>
+                          <MenuItem value="SEK">SEK</MenuItem>
+                          <MenuItem value="NZD">NZD</MenuItem>
+                          <MenuItem value="MXN">MXN</MenuItem>
+                          <MenuItem value="SGD">SGD</MenuItem>
+                          <MenuItem value="HKD">HKD</MenuItem>
+                          <MenuItem value="NOK">NOK</MenuItem>
+                          <MenuItem value="KRW">KRW</MenuItem>
+                          <MenuItem value="TRY">TRY</MenuItem>
+                          <MenuItem value="RUB">RUB</MenuItem>
+                          <MenuItem value="BRL">BRL</MenuItem>
+                          <MenuItem value="ZAR">ZAR</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: -1 }}>
+                        If no currency is selected, the value selected in the profile will be used.
+                      </Typography>
+                    </Grid>
+
+                    {/* S2S Postback URL */}
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="S2S Postback URL"
+                        name="s2sPostbackUrl"
+                        value={formData.s2sPostbackUrl}
+                        onChange={handleFormChange}
+                      />
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                        Use if you need to send conversions back to your traffic source.
+                      </Typography>
+                    </Grid>
+
+                    {/* Click Ref ID & External ID in one row */}
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="Click Ref ID"
+                        name="clickRefId"
+                        value={formData.clickRefId}
+                        onChange={handleFormChange}
+                        placeholder=""
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="External ID"
+                        name="externalId"
+                        value={formData.externalId}
+                        onChange={handleFormChange}
+                        placeholder="External ID"
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {/* Additional Parameters Section */}
+              <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="h6" sx={{ mb: 1 }}>
+                        Additional Parameters
+                      </Typography>
+                    </Grid>
+
+                    {/* Parameter, Macro/Token, Name/Description, Select Role in One Row */}
+                    <Grid item xs={12} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <TextField
+                        fullWidth
+                        label="Parameter *"
+                        name="parameter"
+                        value={formData.parameter}
+                        onChange={handleFormChange}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Macro/Token *"
+                        name="macroToken"
+                        value={formData.macroToken}
+                        onChange={handleFormChange}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Name / Description *"
+                        name="nameDescription"
+                        value={formData.nameDescription}
+                        onChange={handleFormChange}
+                      />
+                      <FormControl fullWidth>
+                        <InputLabel>Select Role</InputLabel>
+                        <Select
+                          name="selectRole"
+                          value={formData.selectRole}
+                          onChange={handleFormChange}
+                          required
+                        >
+                          <MenuItem value="Aid">Aid</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {/* Conditional Rendering Based on selectedChannel */}
+              <Card sx={{ mt: 2, p: 2, boxShadow: 3, borderRadius: 2 }}>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    {selectedChannel && (
+                      <>
+                     {selectedChannel === "Facebook" && (
+  <>
+    {/* Facebook API Integration Section */}
+    <Box
+      sx={{
+        border: "1px solid #ddd",
+        borderRadius: 2,
+        p: 2,
+        mb: 2,
+        backgroundColor: "#fafafa",
+      }}
+    >
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs={6}>
+          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            Facebook API Integration
+          </Typography>
+        </Grid>
+        <Grid item xs={6} sx={{ textAlign: "right" }}>
+          <Button
+            variant={isFacebookConnected ? "contained" : "outlined"}
+            color={isFacebookConnected ? "success" : "primary"}
+            sx={{ textTransform: "none" }}
+            onClick={() => handleAuth("facebook")}
+          >
+            {isFacebookConnected ? "Connected" : "Connect Facebook"}
+          </Button>
+        </Grid>
+        <Grid item xs={12}>
+          <Typography variant="body2" color="textSecondary">
+            Please allow access to activate integrations:  
+            <br /> #1 Click on “Connect” and accept integration permissions  
+            <br /> #2 Once accepted, fill in all mandatory fields and save changes.  
+          </Typography>
+        </Grid>
+      </Grid>
+    </Box>
+
+    {/* Facebook Pixel Data Section */}
+    <Box
+      sx={{
+        border: "1px solid #ddd",
+        borderRadius: 2,
+        p: 2,
+        mb: 2,
+        backgroundColor: "#fafafa",
+         width: '100%'
+      }}
+    >
+     <Grid container spacing={2} flexDirection="column" >
+  {/* Section Title */}
+  <Grid item xs={16}>
+    <Typography variant="h6" sx={{ mt: 1, fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
+      Facebook default data source (pixel)
+      <Tooltip title="Info about pixel data">
+        <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer" }} />
+      </Tooltip>
+    </Typography>
+  </Grid>
+
+  {/* Pixel ID */}
+  <Grid item xs={6}>
+    <TextField
+      fullWidth
+      label="Pixel ID"
+      name="pixelId"
+      value={formData.pixelId}
+      onChange={handleFormChange}
+      required
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Tooltip title="Enter your Pixel ID">
+              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+            </Tooltip>
+          </InputAdornment>
+        ),
+      }}
+    />
+  </Grid>
+
+  {/* Conversions API Access Token */}
+  <Grid item xs={6}>
+    <TextField
+      fullWidth
+      label="Conversions API Access token"
+      name="apiAccessToken"
+      value={formData.apiAccessToken}
+      onChange={handleFormChange}
+      required
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Tooltip title="Enter your API Access Token">
+              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+            </Tooltip>
+          </InputAdornment>
+        ),
+      }}
+    />
+  </Grid>
+
+  {/* Default Event Name */}
+  <Grid item xs={6}>
+    <TextField
+      fullWidth
+      label="Default Event name"
+      name="defaultEventName"
+      value={formData.defaultEventName}
+      onChange={handleFormChange}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Tooltip title="Default event triggered in your pixel">
+              <HelpOutlineIcon fontSize="small" sx={{ cursor: "pointer", color: "#888" }} />
+            </Tooltip>
+          </InputAdornment>
+        ),
+      }}
+    />
+  </Grid>
+
+  {/* Custom Conversion Matching */}
+  <Grid item xs={6} sx={{ display: "flex", alignItems: "center" }}>
+    <Switch
+      checked={formData.customConversionMatching}
+      onChange={(e) =>
+        setFormData((prevState) => ({
+          ...prevState,
+          customConversionMatching: e.target.checked,
+        }))
+      }
+      name="customConversionMatching"
+      inputProps={{ "aria-label": "toggle custom conversion matching" }}
+    />
+    <Typography variant="body2" sx={{ ml: 1, color: "#666" }}>
+      Custom Conversion Matching
+    </Typography>
+  </Grid>
+</Grid>
+
+    </Box>
+  </>
+)}
+
+
+
+                        {/* Google API Integration Section */}
+                        {selectedChannel === "Google" && (
+                          <>
+                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                              <Typography>Google API Integration</Typography>
+                         
+                                
+                             {isGoogleConnected ? "Connected" : "Connect Google"}
+                            </Grid>
+
+                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                              <TextField
+                                fullWidth
+                                label="Google Ads Account ID *"
+                                name="googleAdsAccountId"
+                                value={formData.googleAdsAccountId}
+                                onChange={handleFormChange}
+                                required
+                              />
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                sx={{ width: '400px', height: '60px', mt: 1, mb: 1 }} 
+                                onClick={() => handleAuth("google")}
+                              >
+                                Google Connect
                               </Button>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Tab>
-                      
-                      <Tab eventKey="settings" title="Settings">
-                        <Card>
-                          <Card.Body>
-                            <h5>Channel Settings</h5>
-                            <Row>
-                              <Col md={6}>
-                                <dl>
-                                  <dt>Channel Name</dt>
-                                  <dd>{selectedChannel.channelName}</dd>
-                                  
-                                  <dt>Channel Type</dt>
-                                  <dd>{selectedChannel.aliasChannel}</dd>
-                                  
-                                  <dt>Currency</dt>
-                                  <dd>{selectedChannel.currency}</dd>
-                                  
-                                  <dt>Cost Update Settings</dt>
-                                  <dd>
-                                    Update every {selectedChannel.costUpdateFrequency}, 
-                                    looking back {selectedChannel.costUpdateDepth} days
-                                  </dd>
-                                </dl>
-                              </Col>
-                              
-                              <Col md={6}>
-                                <dl>
-                                  <dt>S2S Postback URL</dt>
-                                  <dd>{selectedChannel.s2sPostbackUrl || 'Not configured'}</dd>
-                                  
-                                  <dt>Status</dt>
-                                  <dd>
-                                    <Badge variant={selectedChannel.status === 'Active' ? 'success' : 'secondary'}>
-                                      {selectedChannel.status}
-                                    </Badge>
-                                  </dd>
-                                  
-                                  <dt>Created</dt>
-                                  <dd>{new Date(selectedChannel.createdAt).toLocaleString()}</dd>
-                                  
-                                  <dt>Last Updated</dt>
-                                  <dd>{new Date(selectedChannel.updatedAt).toLocaleString()}</dd>
-                                </dl>
-                              </Col>
-                            </Row>
-                          </Card.Body>
-                        </Card>
-                      </Tab>
-                    </Tabs>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </>
-          )}
-        </Row>
+                            </Grid>
 
-        {/* Add Channel Modal */}
-        <Modal 
-          show={showAddModal} 
-          onHide={() => {
-            setShowAddModal(false);
-            resetChannelForm();
-          }}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Add Traffic Channel</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Channel Name <span className="text-danger">*</span></Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      value={channelForm.channelName}
-                      onChange={(e) => setChannelForm({...channelForm, channelName: e.target.value})}
-                      placeholder="e.g. Facebook Main, Google Search"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Channel Type <span className="text-danger">*</span></Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.aliasChannel}
-                      onChange={(e) => setChannelForm({...channelForm, aliasChannel: e.target.value})}
-                    >
-                      {channelAliasOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Currency</Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.currency}
-                      onChange={(e) => setChannelForm({...channelForm, currency: e.target.value})}
-                    >
-                      <option value="USD">USD - US Dollar</option>
-                      <option value="EUR">EUR - Euro</option>
-                      <option value="GBP">GBP - British Pound</option>
-                      <option value="CAD">CAD - Canadian Dollar</option>
-                      <option value="AUD">AUD - Australian Dollar</option>
-                      <option value="INR">INR - Indian Rupee</option>
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>S2S Postback URL</Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      value={channelForm.s2sPostbackUrl}
-                      onChange={(e) => setChannelForm({...channelForm, s2sPostbackUrl: e.target.value})}
-                      placeholder="https://traffic-source.com/postback?clickid={click_id}"
-                    />
-                    <Form.Text className="text-muted">
-                      URL to send conversion data back to your traffic source
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Cost Update Frequency</Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.costUpdateFrequency}
-                      onChange={(e) => setChannelForm({...channelForm, costUpdateFrequency: e.target.value})}
-                    >
-                      <option value="hourly">Hourly</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="manual">Manual</option>
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Cost Update Depth (days)</Form.Label>
-                    <Form.Control 
-                      type="number" 
-                      value={channelForm.costUpdateDepth}
-                      onChange={(e) => setChannelForm({...channelForm, costUpdateDepth: e.target.value})}
-                      min="1"
-                      max="90"
-                    />
-                    <Form.Text className="text-muted">
-                      How many days back to update costs
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              {/* Additional fields for Facebook */}
-              {channelForm.aliasChannel === 'Facebook' && (
-                <>
-                  <h6 className="mt-4">Facebook Integration Settings</h6>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Pixel ID</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.pixelId}
-                          onChange={(e) => setChannelForm({...channelForm, pixelId: e.target.value})}
-                          placeholder="e.g. 1234567890123456"
-                        />
-                      </Form.Group>
-                    </Col>
-                    
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Default Event Name</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.defaultEventName}
-                          onChange={(e) => setChannelForm({...channelForm, defaultEventName: e.target.value})}
-                          placeholder="e.g. Purchase"
-                        />
-                        <Form.Text className="text-muted">
-                          Default event name for conversions (Purchase, Lead, etc.)
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </>
-              )}
-              
-              {/* Additional fields for Google */}
-              {channelForm.aliasChannel === 'Google Ads' && (
-                <>
-                  <h6 className="mt-4">Google Ads Integration Settings</h6>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Google Ads Account ID</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.googleAdsAccountId}
-                          onChange={(e) => setChannelForm({...channelForm, googleAdsAccountId: e.target.value})}
-                          placeholder="e.g. 123-456-7890"
-                        />
-                      </Form.Group>
-                    </Col>
-                    
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>MCC Account ID (optional)</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.googleMccAccountId}
-                          onChange={(e) => setChannelForm({...channelForm, googleMccAccountId: e.target.value})}
-                          placeholder="e.g. 123-456-7890"
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </>
-              )}
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button 
-              variant="secondary" 
-              onClick={() => {
-                setShowAddModal(false);
-                resetChannelForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={handleAddChannel}
-              disabled={!channelForm.channelName}
-            >
-              Add Channel
-            </Button>
-          </Modal.Footer>
-        </Modal>
+                            <Grid item xs={8.4}>
+                              <Typography variant="h6" sx={{ mt: 2 }}>Google MCC Account ID (optional)</Typography>
+                              <TextField
+                                fullWidth
+                                label="Google MCC Account ID (optional)"
+                                name="googleMccAccountId"
+                                value={formData.googleMccAccountId}
+                                onChange={handleFormChange}
+                              />
+                              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                                Add MCC account ID to send conversions to it and not the ad account (optional).
+                                Please make sure you have access to the ad account and MCC with the e-mail you used for integration.
+                              </Typography>
+                            </Grid>
 
-        {/* Edit Channel Modal */}
-        <Modal 
-          show={showEditModal} 
-          onHide={() => {
-            setShowEditModal(false);
-            resetChannelForm();
-          }}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Traffic Channel</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Channel Name <span className="text-danger">*</span></Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      value={channelForm.channelName}
-                      onChange={(e) => setChannelForm({...channelForm, channelName: e.target.value})}
-                      placeholder="e.g. Facebook Main, Google Search"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Channel Type <span className="text-danger">*</span></Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.aliasChannel}
-                      onChange={(e) => setChannelForm({...channelForm, aliasChannel: e.target.value})}
-                    >
-                      {channelAliasOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Currency</Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.currency}
-                      onChange={(e) => setChannelForm({...channelForm, currency: e.target.value})}
-                    >
-                      <option value="USD">USD - US Dollar</option>
-                      <option value="EUR">EUR - Euro</option>
-                      <option value="GBP">GBP - British Pound</option>
-                      <option value="CAD">CAD - Canadian Dollar</option>
-                      <option value="AUD">AUD - Australian Dollar</option>
-                      <option value="INR">INR - Indian Rupee</option>
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>S2S Postback URL</Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      value={channelForm.s2sPostbackUrl}
-                      onChange={(e) => setChannelForm({...channelForm, s2sPostbackUrl: e.target.value})}
-                      placeholder="https://traffic-source.com/postback?clickid={click_id}"
-                    />
-                    <Form.Text className="text-muted">
-                      URL to send conversion data back to your traffic source
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              <Row>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Cost Update Frequency</Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.costUpdateFrequency}
-                      onChange={(e) => setChannelForm({...channelForm, costUpdateFrequency: e.target.value})}
-                    >
-                      <option value="hourly">Hourly</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="manual">Manual</option>
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Cost Update Depth (days)</Form.Label>
-                    <Form.Control 
-                      type="number" 
-                      value={channelForm.costUpdateDepth}
-                      onChange={(e) => setChannelForm({...channelForm, costUpdateDepth: e.target.value})}
-                      min="1"
-                      max="90"
-                    />
-                    <Form.Text className="text-muted">
-                      How many days back to update costs
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              <Row>
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>Status</Form.Label>
-                    <Form.Control 
-                      as="select"
-                      value={channelForm.status}
-                      onChange={(e) => setChannelForm({...channelForm, status: e.target.value})}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </Form.Control>
-                  </Form.Group>
-                </Col>
-              </Row>
-              
-              {/* Additional fields for Facebook */}
-              {channelForm.aliasChannel === 'Facebook' && (
-                <>
-                  <h6 className="mt-4">Facebook Integration Settings</h6>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Pixel ID</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.pixelId}
-                          onChange={(e) => setChannelForm({...channelForm, pixelId: e.target.value})}
-                          placeholder="e.g. 1234567890123456"
-                        />
-                      </Form.Group>
-                    </Col>
-                    
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Default Event Name</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.defaultEventName}
-                          onChange={(e) => setChannelForm({...channelForm, defaultEventName: e.target.value})}
-                          placeholder="e.g. Purchase"
-                        />
-                        <Form.Text className="text-muted">
-                          Default event name for conversions (Purchase, Lead, etc.)
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </>
-              )}
-              
-              {/* Additional fields for Google */}
-              {channelForm.aliasChannel === 'Google Ads' && (
-                <>
-                  <h6 className="mt-4">Google Ads Integration Settings</h6>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>Google Ads Account ID</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.googleAdsAccountId}
-                          onChange={(e) => setChannelForm({...channelForm, googleAdsAccountId: e.target.value})}
-                          placeholder="e.g. 123-456-7890"
-                        />
-                      </Form.Group>
-                    </Col>
-                    
-                    <Col md={6}>
-                      <Form.Group>
-                        <Form.Label>MCC Account ID (optional)</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={channelForm.googleMccAccountId}
-                          onChange={(e) => setChannelForm({...channelForm, googleMccAccountId: e.target.value})}
-                          placeholder="e.g. 123-456-7890"
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </>
-              )}
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button 
-              variant="secondary" 
-              onClick={() => {
-                setShowEditModal(false);
-                resetChannelForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={handleUpdateChannel}
-              disabled={!channelForm.channelName}
-            >
-              Save Changes
-            </Button>
-          </Modal.Footer>
-        </Modal>
+                            {/* Conversion Matching Section */}
+                            <Grid item xs={12}>
+                              <Typography variant="h6" sx={{ mt: 2 }}>Conversion Matching</Typography>
+                            </Grid>
 
-        {/* Delete Channel Modal */}
-        <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Traffic Channel</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>Are you sure you want to delete the traffic channel <strong>{currentChannel?.channelName}</strong>?</p>
-            <p className="text-danger">This action cannot be undone if the channel has no associated data.</p>
-            <p>If the channel has clicks and conversions, it will be marked as inactive instead of deleted.</p>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleDeleteChannel}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+                            <Grid item xs={12} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mt: 1 }}>
+                              <Typography variant="body2" color="textSecondary">Conversion Type * ?</Typography>
+                              <Typography variant="body2" color="textSecondary">Conversion Name * ?</Typography>
+                              <Typography variant="body2" color="textSecondary">Category * ?</Typography>
+                              <Typography variant="body2" color="textSecondary">Include in conversions * ?</Typography>
+                            </Grid>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </Grid>
+                </CardContent>
+              </Card>
 
-        {/* Conversion Settings Modal */}
-        <Modal 
-          show={showConversionSettingsModal} 
-          onHide={() => setShowConversionSettingsModal(false)}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Conversion Settings</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p className="text-muted mb-4">
-              Configure how conversion data is forwarded to traffic sources
-            </p>
-            
-            <Card className="mb-4">
-              <Card.Header className="bg-light">
-                <h6 className="mb-0 d-flex align-items-center">
-                  <Facebook size={20} className="text-primary mr-2" /> Facebook Conversion API
-                </h6>
-              </Card.Header>
-              <Card.Body>
-                <Form.Group>
-                  <Form.Check 
-                    type="switch"
-                    id="facebook-toggle"
-                    label="Forward conversions to Facebook"
-                    checked={conversionSettings.forward_to_facebook}
-                    onChange={(e) => setConversionSettings({
-                      ...conversionSettings,
-                      forward_to_facebook: e.target.checked
-                    })}
-                  />
-                  <Form.Text className="text-muted">
-                    Send server-side conversion events to Facebook
-                  </Form.Text>
-                </Form.Group>
-                
-                {conversionSettings.forward_to_facebook && (
-                  <>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group>
-                          <Form.Label>Default Event Name</Form.Label>
-                          <Form.Control 
-                            as="select"
-                            value={conversionSettings.default_event_name}
-                            onChange={(e) => setConversionSettings({
-                              ...conversionSettings,
-                              default_event_name: e.target.value
-                            })}
-                          >
-                            <option value="Purchase">Purchase</option>
-                            <option value="Lead">Lead</option>
-                            <option value="CompleteRegistration">Complete Registration</option>
-                            <option value="Subscribe">Subscribe</option>
-                            <option value="AddToCart">Add To Cart</option>
-                            <option value="InitiateCheckout">Initiate Checkout</option>
-                          </Form.Control>
-                          <Form.Text className="text-muted">
-                            Default event type to send to Facebook
-                          </Form.Text>
-                        </Form.Group>
-                      </Col>
-                      
-                      <Col md={6}>
-                        <Form.Group>
-                          <Form.Label>Pixel ID</Form.Label>
-                          <Form.Control 
-                            type="text" 
-                            value={currentChannel?.pixelId || ''}
-                            disabled
-                          />
-                          <Form.Text className="text-muted">
-                            Set in channel settings
-                          </Form.Text>
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                    
-                    <Alert variant="info">
-                      <small>
-                        Make sure you have connected your Facebook account in the Traffic Channels page to use the Conversion API.
-                      </small>
-                    </Alert>
-                  </>
-                )}
-              </Card.Body>
-            </Card>
-            
-            <Card>
-              <Card.Header className="bg-light">
-                <h6 className="mb-0 d-flex align-items-center">
-                  <Google size={20} className="text-danger mr-2" /> Google Ads Conversion API
-                </h6>
-              </Card.Header>
-              <Card.Body>
-                <Form.Group>
-                  <Form.Check 
-                    type="switch"
-                    id="google-toggle"
-                    label="Forward conversions to Google"
-                    checked={conversionSettings.forward_to_google}
-                    onChange={(e) => setConversionSettings({
-                      ...conversionSettings,
-                      forward_to_google: e.target.checked
-                    })}
-                  />
-                  <Form.Text className="text-muted">
-                    Send server-side conversion events to Google Ads
-                  </Form.Text>
-                </Form.Group>
-                
-                {conversionSettings.forward_to_google && (
-                  <>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group>
-                          <Form.Label>Conversion ID</Form.Label>
-                          <Form.Control 
-                            type="text" 
-                            value={conversionSettings.conversion_id}
-                            onChange={(e) => setConversionSettings({
-                              ...conversionSettings,
-                              conversion_id: e.target.value
-                            })}
-                            placeholder="e.g. AW-123456789"
-                          />
-                        </Form.Group>
-                      </Col>
-                      
-                      <Col md={6}>
-                        <Form.Group>
-                          <Form.Label>Conversion Label</Form.Label>
-                          <Form.Control 
-                            type="text" 
-                            value={conversionSettings.conversion_label}
-                            onChange={(e) => setConversionSettings({
-                              ...conversionSettings,
-                              conversion_label: e.target.value
-                            })}
-                            placeholder="e.g. abcDEF123ghiJKL456"
-                          />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                    
-                    <Alert variant="info">
-                      <small>
-                        Make sure you have connected your Google Ads account in the Traffic Channels page to use the Conversion API.
-                      </small>
-                    </Alert>
-                  </>
-                )}
-              </Card.Body>
-            </Card>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowConversionSettingsModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSaveConversionSettings}>
-              Save Settings
-            </Button>
-          </Modal.Footer>
+              {/* Buttons */}
+              <Box sx={{ mt: 3, display: "flex", gap: 2, justifyContent: "flex-end" }}>
+                <Button variant="outlined" onClick={handleCloseSecondModal}>Cancel</Button>
+                <Button variant="contained" color="primary" type="submit">Save</Button>
+              </Box>
+            </form>
+          </Box>
         </Modal>
-      </Container>
+      </Box>
     </Layout>
   );
 };
 
-export default TrafficChannelsPage;
+export default TrafficChannels;
