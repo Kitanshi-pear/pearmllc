@@ -345,21 +345,6 @@ const DateRange = ({ onDateRangeChange }) => {
         >
           <FontAwesomeIcon icon={faExchangeAlt} style={{ color: "#374151" }} />
         </Button>
-        <Box
-          sx={{
-            border: "1px solid #d1d5db",
-            borderRadius: 1,
-            px: 2,
-            py: 1,
-            width: 240,
-            ml: 4,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-          }}
-        >
-          
-        </Box>
       </Box>
       
       {/* Date Range Popover */}
