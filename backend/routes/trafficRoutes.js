@@ -6,6 +6,7 @@ require('dotenv').config();
 const { TrafficChannel, Campaign, Click, Conversion } = require('../models');
 const MetricsService = require('../services/metrics');
 const MacroService = require('../services/MacroServices');
+const { Op } = require('sequelize'); // Make sure to import Op for Sequelize operators
 
 // Environment variables for OAuth
 const FB_CLIENT_ID = process.env.FB_CLIENT_ID || '1002084978515659';
@@ -30,10 +31,28 @@ router.get('/auth/facebook', (req, res) => {
     res.redirect(fbAuthUrl);
 });
 
-// Facebook OAuth Callback
+// Facebook OAuth Callback - Modified to support popup window
 router.get('/auth/facebook/callback', async (req, res) => {
     const { code } = req.query;
-    if (!code) return res.status(400).json({ error: "No authorization code provided" });
+    if (!code) {
+        // Return HTML with post message for error
+        return res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Facebook',
+                            message: 'No authorization code provided'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication failed. No authorization code provided.</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
+    }
 
     try {
         console.log("🔹 Received Facebook Auth Code:", code);
@@ -69,11 +88,42 @@ router.get('/auth/facebook/callback', async (req, res) => {
         // Create session token
         const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
 
-        // Redirect back to frontend with success flag
-        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Facebook&session=${sessionToken}`);
+        // Return HTML with post message for success
+        res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_success',
+                            platform: 'Facebook',
+                            session: '${sessionToken}'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication successful!</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error);
-        res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Facebook`);
+        // Return HTML with post message for error
+        res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Facebook',
+                            message: '${error.message.replace(/'/g, "\\'")}'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication failed: ${error.message}</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     }
 });
 
@@ -94,19 +144,49 @@ router.get('/auth/google', (req, res) => {
     res.redirect(googleAuthUrl);
 });
 
-// Google OAuth Callback
+// Google OAuth Callback - Modified to support popup window
 router.get('/auth/google/callback', async (req, res) => {
     console.log("🔹 Google OAuth Callback Triggered");
     const { code, error } = req.query;
     
     if (error) {
         console.error("❌ OAuth error:", error);
-        return res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=${encodeURIComponent(error)}`);
+        return res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: '${error.replace(/'/g, "\\'")}'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication failed: ${error}</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     }
     
     if (!code) {
         console.error("❌ No authorization code received.");
-        return res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=No authorization code provided`);
+        return res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: 'No authorization code provided'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication failed. No authorization code provided.</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     }
 
     try {
@@ -157,12 +237,42 @@ router.get('/auth/google/callback', async (req, res) => {
         // Create a session token
         const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
 
-        // Redirect back to frontend with success flag and session token
-        res.redirect(`https://pearmllc.onrender.com/traffic-channels?success=true&platform=Google&session=${sessionToken}`);
+        // Return HTML with post message for success
+        res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_success',
+                            platform: 'Google',
+                            session: '${sessionToken}'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication successful!</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     } catch (error) {
         console.error("❌ Google OAuth Error:", error.response?.data || error);
         const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
-        res.redirect(`https://pearmllc.onrender.com/traffic-channels?error=true&platform=Google&message=${encodeURIComponent(errorMessage)}`);
+        res.send(`
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: '${errorMessage.replace(/'/g, "\\'")}'
+                        }, window.location.origin);
+                        window.close();
+                    </script>
+                    <p>Authentication failed: ${errorMessage}</p>
+                    <p>This window will close automatically.</p>
+                </body>
+            </html>
+        `);
     }
 });
 
@@ -267,6 +377,48 @@ router.post('/auth/google/disconnect', async (req, res) => {
     }
 });
 
+// Disconnect Facebook OAuth
+router.post('/auth/facebook/disconnect', async (req, res) => {
+    try {
+        const authorization = req.headers.authorization;
+        const sessionToken = authorization ? authorization.split(' ')[1] : null;
+        
+        if (!sessionToken) {
+            return res.status(401).json({ error: "No session token provided" });
+        }
+        
+        const decodedToken = Buffer.from(sessionToken, 'base64').toString();
+        
+        if (!decodedToken.startsWith('fb_')) {
+            return res.status(400).json({ error: "Invalid session token for Facebook" });
+        }
+        
+        const userId = decodedToken.substring(3);
+        
+        if (userId && facebookTokenStore[userId]) {
+            // Optionally revoke the token with Facebook
+            const token = facebookTokenStore[userId].access_token;
+            
+            try {
+                await axios.delete(`https://graph.facebook.com/v22.0/me/permissions?access_token=${token}`);
+                console.log("✅ Facebook permissions revoked successfully");
+            } catch (revokeError) {
+                console.error("⚠️ Facebook permissions revoke failed:", revokeError.message);
+            }
+            
+            // Remove from store
+            delete facebookTokenStore[userId];
+            
+            res.json({ success: true, message: "Facebook account disconnected" });
+        } else {
+            res.status(404).json({ error: "Facebook account not found or already disconnected" });
+        }
+    } catch (error) {
+        console.error("❌ Error disconnecting Facebook account:", error);
+        res.status(500).json({ error: "Failed to disconnect Facebook account" });
+    }
+});
+
 // ----- CRUD Endpoints -----
 
 // Create Traffic Channel
@@ -289,7 +441,8 @@ router.post('/', async (req, res) => {
             customConversionMatching: req.body.customConversionMatching,
             googleAdsAccountId: req.body.googleAdsAccountId,
             googleMccAccountId: req.body.googleMccAccountId,
-            status: 'Active'
+            status: 'Active',
+            isConnected: req.body.isConnected || false
         });
 
         res.status(201).json(newChannel);
@@ -322,7 +475,8 @@ router.get("/", async (req, res) => {
             attributes: [
                 'id', 'channelName', 'aliasChannel', 'costUpdateDepth', 
                 'costUpdateFrequency', 'currency', 's2sPostbackUrl', 'status', 
-                'createdAt', 'updatedAt'
+                'createdAt', 'updatedAt', 'isConnected', 'pixelId', 'apiAccessToken',
+                'googleAdsAccountId'
             ],
             order: [['id', 'ASC']],
         });
@@ -378,8 +532,14 @@ router.get("/", async (req, res) => {
         // Map channels with their metrics - with error handling
         const channelsWithMetrics = channels.map((channel, index) => {
             try {
+                // Check if this channel should be marked as connected based on API tokens
+                const isChannelConnected = channel.isConnected || 
+                                        (channel.apiAccessToken && channel.aliasChannel === 'Facebook') || 
+                                        (channel.googleAdsAccountId && channel.aliasChannel === 'Google');
+                
                 return {
                     ...channel.toJSON(),
+                    isConnected: isChannelConnected,
                     metrics: metrics[index] || {}
                 };
             } catch (mappingError) {
@@ -388,6 +548,7 @@ router.get("/", async (req, res) => {
                 return {
                     id: channel.id || 'unknown',
                     channelName: channel.channelName || 'Error processing channel',
+                    isConnected: false,
                     metrics: {}
                 };
             }
@@ -553,9 +714,15 @@ router.get("/:id", async (req, res) => {
             }
         }
 
+        // Check if this channel should be marked as connected based on API tokens
+        const isChannelConnected = channel.isConnected || 
+                                (channel.apiAccessToken && channel.aliasChannel === 'Facebook') || 
+                                (channel.googleAdsAccountId && channel.aliasChannel === 'Google');
+
         // Combine all data
         const response = {
             ...channel.toJSON(),
+            isConnected: isChannelConnected,
             metrics,
             campaigns: include_campaigns === 'true' ? campaigns : undefined,
             macros: include_macros === 'true' ? macros : undefined
@@ -593,10 +760,24 @@ router.put('/:id', async (req, res) => {
             customConversionMatching: req.body.customConversionMatching,
             googleAdsAccountId: req.body.googleAdsAccountId,
             googleMccAccountId: req.body.googleMccAccountId,
+            isConnected: req.body.isConnected || false,
             status: req.body.status || channel.status
         });
         
-        res.json(channel);
+        // Re-check connection status based on available tokens
+        const isChannelConnected = channel.isConnected || 
+                                (channel.apiAccessToken && channel.aliasChannel === 'Facebook') || 
+                                (channel.googleAdsAccountId && channel.aliasChannel === 'Google');
+        
+        // If connection status changed, update it
+        if (isChannelConnected !== channel.isConnected) {
+            await channel.update({ isConnected: isChannelConnected });
+        }
+        
+        res.json({
+            ...channel.toJSON(),
+            isConnected: isChannelConnected
+        });
     } catch (error) {
         console.error("❌ Error updating channel:", error);
         res.status(500).json({ error: "Failed to update channel" });
@@ -898,258 +1079,246 @@ function getMacroDescription(macroKey) {
     return descriptions[macroKey] || 'Custom parameter';
 }
 
-// ADD THESE ROUTES TO YOUR EXISTING traffic-channels.js FILE
-// Make sure to add the ConversionApiService import at the top:
-// const ConversionApiService = require('../services/ConversionApiService');
-
-/**
- * Update conversion settings for a traffic channel
- */
-router.put('/:id/conversion-settings', async (req, res) => {
+// Test a conversion for a traffic channel
+router.post('/:id/test-conversion', async (req, res) => {
     try {
-      const { id } = req.params;
-      
-      // Find the traffic channel
-      const channel = await TrafficChannel.findByPk(id);
-      if (!channel) {
-        return res.status(404).json({ error: "Traffic channel not found" });
-      }
-      
-      // Extract conversion API fields
-      const {
-        forward_to_facebook,
-        forward_to_google,
-        conversion_id,
-        conversion_label,
-        default_event_name
-      } = req.body;
-      
-      // Update the traffic channel
-      await channel.update({
-        ...(forward_to_facebook !== undefined && { forward_to_facebook }),
-        ...(forward_to_google !== undefined && { forward_to_google }),
-        ...(conversion_id && { conversion_id }),
-        ...(conversion_label && { conversion_label }),
-        ...(default_event_name && { defaultEventName: default_event_name })
-      });
-      
-      res.json({
-        message: "Conversion settings updated successfully",
-        channel
-      });
-    } catch (error) {
-      console.error('❌ Error updating conversion settings:', error);
-      res.status(500).json({ error: 'Failed to update conversion settings' });
-    }
-  });
-  
-  /**
-   * Get conversion settings for a traffic channel
-   */
-  router.get('/:id/conversion-settings', async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Find the traffic channel
-      const channel = await TrafficChannel.findByPk(id);
-      if (!channel) {
-        return res.status(404).json({ error: "Traffic channel not found" });
-      }
-      
-      // Prepare conversion settings
-      const conversionSettings = {
-        traffic_channel: {
-          id: channel.id,
-          name: channel.channelName
-        },
-        facebook: {
-          enabled: !!channel.forward_to_facebook,
-          pixel_id: channel.pixelId || null,
-          has_token: !!channel.apiAccessToken,
-          default_event_name: channel.defaultEventName || 'Purchase'
-        },
-        google: {
-          enabled: !!channel.forward_to_google,
-          ads_account_id: channel.googleAdsAccountId || null,
-          conversion_id: channel.conversion_id || null,
-          conversion_label: channel.conversion_label || null
-        }
-      };
-      
-      res.json(conversionSettings);
-    } catch (error) {
-      console.error('❌ Error fetching conversion settings:', error);
-      res.status(500).json({ error: 'Failed to fetch conversion settings' });
-    }
-  });
-  
-  /**
-   * Test a conversion for a traffic channel
-   */
-  router.post('/:id/test-conversion', async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Find the traffic channel
-      const channel = await TrafficChannel.findByPk(id);
-      if (!channel) {
-        return res.status(404).json({ error: "Traffic channel not found" });
-      }
-      
-      // Get a campaign for this traffic channel
-      const campaign = await Campaign.findOne({
-        where: {
-          traffic_channel_id: id
-        }
-      });
-      
-      if (!campaign) {
-        return res.status(404).json({ error: "No campaigns found for this traffic channel" });
-      }
-      
-      // Check if the channel has required conversion API settings
-      const hasFacebookSettings = channel.pixelId && channel.apiAccessToken;
-      const hasGoogleSettings = channel.googleAdsAccountId && channel.conversion_id && channel.conversion_label;
-      
-      if (!hasFacebookSettings && !hasGoogleSettings) {
-        return res.status(400).json({ 
-          error: "This traffic channel does not have conversion API settings configured",
-          requiredFields: {
-            facebook: ['pixelId', 'apiAccessToken'],
-            google: ['googleAdsAccountId', 'conversion_id', 'conversion_label']
-          }
-        });
-      }
-      
-      // Create a test conversion payload
-      const testConversion = {
-        traffic_channel: {
-          id: channel.id,
-          name: channel.channelName,
-          type: channel.aliasChannel
-        },
-        campaign: {
-          id: campaign.id,
-          name: campaign.name
-        },
-        testPayload: {
-          click_id: 'test_' + Date.now(),
-          payout: req.body.payout || 10.00,
-          event_name: req.body.event_name || channel.defaultEventName || 'Purchase'
-        },
-        apiSettings: {
-          facebook: {
-            enabled: hasFacebookSettings && !!channel.forward_to_facebook,
-            pixel_id: channel.pixelId,
-            has_token: !!channel.apiAccessToken
-          },
-          google: {
-            enabled: hasGoogleSettings && !!channel.forward_to_google,
-            ads_account_id: channel.googleAdsAccountId,
-            conversion_id: channel.conversion_id,
-            conversion_label: channel.conversion_label
-          }
-        }
-      };
-      
-      // Return test info
-      res.json({
-        success: true,
-        message: 'Conversion test info generated',
-        test_conversion: testConversion,
-        test_url: `/api/postback/conversion?${new URLSearchParams(testConversion.testPayload).toString()}`,
-        note: 'Use this URL to test your conversion. No actual API calls will be made.'
-      });
-    } catch (error) {
-      console.error('❌ Error testing conversion:', error);
-      res.status(500).json({ error: 'Failed to test conversion' });
-    }
-  });
-  
-  /**
-   * Get conversions for a traffic channel
-   */
-  router.get('/:id/conversions', async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Find the traffic channel
-      const channel = await TrafficChannel.findByPk(id);
-      if (!channel) {
-        return res.status(404).json({ error: "Traffic channel not found" });
-      }
-      
-      // Get date range from query or default to last 30 days
-      const {
-        start_date,
-        end_date,
-        limit = 50
-      } = req.query;
-      
-      const startDate = start_date ? new Date(start_date) : new Date(new Date().setDate(new Date().getDate() - 30));
-      const endDate = end_date ? new Date(end_date) : new Date();
-      
-      // Get conversions for this traffic channel
-      const conversions = await Conversion.findAll({
-        where: {
-          traffic_channel_id: id,
-          createdAt: {
-            [Op.between]: [startDate, endDate]
-          }
-        },
-        order: [['createdAt', 'DESC']],
-        limit: parseInt(limit, 10)
-      });
-      
-      // Map conversions with campaign info if available
-      const conversionsWithInfo = await Promise.all(conversions.map(async (conv) => {
-        let campaign = null;
-        if (conv.campaign_id) {
-          campaign = await Campaign.findByPk(conv.campaign_id, {
-            attributes: ['id', 'name']
-          });
+        const { id } = req.params;
+        
+        // Find the traffic channel
+        const channel = await TrafficChannel.findByPk(id);
+        if (!channel) {
+            return res.status(404).json({ error: "Traffic channel not found" });
         }
         
-        return {
-          id: conv.id,
-          click_id: conv.click_id,
-          campaign: campaign ? {
-            id: campaign.id,
-            name: campaign.name
-          } : null,
-          payout: conv.payout,
-          revenue: conv.revenue,
-          profit: conv.profit,
-          status: conv.status,
-          event_name: conv.event_name,
-          created_at: conv.createdAt
+        // Get a campaign for this traffic channel
+        const campaign = await Campaign.findOne({
+            where: {
+                traffic_channel_id: id
+            }
+        });
+        
+        if (!campaign) {
+            return res.status(404).json({ error: "No campaigns found for this traffic channel" });
+        }
+        
+        // Check if the channel has required conversion API settings
+        const hasFacebookSettings = channel.pixelId && channel.apiAccessToken;
+        const hasGoogleSettings = channel.googleAdsAccountId && channel.conversion_id && channel.conversion_label;
+        
+        if (!hasFacebookSettings && !hasGoogleSettings) {
+            return res.status(400).json({ 
+                error: "This traffic channel does not have conversion API settings configured",
+                requiredFields: {
+                    facebook: ['pixelId', 'apiAccessToken'],
+                    google: ['googleAdsAccountId', 'conversion_id', 'conversion_label']
+                }
+            });
+        }
+        
+        // Create a test conversion payload
+        const testConversion = {
+            traffic_channel: {
+                id: channel.id,
+                name: channel.channelName,
+                type: channel.aliasChannel
+            },
+            campaign: {
+                id: campaign.id,
+                name: campaign.name
+            },
+            testPayload: {
+                click_id: 'test_' + Date.now(),
+                payout: req.body.payout || 10.00,
+                event_name: req.body.event_name || channel.defaultEventName || 'Purchase'
+            },
+            apiSettings: {
+                facebook: {
+                    enabled: hasFacebookSettings && !!channel.forward_to_facebook,
+                    pixel_id: channel.pixelId,
+                    has_token: !!channel.apiAccessToken
+                },
+                google: {
+                    enabled: hasGoogleSettings && !!channel.forward_to_google,
+                    ads_account_id: channel.googleAdsAccountId,
+                    conversion_id: channel.conversion_id,
+                    conversion_label: channel.conversion_label
+                }
+            }
         };
-      }));
-      
-      // Calculate summary metrics
-      const summary = {
-        total_conversions: conversions.length,
-        total_revenue: conversions.reduce((sum, conv) => sum + (parseFloat(conv.revenue) || 0), 0),
-        total_payout: conversions.reduce((sum, conv) => sum + (parseFloat(conv.payout) || 0), 0),
-        total_profit: conversions.reduce((sum, conv) => sum + (parseFloat(conv.profit) || 0), 0)
-      };
-      
-      res.json({
-        traffic_channel: {
-          id: channel.id,
-          name: channel.channelName
-        },
-        date_range: {
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0]
-        },
-        summary,
-        conversions: conversionsWithInfo
-      });
+        
+        // Return test info
+        res.json({
+            success: true,
+            message: 'Conversion test info generated',
+            test_conversion: testConversion,
+            test_url: `/api/postback/conversion?${new URLSearchParams(testConversion.testPayload).toString()}`,
+            note: 'Use this URL to test your conversion. No actual API calls will be made.'
+        });
     } catch (error) {
-      console.error('❌ Error fetching conversions:', error);
-      res.status(500).json({ error: 'Failed to fetch conversions' });
+        console.error('❌ Error testing conversion:', error);
+        res.status(500).json({ error: 'Failed to test conversion' });
     }
-  });
+});
+
+// Update conversion settings for a traffic channel
+router.put('/:id/conversion-settings', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Find the traffic channel
+        const channel = await TrafficChannel.findByPk(id);
+        if (!channel) {
+            return res.status(404).json({ error: "Traffic channel not found" });
+        }
+        
+        // Extract conversion API fields
+        const {
+            forward_to_facebook,
+            forward_to_google,
+            conversion_id,
+            conversion_label,
+            default_event_name
+        } = req.body;
+        
+        // Update the traffic channel
+        await channel.update({
+            ...(forward_to_facebook !== undefined && { forward_to_facebook }),
+            ...(forward_to_google !== undefined && { forward_to_google }),
+            ...(conversion_id && { conversion_id }),
+            ...(conversion_label && { conversion_label }),
+            ...(default_event_name && { defaultEventName: default_event_name })
+        });
+        
+        res.json({
+            message: "Conversion settings updated successfully",
+            channel
+        });
+    } catch (error) {
+        console.error('❌ Error updating conversion settings:', error);
+        res.status(500).json({ error: 'Failed to update conversion settings' });
+    }
+});
+
+// Get conversion settings for a traffic channel
+router.get('/:id/conversion-settings', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Find the traffic channel
+        const channel = await TrafficChannel.findByPk(id);
+        if (!channel) {
+            return res.status(404).json({ error: "Traffic channel not found" });
+        }
+        
+        // Prepare conversion settings
+        const conversionSettings = {
+            traffic_channel: {
+                id: channel.id,
+                name: channel.channelName
+            },
+            facebook: {
+                enabled: !!channel.forward_to_facebook,
+                pixel_id: channel.pixelId || null,
+                has_token: !!channel.apiAccessToken,
+                default_event_name: channel.defaultEventName || 'Purchase'
+            },
+            google: {
+                enabled: !!channel.forward_to_google,
+                ads_account_id: channel.googleAdsAccountId || null,
+                conversion_id: channel.conversion_id || null,
+                conversion_label: channel.conversion_label || null
+            }
+        };
+        
+        res.json(conversionSettings);
+    } catch (error) {
+        console.error('❌ Error fetching conversion settings:', error);
+        res.status(500).json({ error: 'Failed to fetch conversion settings' });
+    }
+});
+
+// Get conversions for a traffic channel
+router.get('/:id/conversions', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Find the traffic channel
+        const channel = await TrafficChannel.findByPk(id);
+        if (!channel) {
+            return res.status(404).json({ error: "Traffic channel not found" });
+        }
+        
+        // Get date range from query or default to last 30 days
+        const {
+            start_date,
+            end_date,
+            limit = 50
+        } = req.query;
+        
+        const startDate = start_date ? new Date(start_date) : new Date(new Date().setDate(new Date().getDate() - 30));
+        const endDate = end_date ? new Date(end_date) : new Date();
+        
+        // Get conversions for this traffic channel
+        const conversions = await Conversion.findAll({
+            where: {
+                traffic_channel_id: id,
+                createdAt: {
+                    [Op.between]: [startDate, endDate]
+                }
+            },
+            order: [['createdAt', 'DESC']],
+            limit: parseInt(limit, 10)
+        });
+        
+        // Map conversions with campaign info if available
+        const conversionsWithInfo = await Promise.all(conversions.map(async (conv) => {
+            let campaign = null;
+            if (conv.campaign_id) {
+                campaign = await Campaign.findByPk(conv.campaign_id, {
+                    attributes: ['id', 'name']
+                });
+            }
+            
+            return {
+                id: conv.id,
+                click_id: conv.click_id,
+                campaign: campaign ? {
+                    id: campaign.id,
+                    name: campaign.name
+                } : null,
+                payout: conv.payout,
+                revenue: conv.revenue,
+                profit: conv.profit,
+                status: conv.status,
+                event_name: conv.event_name,
+                created_at: conv.createdAt
+            };
+        }));
+        
+        // Calculate summary metrics
+        const summary = {
+            total_conversions: conversions.length,
+            total_revenue: conversions.reduce((sum, conv) => sum + (parseFloat(conv.revenue) || 0), 0),
+            total_payout: conversions.reduce((sum, conv) => sum + (parseFloat(conv.payout) || 0), 0),
+            total_profit: conversions.reduce((sum, conv) => sum + (parseFloat(conv.profit) || 0), 0)
+        };
+        
+        res.json({
+            traffic_channel: {
+                id: channel.id,
+                name: channel.channelName
+            },
+            date_range: {
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: endDate.toISOString().split('T')[0]
+            },
+            summary,
+            conversions: conversionsWithInfo
+        });
+    } catch (error) {
+        console.error('❌ Error fetching conversions:', error);
+        res.status(500).json({ error: 'Failed to fetch conversions' });
+    }
+});
 
 module.exports = router;

@@ -138,13 +138,13 @@ const OfferSourcePage = () => {
     sourceType: "",
     currency: "USD",
     offerUrl: "",
-    clickid: "click_id", // Default to "click_id" parameter name
-    sum: "payout",      // Default to "payout" parameter name
+    clickid: "", // Default to "click_id" parameter name
+    sum: "", // Default to "payout" parameter name 
     parameter: "",
     token: "",
     description: "",
     role: "",
-    is_active: true,   // Active status
+    is_active: true, // Active status
   });
 
   const handleDateChange = (e) => {
@@ -172,8 +172,8 @@ const OfferSourcePage = () => {
         postback: item.postback_url,
         currency: item.currency,
         offer_url: item.offer_url,
-        clickid: item.clickid || "click_id",
-        sum: item.sum || "payout",
+        clickid: item.clickid,
+        sum: item.sum,
         parameter: item.parameter,
         token: item.token,
         description: item.description,
@@ -223,8 +223,8 @@ const OfferSourcePage = () => {
       sourceType: row.source_type || "Other",
       currency: row.currency || "USD",
       offerUrl: row.offer_url || "",
-      clickid: row.clickid || "click_id",
-      sum: row.sum || "payout",
+      clickid: row.clickid || "",
+      sum: row.sum || "",
       parameter: row.parameter || "",
       token: row.token || "",
       description: row.description || "",

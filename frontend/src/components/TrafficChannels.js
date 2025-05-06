@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -135,6 +135,26 @@ const channelTemplates = {
   }
 };
 
+// Helper component for platform connection status
+const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect }) => {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="h6">{platform} API integration</Typography>
+        <Tooltip title="Integration information">
+          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+        </Tooltip>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
+          {isConnected ? "Connected" : "Not connected"}
+        </Typography>
+        {isConnected ? <CheckIcon /> : <CancelIcon />}
+      </Box>
+    </Box>
+  );
+};
+
 // Main component
 const TrafficChannels = () => {
   // State management
@@ -171,6 +191,12 @@ const TrafficChannels = () => {
   const [formErrors, setFormErrors] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
   const [channelConnectionStatus, setChannelConnectionStatus] = useState({});
+  const [authPopupOpen, setAuthPopupOpen] = useState(false);
+  
+  // Refs for auth popup window and interval
+  const authWindow = useRef(null);
+  const authInterval = useRef(null);
+  const authPlatform = useRef(null);
   
   // Form data with all potential platform-specific fields
   const [formData, setFormData] = useState({
@@ -215,6 +241,129 @@ const TrafficChannels = () => {
     isConnected: false,
     status: "Active"
   });
+
+  // Check if current URL contains OAuth callback parameters
+  useEffect(() => {
+    // Run only in popup windows
+    if (!window.opener) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const platform = urlParams.get('platform');
+    const session = urlParams.get('session');
+    const error = urlParams.get('error');
+    const message = urlParams.get('message');
+    
+    if (success === 'true' && platform && session) {
+      // We're in a popup window that received successful OAuth callback
+      console.log("Authentication successful, sending message to parent window");
+      window.opener.postMessage({
+        type: 'auth_success',
+        platform,
+        session
+      }, window.location.origin);
+      
+      // Close popup after sending message
+      window.close();
+    } else if (error === 'true' && platform) {
+      // We're in a popup window that received an OAuth error
+      console.log("Authentication failed, sending error to parent window");
+      window.opener.postMessage({
+        type: 'auth_error',
+        platform,
+        message: message || 'Authentication failed'
+      }, window.location.origin);
+      
+      // Close popup after sending message
+      window.close();
+    }
+  }, []);
+
+  // Listen for messages from popup window
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Only accept messages from our domain
+      if (event.origin !== window.location.origin) return;
+      
+      console.log("Received message from popup:", event.data);
+      
+      if (event.data && event.data.type === 'auth_success') {
+        // Handle successful authentication
+        const { platform, session } = event.data;
+        const platformLower = platform.toLowerCase();
+        
+        console.log(`${platform} authentication successful`);
+        
+        // Store session token
+        localStorage.setItem('sessionToken', session);
+        
+        // Update auth status for the platform
+        setAuthStatus(prev => ({
+          ...prev,
+          [platformLower]: true
+        }));
+        
+        // If we're editing a channel, update its connection status
+        if (selectedRow) {
+          setChannelConnectionStatus(prev => ({
+            ...prev,
+            [selectedRow.id]: true
+          }));
+        }
+        
+        // Update form data to reflect connected status
+        setFormData(prev => ({
+          ...prev,
+          isConnected: true
+        }));
+        
+        // Show success message
+        setSnackbar({
+          open: true,
+          message: `${platform} account connected successfully`,
+          severity: 'success'
+        });
+        
+        // Reset loading state
+        setLoading(prev => ({ ...prev, [platformLower]: false }));
+      } else if (event.data && event.data.type === 'auth_error') {
+        // Handle authentication error
+        const { platform, message } = event.data;
+        const platformLower = platform.toLowerCase();
+        
+        console.log(`${platform} authentication failed:`, message);
+        
+        // Show error message
+        setSnackbar({
+          open: true,
+          message: `Failed to connect to ${platform}: ${message}`,
+          severity: 'error'
+        });
+        
+        // Reset loading state
+        setLoading(prev => ({ ...prev, [platformLower]: false }));
+      }
+      
+      // Reset auth popup state
+      setAuthPopupOpen(false);
+      authPlatform.current = null;
+      
+      // Close popup if it's still open
+      if (authWindow.current && !authWindow.current.closed) {
+        authWindow.current.close();
+      }
+      authWindow.current = null;
+      
+      // Clear interval
+      if (authInterval.current) {
+        clearInterval(authInterval.current);
+        authInterval.current = null;
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [selectedRow]);
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -308,21 +457,67 @@ const TrafficChannels = () => {
     return ["Facebook", "Google", "TikTok"].includes(platformName);
   };
 
-  // Handle authentication for platforms
+  // Handle authentication for platforms using popup
   const handleAuth = async (platform) => {
-    setLoading(prev => ({ ...prev, [platform.toLowerCase()]: true }));
+    const platformLower = platform.toLowerCase();
+    
+    // Don't proceed if already authenticating
+    if (authPopupOpen) {
+      return;
+    }
+    
+    setLoading(prev => ({ ...prev, [platformLower]: true }));
+    authPlatform.current = platform;
     
     try {
-      // Redirect to the appropriate OAuth endpoint
-      window.location.href = `${API_URL}/auth/${platform.toLowerCase()}`;
+      // Calculate center position for popup
+      const width = 600;
+      const height = 700;
+      const left = (window.innerWidth - width) / 2 + window.screenX;
+      const top = (window.innerHeight - height) / 2 + window.screenY;
+      
+      // Open popup for authentication
+      authWindow.current = window.open(
+        `${API_URL}/auth/${platformLower}`,
+        `${platform}Auth`,
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+      
+      // Check if popup was blocked
+      if (!authWindow.current || authWindow.current.closed) {
+        throw new Error('Popup was blocked. Please allow popups for this site.');
+      }
+      
+      setAuthPopupOpen(true);
+      
+      // Check periodically if the popup has been closed without completing auth
+      authInterval.current = setInterval(() => {
+        if (authWindow.current && authWindow.current.closed) {
+          clearInterval(authInterval.current);
+          authInterval.current = null;
+          
+          if (authPopupOpen) {
+            // Popup was closed without completing authentication
+            setAuthPopupOpen(false);
+            setLoading(prev => ({ ...prev, [platformLower]: false }));
+            
+            setSnackbar({
+              open: true,
+              message: `${platform} authentication was cancelled`,
+              severity: 'info'
+            });
+          }
+        }
+      }, 1000);
     } catch (error) {
       console.error(`Error initiating ${platform} auth:`, error);
-      setLoading(prev => ({ ...prev, [platform.toLowerCase()]: false }));
+      setLoading(prev => ({ ...prev, [platformLower]: false }));
       setSnackbar({
         open: true,
         message: `Failed to connect to ${platform}: ${error.message}`,
         severity: 'error'
       });
+      setAuthPopupOpen(false);
     }
   };
 
@@ -582,37 +777,35 @@ const TrafficChannels = () => {
   // Render Facebook connection section
   const renderFacebookConnection = () => {
     // Check if the current channel is connected
-    const isConnected = editMode 
-      ? channelConnectionStatus[selectedRow?.id] || false 
-      : false;
+    const isConnected = (editMode && selectedRow) 
+      ? channelConnectionStatus[selectedRow.id] || false 
+      : formData.isConnected || authStatus.facebook;
     
     return (
       <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6">Facebook API integration</Typography>
-            <Tooltip title="Integration information">
-              <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-            </Tooltip>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
-              {isConnected ? "Connected" : "Not connected"}
-            </Typography>
-            {isConnected ? <CheckIcon /> : <CancelIcon />}
-          </Box>
-        </Box>
+        <PlatformConnectionStatus 
+          platform="Facebook"
+          isConnected={isConnected}
+          isLoading={loading.facebook}
+          onConnect={() => handleAuth('facebook')}
+        />
         
         <Button
           variant="contained"
           color="primary"
           startIcon={<div style={{ width: 24, height: 24, backgroundColor: '#4267B2', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>f</div>}
           onClick={() => handleAuth('facebook')}
-          disabled={loading.facebook}
+          disabled={loading.facebook || authPopupOpen}
           sx={{ mb: 2, bgcolor: '#1877F2', '&:hover': { bgcolor: '#166FE5' } }}
         >
           {loading.facebook ? <CircularProgress size={24} /> : isConnected ? "Reconnect Facebook" : "Connect Facebook"}
         </Button>
+        
+        {authPopupOpen && authPlatform.current === 'facebook' && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Facebook authentication window opened. Please complete the process in the popup window.
+          </Alert>
+        )}
         
         <Box sx={{ mt: 2, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box display="flex" alignItems="center" gap={1}>
@@ -724,26 +917,18 @@ const TrafficChannels = () => {
   // Render Google connection section
   const renderGoogleConnection = () => {
     // Check if the current channel is connected
-    const isConnected = editMode 
-      ? channelConnectionStatus[selectedRow?.id] || false 
-      : false;
+    const isConnected = (editMode && selectedRow) 
+      ? channelConnectionStatus[selectedRow.id] || false 
+      : formData.isConnected || authStatus.google;
     
     return (
       <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6">Google API integration</Typography>
-            <Tooltip title="Integration information">
-              <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-            </Tooltip>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
-              {isConnected ? "Connected" : "Not connected"}
-            </Typography>
-            {isConnected ? <CheckIcon /> : <CancelIcon />}
-          </Box>
-        </Box>
+        <PlatformConnectionStatus 
+          platform="Google"
+          isConnected={isConnected}
+          isLoading={loading.google}
+          onConnect={() => handleAuth('google')}
+        />
         
         <Grid container spacing={2}>
           <Grid item xs={12} md={8}>
@@ -763,7 +948,7 @@ const TrafficChannels = () => {
             <Button
               variant="outlined"
               onClick={() => handleAuth('google')}
-              disabled={loading.google}
+              disabled={loading.google || authPopupOpen}
               startIcon={<div style={{ width: 20, height: 20, backgroundColor: '#4285F4', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>G</div>}
               fullWidth
               sx={{ mb: 0.5 }}
@@ -772,6 +957,12 @@ const TrafficChannels = () => {
             </Button>
           </Grid>
         </Grid>
+        
+        {authPopupOpen && authPlatform.current === 'google' && (
+          <Alert severity="info" sx={{ mb: 2, mt: 2 }}>
+            Google authentication window opened. Please complete the process in the popup window.
+          </Alert>
+        )}
         
         <Typography variant="body2" color="textSecondary" sx={{ mt: 1, mb: 3 }}>
           Our platform will update costs via API and send conversions for the connected ad account
@@ -1361,7 +1552,7 @@ const TrafficChannels = () => {
           <Tooltip title="Edit Channel">
             <IconButton
               size="small"
-              onClick={(e) => {
+                              onClick={(e) => {
                 e.stopPropagation();
                 handleEditChannel(params.row);
               }}
