@@ -373,6 +373,14 @@ const TrafficChannels = () => {
         
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
+        
+        // Save the form changes to update the connection status
+        handleSubmit();
+        
+        // Automatically close the modal after successful connection
+        setTimeout(() => {
+          setOpenSecondModal(false);
+        }, 1500); // Delay closure to show the success state
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
