@@ -484,10 +484,12 @@ router.get("/", async (req, res) => {
         try {
             channels = await TrafficChannel.findAll({
                 attributes: [
-                    'id', 'channelName', 'aliasChannel', 'costUpdateDepth', 
-                    'costUpdateFrequency', 'currency', 's2sPostbackUrl', 'status', 
-                    'createdAt', 'updatedAt', 'isConnected', 'pixelId', 'apiAccessToken',
-                    'googleAdsAccountId'
+                    'id', 'name', 'platform_type', 'channelName', 
+                    'aliasChannel', 'costUpdateDepth', 'costUpdateFrequency', 
+                    'currency', 's2sPostbackUrl', 'clickRefId', 'externalId', 
+                    'pixelId', 'apiAccessToken', 'defaultEventName', 
+                    'customConversionMatching', 'googleAdsAccountId', 
+                    'googleMccAccountId', 'status', 'createdAt', 'updatedAt'
                 ],
                 order: [['id', 'ASC']],
             });
