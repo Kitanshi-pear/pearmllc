@@ -403,7 +403,7 @@ const OffersPage = () => {
     
     return (
         <Layout>
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mb: 3 }}>
                 <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                     <Typography variant="h4">Offers</Typography>
                     <Button variant="contained" color="primary" onClick={handleOpen}>
