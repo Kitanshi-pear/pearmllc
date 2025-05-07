@@ -2,14 +2,196 @@ import React, { useEffect, useState } from 'react';
 import {
     Box, CircularProgress, Typography, Grid, TextField, Button, Select, MenuItem, Dialog,
     DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, IconButton,
-    Tooltip, Snackbar, Alert, Card, CardContent, Tabs, Tab, Paper, Divider
+    Tooltip, Snackbar, Alert, Card, CardContent, Tabs, Tab, Paper, Divider, Container,
+    useTheme, alpha, styled, Badge, Chip, Avatar, InputAdornment
 } from "@mui/material";
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, gridClasses } from '@mui/x-data-grid';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import AddIcon from '@mui/icons-material/Add';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import TitleIcon from '@mui/icons-material/Title';
+import SendIcon from '@mui/icons-material/Send';
+import CodeIcon from '@mui/icons-material/Code';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import LinkIcon from '@mui/icons-material/Link';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import GoogleIcon from '@mui/icons-material/Google';
+import SettingsIcon from '@mui/icons-material/Settings';
+import PublicIcon from '@mui/icons-material/Public';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import Layout from "./Layout";
 import axios from 'axios';
+
+// Modern styled components
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 16,
+  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
+  transition: 'transform 0.3s, box-shadow 0.3s',
+  overflow: 'hidden',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+  },
+}));
+
+const GradientButton = styled(Button)(({ theme, colorStart = '#4776E6', colorEnd = '#8E54E9' }) => ({
+  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
+  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
+  transition: 'all 0.3s',
+  color: 'white',
+  fontWeight: 600,
+  '&:hover': {
+    boxShadow: '0 6px 15px rgba(0, 0, 0, 0.25)',
+    transform: 'translateY(-2px)',
+  },
+  '&:active': {
+    transform: 'translateY(1px)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+  },
+}));
+
+const AnimatedIconButton = styled(IconButton)(({ theme }) => ({
+  transition: 'transform 0.2s, background 0.2s',
+  '&:hover': {
+    transform: 'scale(1.1)',
+    background: alpha(theme.palette.primary.main, 0.1),
+  },
+}));
+
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+  border: 'none',
+  borderRadius: 16,
+  '& .MuiDataGrid-columnHeader': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+    padding: '12px 16px',
+    '&:first-of-type': {
+      borderTopLeftRadius: 16,
+    },
+    '&:last-of-type': {
+      borderTopRightRadius: 16,
+    },
+  },
+  '& .MuiDataGrid-columnHeaderTitle': {
+    fontWeight: 600,
+  },
+  '& .MuiDataGrid-cell': {
+    padding: '16px',
+    fontSize: '0.95rem',
+  },
+  '& .MuiDataGrid-row': {
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.04),
+    },
+    '&.Mui-selected': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+      },
+    },
+  },
+  // Zebra striping for rows
+  [`& .${gridClasses.row}.even`]: {
+    backgroundColor: alpha(theme.palette.primary.main, 0.02),
+  },
+}));
+
+const StatusChip = styled(Chip)(({ theme, status }) => ({
+  fontWeight: 600,
+  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+  ...(status === 'active' && {
+    background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+    color: '#05603a',
+  }),
+  ...(status === 'inactive' && {
+    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+    color: '#4b4b4b',
+  }),
+}));
+
+const GradientBox = styled(Box)(({ theme, colorStart = '#a1c4fd', colorEnd = '#c2e9fb' }) => ({
+  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
+  borderRadius: 16,
+  padding: theme.spacing(3),
+  color: theme.palette.getContrastText(theme.palette.primary.light),
+  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
+}));
+
+// Custom styled modal container
+const ModalContainer = styled(Box)(({ theme }) => ({
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: "900px",
+  maxWidth: "95vw",
+  maxHeight: "90vh",
+  overflow: "auto",
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: 16,
+  boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
+  padding: 0,
+}));
+
+// Custom styled tab
+const StyledTab = styled(Tab)(({ theme }) => ({
+  fontWeight: 600,
+  textTransform: 'none',
+  minWidth: 120,
+}));
+
+const TabPanel = (props) => {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+      {...other}
+      style={{ padding: '24px 0' }}
+    >
+      {value === index && <>{children}</>}
+    </div>
+  );
+};
+
+// Enhanced text field
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 8,
+    transition: 'box-shadow 0.3s',
+    '&:hover': {
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    },
+    '&.Mui-focused': {
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+    }
+  }
+}));
+
+// Enhanced select field
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 8,
+    transition: 'box-shadow 0.3s',
+    '&:hover': {
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    },
+    '&.Mui-focused': {
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+    }
+  }
+}));
 
 // Define postback macros globally
 const POSTBACK_MACROS = {
@@ -66,7 +248,23 @@ const parsePostbackUrl = (template, data) => {
     return url;
 };
 
+// Function to get source icon based on source name
+const getSourceIcon = (source) => {
+  const sourceLower = source?.toLowerCase() || '';
+  
+  if (sourceLower === 'facebook') {
+    return <FacebookIcon sx={{ color: '#1877F2' }} />;
+  } else if (sourceLower === 'google') {
+    return <GoogleIcon sx={{ color: '#4285F4' }} />;
+  } else if (sourceLower === 'tiktok') {
+    return <Box component="span" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>TT</Box>;
+  } else {
+    return <LinkIcon />;
+  }
+};
+
 const OffersPage = () => {
+    const theme = useTheme();
     const [offers, setOffers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -105,11 +303,12 @@ const OffersPage = () => {
     const [testResult, setTestResult] = useState(null);
     const [isTesting, setIsTesting] = useState(false);
 
-    // Missing state variables (now added)
+    // State variables for filters
     const [date, setDate] = useState('');
     const [titleText, setTitleText] = useState('');
     const [filterText, setFilterText] = useState('');
 
+    // New offer state
     const [newOffer, setNewOffer] = useState({
         name: '',
         source: '',
@@ -119,6 +318,16 @@ const OffersPage = () => {
         postbackUrl: ''
     });
 
+    // Stats for dashboard
+    const [stats, setStats] = useState({
+        totalOffers: 0,
+        activeOffers: 0,
+        totalConversions: 0,
+        totalRevenue: 0,
+        totalProfit: 0
+    });
+
+    // Fetch offer sources on component mount
     useEffect(() => {
         fetch('https://pearmllc.onrender.com/offersource/')
             .then(res => res.json())
@@ -154,10 +363,31 @@ const OffersPage = () => {
         }));
     };
     
-    // Handlers for missing variables
+    // Handlers for filters
     const handleDateChange = (event) => setDate(event.target.value);
     const handleTitleChange = (event) => setTitleText(event.target.value);
-    const handleFilterReset = () => setFilterText('');
+    const handleFilterReset = () => {
+        setDate('');
+        setTitleText('');
+        setFilterText('');
+        // Re-fetch offers with no filters
+        fetchOffers();
+    };
+
+    // Apply filters
+    const handleApplyFilters = () => {
+        // You would typically call your API with filter parameters here
+        // For now, we'll just simulate filtering by offer name
+        if (titleText) {
+            const filteredOffers = offers.filter(offer => 
+                offer.offers_name.toLowerCase().includes(titleText.toLowerCase())
+            );
+            setOffers(filteredOffers);
+        } else {
+            // If no filters, fetch all offers
+            fetchOffers();
+        }
+    };
 
     // Postback URL handlers
     const handleCopyPostback = () => {
@@ -253,11 +483,77 @@ const OffersPage = () => {
         setSnackbar({ ...snackbar, open: false });
     };
 
+    // Enhanced columns for DataGrid with modern styling
     const columns = [
-        { field: 'serial_no', headerName: 'Serial No', width: 100 },
-        { field: 'offers_name', headerName: 'Offers Name', width: 150 },
-        { field: 'offer_status', headerName: 'Offer Status', width: 150 },
-        { field: 'source', headerName: 'Source', width: 120 },
+        { 
+            field: 'serial_no', 
+            headerName: '#', 
+            width: 80,
+            align: 'center',
+            headerAlign: 'center'
+        },
+        { 
+            field: 'offers_name', 
+            headerName: 'Offer Name', 
+            width: 200,
+            renderCell: (params) => (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar 
+                        sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            mr: 1,
+                            background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+                        }}
+                    >
+                        {params.value.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            {params.value}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            ID: {params.row.id}
+                        </Typography>
+                    </Box>
+                </Box>
+            )
+        },
+        { 
+            field: 'offer_status', 
+            headerName: 'Status', 
+            width: 120,
+            renderCell: (params) => {
+                const isActive = params.value?.toLowerCase() === 'active';
+                return (
+                    <StatusChip
+                        label={params.value || 'Unknown'}
+                        status={isActive ? 'active' : 'inactive'}
+                        icon={isActive ? <CheckCircleIcon /> : <CancelIcon />}
+                        size="small"
+                    />
+                );
+            }
+        },
+        { 
+            field: 'source', 
+            headerName: 'Source', 
+            width: 140,
+            renderCell: (params) => (
+                <Chip
+                    icon={getSourceIcon(params.value)}
+                    label={params.value || 'Unknown'}
+                    variant="outlined"
+                    size="small"
+                    sx={{ 
+                        borderRadius: 1,
+                        '& .MuiChip-icon': {
+                            mr: 0.5
+                        }
+                    }}
+                />
+            )
+        },
         { 
             field: 'postbackUrl', 
             headerName: 'Postback', 
@@ -265,36 +561,159 @@ const OffersPage = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     {params.value ? (
-                        <>
-                            <Tooltip title="Test Postback">
-                                <IconButton 
-                                    size="small" 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenPostbackTest(params.row);
-                                    }}
-                                >
-                                    <VisibilityIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        </>
+                        <Tooltip title="Test Postback">
+                            <AnimatedIconButton 
+                                size="small" 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenPostbackTest(params.row);
+                                }}
+                                sx={{ color: theme.palette.warning.main }}
+                            >
+                                <VisibilityIcon fontSize="small" />
+                            </AnimatedIconButton>
+                        </Tooltip>
                     ) : (
                         <Typography variant="body2" color="text.secondary">None</Typography>
                     )}
                 </Box>
             ),
         },
-        { field: 'clicks', headerName: 'Clicks', width: 100, type: 'number' },
-        { field: 'lp_clicks', headerName: 'LP Clicks', width: 120, type: 'number' },
-        { field: 'conversion', headerName: 'Conversions', width: 150, type: 'number' },
-        { field: 'total_cpa', headerName: 'Total CPA ($)', width: 150, type: 'number' },
-        { field: 'epc', headerName: 'EPC ($)', width: 120, type: 'number' },
-        { field: 'total_revenue', headerName: 'Total Revenue ($)', width: 180, type: 'number' },
-        { field: 'cost', headerName: 'Cost ($)', width: 150, type: 'number' },
-        { field: 'profit', headerName: 'Profit ($)', width: 150, type: 'number' },
-        { field: 'total_roi', headerName: 'Total ROI (%)', width: 150, type: 'number' },
-        { field: 'lp_views', headerName: 'LP Views', width: 150, type: 'number' },
-        { field: 'impressions', headerName: 'Impressions', width: 150, type: 'number' }
+        { 
+            field: 'clicks', 
+            headerName: 'Clicks', 
+            width: 100, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => (
+                <Typography sx={{ fontWeight: 600 }}>
+                    {params.value?.toLocaleString() || 0}
+                </Typography>
+            )
+        },
+        { 
+            field: 'conversion', 
+            headerName: 'Conv.', 
+            width: 100, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => (
+                <Typography sx={{ fontWeight: 600 }}>
+                    {params.value?.toLocaleString() || 0}
+                </Typography>
+            )
+        },
+        { 
+            field: 'total_cpa', 
+            headerName: 'CPA ($)', 
+            width: 120, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => {
+                const value = params.value || 0;
+                return (
+                    <Typography sx={{ 
+                        fontWeight: 600,
+                        color: value > 10 ? theme.palette.error.main : theme.palette.success.main 
+                    }}>
+                        ${value.toFixed(2)}
+                    </Typography>
+                );
+            }
+        },
+        { 
+            field: 'epc', 
+            headerName: 'EPC ($)', 
+            width: 120, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => {
+                const value = params.value || 0;
+                return (
+                    <Typography sx={{ 
+                        fontWeight: 600,
+                        color: value > 0.5 ? theme.palette.success.main : theme.palette.text.primary 
+                    }}>
+                        ${value.toFixed(2)}
+                    </Typography>
+                );
+            }
+        },
+        { 
+            field: 'total_revenue', 
+            headerName: 'Revenue', 
+            width: 140, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => {
+                const value = params.value || 0;
+                return (
+                    <Typography sx={{ fontWeight: 600 }}>
+                        ${value.toFixed(2)}
+                    </Typography>
+                );
+            }
+        },
+        { 
+            field: 'profit', 
+            headerName: 'Profit', 
+            width: 140, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => {
+                const value = params.value || 0;
+                const isPositive = value >= 0;
+                return (
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {isPositive ? 
+                            <ArrowUpwardIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5 }} /> :
+                            <ArrowDownwardIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5 }} />
+                        }
+                        <Typography sx={{ 
+                            fontWeight: 600,
+                            color: isPositive ? theme.palette.success.main : theme.palette.error.main
+                        }}>
+                            ${Math.abs(value).toFixed(2)}
+                        </Typography>
+                    </Box>
+                );
+            }
+        },
+        { 
+            field: 'total_roi', 
+            headerName: 'ROI', 
+            width: 120, 
+            type: 'number',
+            align: 'right',
+            headerAlign: 'right',
+            renderCell: (params) => {
+                const value = params.value || 0;
+                const isPositive = value >= 0;
+                return (
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        bgcolor: isPositive ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1
+                    }}>
+                        <Typography sx={{ 
+                            fontWeight: 600,
+                            color: isPositive ? theme.palette.success.main : theme.palette.error.main
+                        }}>
+                            {value.toFixed(2)}%
+                        </Typography>
+                    </Box>
+                );
+            }
+        }
     ];
       
     const handleSubmit = async () => {
@@ -363,7 +782,8 @@ const OffersPage = () => {
         }
     };
 
-    useEffect(() => {
+    // Function to fetch offers
+    const fetchOffers = () => {
         setLoading(true);
         fetch('https://pearmllc.onrender.com/api/offers')
             .then(res => res.json())
@@ -372,22 +792,38 @@ const OffersPage = () => {
                     id: offer.Serial_No,
                     serial_no: offer.Serial_No,
                     offers_name: offer.Offer_name,
-                    offer_status: offer.offer_status,
+                    offer_status: offer.offer_status || 'Active',
                     source: offer.source || '',
                     postbackUrl: offer.postbackUrl || '',
-                    clicks: offer.clicks,
-                    lp_clicks: offer.lp_clicks,
-                    conversion: offer.conversion,
-                    total_cpa: offer.total_cpa,
-                    epc: offer.epc,
-                    total_revenue: offer.total_revenue,
-                    cost: offer.cost,
-                    profit: offer.profit,
-                    total_roi: offer.total_roi,
-                    lp_views: offer.lp_views,
-                    impressions: offer.impressions
+                    clicks: offer.clicks || 0,
+                    lp_clicks: offer.lp_clicks || 0,
+                    conversion: offer.conversion || 0,
+                    total_cpa: offer.total_cpa || 0,
+                    epc: offer.epc || 0,
+                    total_revenue: offer.total_revenue || 0,
+                    cost: offer.cost || 0,
+                    profit: offer.profit || 0,
+                    total_roi: offer.total_roi || 0,
+                    lp_views: offer.lp_views || 0,
+                    impressions: offer.impressions || 0
                 }));
                 setOffers(formatted);
+                
+                // Calculate and update stats
+                const totalOffers = formatted.length;
+                const activeOffers = formatted.filter(o => o.offer_status?.toLowerCase() === 'active').length;
+                const totalConversions = formatted.reduce((sum, o) => sum + (o.conversion || 0), 0);
+                const totalRevenue = formatted.reduce((sum, o) => sum + (o.total_revenue || 0), 0);
+                const totalProfit = formatted.reduce((sum, o) => sum + (o.profit || 0), 0);
+                
+                setStats({
+                    totalOffers,
+                    activeOffers,
+                    totalConversions,
+                    totalRevenue,
+                    totalProfit
+                });
+                
                 setLoading(false);
             })
             .catch(err => {
@@ -399,472 +835,1022 @@ const OffersPage = () => {
                     severity: 'error'
                 });
             });
+    };
+
+    // Fetch offers on initial load
+    useEffect(() => {
+        fetchOffers();
     }, []);
     
     return (
         <Layout>
-            <Box >
-                <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                    <Typography variant="h4">Offers</Typography>
-                    <Button variant="contained" color="primary" onClick={handleOpen}>
-                        Create New Offer
-                    </Button>
-                </Grid>
-
-                {/* Date and Title Filters */}
-                <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                    <Grid item xs={6} sm={2}>
-                        <TextField
-                            label="Date"
-                            type="date"
-                            value={date}
-                            onChange={handleDateChange}
-                            fullWidth
-                            InputLabelProps={{ shrink: true }}
-                        />
-                    </Grid>
-                    <Grid item xs={6} sm={2}>
-                        <TextField
-                            label="Title"
-                            value={titleText}
-                            onChange={handleTitleChange}
-                            fullWidth
-                        />
-                    </Grid>
-                    <Grid item xs={4} sm={2}>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            fullWidth
-                            onClick={handleFilterReset}
-                        >
-                            Apply
-                        </Button>
-                    </Grid>
-                </Grid>
-
-                {/* DataGrid Table */}
-                {loading ? (
-                    <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <Box sx={{ height: 600, width: '100%', bgcolor: 'white', boxShadow: 1 }}>
-                        <DataGrid 
-                            rows={offers} 
-                            columns={columns} 
-                            pageSize={10}
-                            rowsPerPageOptions={[5, 10, 25]}
-                            disableSelectionOnClick
-                        />
-                    </Box>
-                )}
-            </Box>
-
-            {/* Create Offer Dialog */}
-            <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
-                <DialogTitle>Create New Offer</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                        <Tabs value={tabValue} onChange={handleTabChange}>
-                            <Tab label="Basic Details" />
-                            <Tab label="Postback Configuration" />
-                        </Tabs>
-                    </Box>
-
-                    {/* Tab 1: Basic Details */}
-                    {tabValue === 0 && (
-                        <Box>
-                            <TextField 
-                                label="Offer Name" 
-                                name="name" 
-                                fullWidth 
-                                margin="dense" 
-                                onChange={handleChange}
-                                value={newOffer.name}
-                            />
-                            <FormControl fullWidth margin="dense">
-                                <InputLabel>Offer Source</InputLabel>
-                                <Select 
-                                    name="source" 
-                                    value={newOffer.source} 
-                                    onChange={handleSourceChange}
-                                >
-                                    {offerSources.map(src => (
-                                        <MenuItem key={src.id} value={src.name}>{src.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <TextField 
-                                label="URL" 
-                                name="url" 
-                                fullWidth 
-                                margin="dense" 
-                                onChange={handleChange}
-                                value={newOffer.url}
-                            />
-                            <TextField 
-                                label="Default Conversion Revenue" 
-                                name="revenue" 
-                                type="number" 
-                                fullWidth 
-                                margin="dense" 
-                                onChange={handleChange}
-                                value={newOffer.revenue}
-                            />
-                            <FormControl fullWidth margin="dense">
-                                <InputLabel>Country</InputLabel>
-                                <Select 
-                                    name="country" 
-                                    value={newOffer.country} 
-                                    onChange={handleChange}
-                                >
-                                    <MenuItem value="Global">Global</MenuItem>
-                                    <MenuItem value="US">United States</MenuItem>
-                                    <MenuItem value="UK">United Kingdom</MenuItem>
-                                    <MenuItem value="CA">Canada</MenuItem>
-                                    <MenuItem value="AU">Australia</MenuItem>
-                                    <MenuItem value="IN">India</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Box>
-                    )}
-
-                    {/* Tab 2: Postback Configuration */}
-                    {tabValue === 1 && (
-                        <Box>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                                Postback URLs are used to track conversions. When a conversion occurs, this URL will be pinged automatically.
-                            </Typography>
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Postback URL"
-                                    value={newOffer.postbackUrl}
-                                    onChange={(e) => setNewOffer({ ...newOffer, postbackUrl: e.target.value })}
-                                    multiline
-                                    rows={3}
-                                    sx={{ mr: 1 }}
-                                />
-                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                    <Tooltip title="Copy URL">
-                                        <IconButton onClick={handleCopyPostback} size="small">
-                                            <ContentCopyIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Generate Template">
-                                        <IconButton onClick={handleGeneratePostbackTemplate} size="small">
-                                            <HelpOutlineIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-                            </Box>
-                            
-                            <Typography variant="subtitle2" gutterBottom>
-                                Available Parameters:
-                            </Typography>
-                            
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-                                {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
-                                    <Button 
-                                        key={key}
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => handleInsertMacro(value)}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        {value}
-                                    </Button>
-                                ))}
-                            </Box>
-                            
-                            <Typography variant="subtitle2" gutterBottom>
-                                Example preview:
-                            </Typography>
-                            
-                            <TextField
-                                fullWidth
-                                disabled
-                                value={parsePostbackUrl(newOffer.postbackUrl, {
-                                    click_id: 'abc123',
-                                    payout: '10.00',
-                                    revenue: newOffer.revenue.toString(),
-                                    conversion_id: '123456',
-                                    offer_id: '789',
-                                    offer_name: newOffer.name,
-                                    campaign_id: 'camp_1',
-                                    source: newOffer.source,
-                                    status: '1'
-                                })}
-                                sx={{ mb: 3 }}
-                            />
-                            
-                            <Card variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                                <Typography variant="body2" color="text.secondary">
-                                    <strong>How it works:</strong> When a conversion occurs, the system will replace the 
-                                    placeholders with actual values and ping this URL automatically.
-                                    This notifies your traffic source about successful conversions.
-                                    
-                                    {newOffer.source && newOffer.source.toLowerCase() === 'facebook' && (
-                                        <Box mt={1}>
-                                            <strong>Facebook-specific:</strong> Use {'{sub1}'} for user_id, {'{sub2}'} for email, and {'{sub3}'} for phone.
-                                            These will be automatically hashed for privacy as required by Facebook.
-                                        </Box>
-                                    )}
-                                    
-                                    {newOffer.source && newOffer.source.toLowerCase() === 'google' && (
-                                        <Box mt={1}>
-                                            <strong>Google-specific:</strong> Use {'{gclid}'} or {'{sub1}'} for Google Click ID for conversion tracking.
-                                            You can also use {'{sub2}'} for email and {'{sub3}'} for phone for enhanced conversions.
-                                        </Box>
-                                    )}
+            <Container maxWidth="xl">
+                <Box sx={{ pt: 4, pb: 8 }}>
+                    {/* Dashboard Header with Stats */}
+                    <GradientBox 
+                        sx={{ mb: 4 }}
+                        colorStart="#4facfe"
+                        colorEnd="#00f2fe"
+                    >
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                                    Offers Dashboard
                                 </Typography>
-                            </Card>
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleSubmit} color="primary" variant="contained">Save</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Postback Testing Dialog */}
-            <Dialog 
-                open={postbackTestDialogOpen} 
-                onClose={handleClosePostbackTest}
-                fullWidth
-                maxWidth="md"
-            >
-                <DialogTitle>
-                    Test Postback URL
-                    {selectedOffer && (
-                        <Typography variant="subtitle2" color="text.secondary">
-                            {selectedOffer.offers_name} - {selectedOffer.source}
-                        </Typography>
-                    )}
-                </DialogTitle>
-                <DialogContent>
-                    {selectedOffer && (
-                        <>
-                            <Typography variant="subtitle2" gutterBottom>
-                                Postback URL Template:
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                value={selectedOffer.postbackUrl || 'No postback URL configured'}
-                                InputProps={{ readOnly: true }}
-                                sx={{ mb: 3 }}
-                            />
-                            
-                            <Typography variant="subtitle2" gutterBottom>
-                                Test Parameters:
-                            </Typography>
-                            
-                            <Grid container spacing={2} sx={{ mb: 3 }}>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Click ID"
-                                        name="click_id"
-                                        value={testPostbackData.click_id}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Payout"
-                                        name="payout"
-                                        value={testPostbackData.payout}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Revenue"
-                                        name="revenue"
-                                        value={testPostbackData.revenue}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Conversion ID"
-                                        name="conversion_id"
-                                        value={testPostbackData.conversion_id}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Event Name"
-                                        name="event_name"
-                                        value={testPostbackData.event_name}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={4}>
-                                    <TextField
-                                        fullWidth
-                                        label="Campaign ID"
-                                        name="campaign_id"
-                                        value={testPostbackData.campaign_id}
-                                        onChange={handleTestDataChange}
-                                    />
-                                </Grid>
-                                
-                                {/* Show Facebook-specific fields if the source is Facebook */}
-                                {selectedOffer.source && selectedOffer.source.toLowerCase() === 'facebook' && (
-                                    <>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="User ID (sub1)"
-                                                name="sub1"
-                                                value={testPostbackData.sub1}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Email (sub2)"
-                                                name="sub2"
-                                                value={testPostbackData.sub2}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Phone (sub3)"
-                                                name="sub3"
-                                                value={testPostbackData.sub3}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                    </>
-                                )}
-                                
-                                {/* Show Google-specific fields if the source is Google */}
-                                {selectedOffer.source && selectedOffer.source.toLowerCase() === 'google' && (
-                                    <>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="GCLID"
-                                                name="gclid"
-                                                value={testPostbackData.gclid}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Email (sub2)"
-                                                name="sub2"
-                                                value={testPostbackData.sub2}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6} md={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Phone (sub3)"
-                                                name="sub3"
-                                                value={testPostbackData.sub3}
-                                                onChange={handleTestDataChange}
-                                            />
-                                        </Grid>
-                                    </>
-                                )}
-                            </Grid>
-                            
-                            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                                <Button
-                                    variant="outlined"
-                                    onClick={handleGenerateTestUrl}
-                                    disabled={!selectedOffer.postbackUrl}
-                                >
-                                    Generate Test URL
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={handleTestPostback}
-                                    disabled={!selectedOffer.postbackUrl || isTesting}
-                                >
-                                    {isTesting ? 'Testing...' : 'Send Test Postback'}
-                                </Button>
+                                <Typography variant="body1">
+                                    Monitor performance and manage your offers
+                                </Typography>
                             </Box>
-                            
-                            {processedUrl && (
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        Generated URL:
-                                    </Typography>
-                                    <TextField
-                                        fullWidth
-                                        value={processedUrl}
-                                        multiline
-                                        rows={2}
-                                        InputProps={{
-                                            readOnly: true,
-                                        }}
-                                    />
-                                </Box>
-                            )}
-                            
-                            {testResult && (
-                                <Paper 
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button 
+                                    variant="contained" 
+                                    color="inherit"
+                                    startIcon={<RefreshIcon />}
+                                    onClick={fetchOffers}
+                                    disabled={loading}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
-                                        borderRadius: 1
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        color: theme.palette.primary.main,
+                                        '&:hover': {
+                                            bgcolor: 'rgba(255, 255, 255, 1)',
+                                        }
                                     }}
                                 >
-                                    <Typography>
-                                        {testResult.message}
+                                    {loading ? 'Refreshing...' : 'Refresh'}
+                                </Button>
+                                <GradientButton
+                                    startIcon={<AddIcon />}
+                                    colorStart="#FF416C"
+                                    colorEnd="#FF4B2B"
+                                    onClick={handleOpen}
+                                >
+                                    Create New Offer
+                                </GradientButton>
+                            </Box>
+                        </Box>
+
+                        {/* Stats Overview */}
+                        <Grid container spacing={3} sx={{ mt: 3 }}>
+                            <Grid item xs={12} md={2.4}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        backdropFilter: 'blur(5px)', 
+                                        borderRadius: 2,
+                                        transition: 'transform 0.3s',
+                                        '&:hover': {
+                                            transform: 'translateY(-5px)',
+                                        }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        Total Offers
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                                        {stats.totalOffers}
+                                        <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                                            ({stats.activeOffers} active)
+                                        </Typography>
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={2.4}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        backdropFilter: 'blur(5px)', 
+                                        borderRadius: 2,
+                                        transition: 'transform 0.3s',
+                                        '&:hover': {
+                                            transform: 'translateY(-5px)',
+                                        }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        Total Clicks
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                                        {offers.reduce((sum, o) => sum + (o.clicks || 0), 0).toLocaleString()}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={2.4}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        backdropFilter: 'blur(5px)', 
+                                        borderRadius: 2,
+                                        transition: 'transform 0.3s',
+                                        '&:hover': {
+                                            transform: 'translateY(-5px)',
+                                        }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        Conversions
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                                        {stats.totalConversions.toLocaleString()}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={2.4}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        backdropFilter: 'blur(5px)', 
+                                        borderRadius: 2,
+                                        transition: 'transform 0.3s',
+                                        '&:hover': {
+                                            transform: 'translateY(-5px)',
+                                        }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        Total Revenue
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                                        ${stats.totalRevenue.toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        })}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={2.4}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                                        backdropFilter: 'blur(5px)', 
+                                        borderRadius: 2,
+                                        transition: 'transform 0.3s',
+                                        '&:hover': {
+                                            transform: 'translateY(-5px)',
+                                        }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        Total Profit
+                                    </Typography>
+                                    <Typography 
+                                        variant="h4" 
+                                        sx={{ 
+                                            fontWeight: 700, 
+                                            color: stats.totalProfit >= 0 ? 
+                                                theme.palette.success.main : theme.palette.error.main
+                                        }}
+                                    >
+                                        ${stats.totalProfit.toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        })}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </GradientBox>
+
+                    {/* Filter Controls */}
+                    <StyledCard sx={{ mb: 4 }}>
+                        <CardContent>
+                            <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={12} md={3}>
+                                    <StyledTextField
+                                        label="Date"
+                                        type="date"
+                                        value={date}
+                                        onChange={handleDateChange}
+                                        fullWidth
+                                        InputLabelProps={{ shrink: true }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <CalendarTodayIcon color="primary" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                    <StyledTextField
+                                        label="Offer Name"
+                                        value={titleText}
+                                        onChange={handleTitleChange}
+                                        fullWidth
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <TitleIcon color="primary" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                    <StyledFormControl fullWidth>
+                                        <InputLabel>Source</InputLabel>
+                                        <Select
+                                            value={filterText}
+                                            onChange={(e) => setFilterText(e.target.value)}
+                                            label="Source"
+                                            startAdornment={
+                                                <InputAdornment position="start">
+                                                    <LinkIcon color="primary" />
+                                                </InputAdornment>
+                                            }
+                                        >
+                                            <MenuItem value="">All Sources</MenuItem>
+                                            {offerSources.map(src => (
+                                                <MenuItem key={src.id} value={src.name}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        {getSourceIcon(src.name)}
+                                                        <Box sx={{ ml: 1 }}>{src.name}</Box>
+                                                    </Box>
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </StyledFormControl>
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                    <Box sx={{ display: 'flex', gap: 2 }}>
+                                        <GradientButton
+                                            variant="contained"
+                                            color="primary"
+                                            fullWidth
+                                            startIcon={<FilterListIcon />}
+                                            onClick={handleApplyFilters}
+                                        >
+                                            Apply Filters
+                                        </GradientButton>
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            onClick={handleFilterReset}
+                                            sx={{ borderRadius: 2 }}
+                                        >
+                                            Reset
+                                        </Button>
+                                    </Box>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </StyledCard>
+
+                    {/* DataGrid Table */}
+                    <StyledCard>
+                        <Box sx={{ position: 'relative', height: 650, p: 0 }}>
+                            {loading ? (
+                                <Box 
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        bgcolor: 'rgba(255, 255, 255, 0.8)',
+                                        zIndex: 10,
+                                        backdropFilter: 'blur(4px)',
+                                    }}
+                                >
+                                    <CircularProgress />
+                                </Box>
+                            ) : null}
+                            
+                            <StyledDataGrid 
+                                rows={offers} 
+                                columns={columns} 
+                                pageSize={10}
+                                rowsPerPageOptions={[5, 10, 25]}
+                                disableSelectionOnClick
+                                getRowClassName={(params) => params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'}
+                                components={{
+                                    NoRowsOverlay: () => (
+                                        <Box 
+                                            sx={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                height: '100%',
+                                                p: 5
+                                            }}
+                                        >
+                                            <FormatListBulletedIcon 
+                                                sx={{ fontSize: 60, color: theme.palette.grey[300], mb: 2 }} 
+                                            />
+                                            <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                                                No Offers Found
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center', maxWidth: 400 }}>
+                                                Create your first offer or adjust your filter criteria
+                                            </Typography>
+                                            <GradientButton
+                                                startIcon={<AddIcon />}
+                                                onClick={handleOpen}
+                                            >
+                                                Create New Offer
+                                            </GradientButton>
+                                        </Box>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                    </StyledCard>
+                </Box>
+
+                {/* Create Offer Dialog */}
+                <Dialog 
+                    open={open} 
+                    onClose={handleClose} 
+                    fullWidth 
+                    maxWidth="md"
+                    PaperProps={{
+                        sx: {
+                            borderRadius: 3,
+                            overflow: 'hidden'
+                        }
+                    }}
+                >
+                    <Box sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                            Create New Offer
+                        </Typography>
+                    </Box>
+                    
+                    <Box sx={{ p: 3 }}>
+                        <Tabs 
+                            value={tabValue} 
+                            onChange={handleTabChange}
+                            variant="fullWidth"
+                            TabIndicatorProps={{
+                                style: {
+                                    height: 3,
+                                    borderRadius: '3px',
+                                    background: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
+                                }
+                            }}
+                            sx={{ mb: 3 }}
+                        >
+                            <StyledTab 
+                                label="Basic Details" 
+                                icon={<SettingsIcon />} 
+                                iconPosition="start"
+                            />
+                            <StyledTab 
+                                label="Postback Configuration" 
+                                icon={<CodeIcon />}
+                                iconPosition="start"
+                            />
+                        </Tabs>
+
+                        {/* Tab 1: Basic Details */}
+                        {tabValue === 0 && (
+                            <TabPanel value={tabValue} index={0}>
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12}>
+                                        <StyledTextField 
+                                            label="Offer Name" 
+                                            name="name" 
+                                            fullWidth 
+                                            onChange={handleChange}
+                                            value={newOffer.name}
+                                            placeholder="Enter a descriptive name for your offer"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <StyledFormControl fullWidth>
+                                            <InputLabel>Offer Source</InputLabel>
+                                            <Select 
+                                                name="source" 
+                                                value={newOffer.source} 
+                                                onChange={handleSourceChange}
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        {getSourceIcon(newOffer.source)}
+                                                    </InputAdornment>
+                                                }
+                                            >
+                                                <MenuItem value="" disabled>
+                                                    <Typography color="text.secondary">Select a traffic source</Typography>
+                                                </MenuItem>
+                                                {offerSources.map(src => (
+                                                    <MenuItem key={src.id} value={src.name}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                            {getSourceIcon(src.name)}
+                                                            <Box sx={{ ml: 1 }}>{src.name}</Box>
+                                                        </Box>
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </StyledFormControl>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <StyledTextField 
+                                            label="Offer URL" 
+                                            name="url" 
+                                            fullWidth 
+                                            onChange={handleChange}
+                                            value={newOffer.url}
+                                            placeholder="https://example.com/offer"
+                                            helperText="The landing page URL for this offer"
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <LinkIcon color="primary" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <StyledTextField 
+                                            label="Default Conversion Revenue" 
+                                            name="revenue" 
+                                            type="number" 
+                                            fullWidth 
+                                            onChange={handleChange}
+                                            value={newOffer.revenue}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">$</InputAdornment>
+                                                ),
+                                            }}
+                                            helperText="Revenue amount for each conversion"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <StyledFormControl fullWidth>
+                                            <InputLabel>Country</InputLabel>
+                                            <Select 
+                                                name="country" 
+                                                value={newOffer.country} 
+                                                onChange={handleChange}
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <PublicIcon color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            >
+                                                <MenuItem value="Global">Global (Worldwide)</MenuItem>
+                                                <MenuItem value="US">United States</MenuItem>
+                                                <MenuItem value="UK">United Kingdom</MenuItem>
+                                                <MenuItem value="CA">Canada</MenuItem>
+                                                <MenuItem value="AU">Australia</MenuItem>
+                                                <MenuItem value="IN">India</MenuItem>
+                                            </Select>
+                                        </StyledFormControl>
+                                    </Grid>
+                                </Grid>
+                            </TabPanel>
+                        )}
+
+                        {/* Tab 2: Postback Configuration */}
+                        {tabValue === 1 && (
+                            <TabPanel value={tabValue} index={1}>
+                                <Box>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            mb: 3, 
+                                            bgcolor: alpha(theme.palette.info.main, 0.05),
+                                            borderRadius: 2,
+                                            borderLeft: `4px solid ${theme.palette.info.main}`
+                                        }}
+                                    >
+                                        <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                            About Postback URLs
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Postback URLs are used to track conversions. When a conversion occurs, this URL will be pinged automatically.
+                                            This allows your traffic sources to track the performance of your campaigns.
+                                        </Typography>
+                                    </Paper>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3 }}>
+                                        <StyledTextField
+                                            fullWidth
+                                            label="Postback URL"
+                                            value={newOffer.postbackUrl}
+                                            onChange={(e) => setNewOffer({ ...newOffer, postbackUrl: e.target.value })}
+                                            multiline
+                                            rows={3}
+                                            sx={{ mr: 1 }}
+                                            placeholder="Configure your postback URL or generate one automatically"
+                                            InputProps={{
+                                                sx: { 
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '0.9rem'
+                                                }
+                                            }}
+                                        />
+                                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                            <AnimatedIconButton onClick={handleCopyPostback} title="Copy URL">
+                                                <ContentCopyIcon />
+                                            </AnimatedIconButton>
+                                            <AnimatedIconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
+                                                <HelpOutlineIcon />
+                                            </AnimatedIconButton>
+                                        </Box>
+                                    </Box>
+                                    
+                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                                        Available Parameters
                                     </Typography>
                                     
-                                    {testResult.success && testResult.data && (
-                                        <Box mt={2}>
-                                            <Typography variant="subtitle2">Response Data:</Typography>
-                                            <pre style={{ whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(testResult.data, null, 2)}
-                                            </pre>
-                                        </Box>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                                        {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
+                                            <Chip 
+                                                key={key}
+                                                label={value}
+                                                onClick={() => handleInsertMacro(value)}
+                                                sx={{ 
+                                                    fontFamily: 'monospace',
+                                                    borderRadius: 1.5,
+                                                    fontWeight: 500,
+                                                    transition: 'all 0.2s',
+                                                    '&:hover': {
+                                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                    }
+                                                }}
+                                                clickable
+                                            />
+                                        ))}
+                                    </Box>
+                                    
+                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                                        Example Preview
+                                    </Typography>
+                                    
+                                    <Paper 
+                                        elevation={0}
+                                        sx={{ 
+                                            p: 2, 
+                                            bgcolor: alpha(theme.palette.background.paper, 0.5), 
+                                            borderRadius: 2,
+                                            mb: 3,
+                                            border: `1px dashed ${theme.palette.divider}`
+                                        }}
+                                    >
+                                        <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                                fontFamily: 'monospace',
+                                                fontSize: '0.85rem',
+                                                whiteSpace: 'pre-wrap',
+                                                wordBreak: 'break-all'
+                                            }}
+                                        >
+                                            {parsePostbackUrl(newOffer.postbackUrl, {
+                                                click_id: 'abc123',
+                                                payout: '10.00',
+                                                revenue: newOffer.revenue.toString(),
+                                                conversion_id: '123456',
+                                                offer_id: '789',
+                                                offer_name: newOffer.name,
+                                                campaign_id: 'camp_1',
+                                                source: newOffer.source,
+                                                status: '1'
+                                            }) || 'Postback URL preview will appear here...'}
+                                        </Typography>
+                                    </Paper>
+                                    
+                                    {/* Source-specific instructions */}
+                                    {newOffer.source && (newOffer.source.toLowerCase() === 'facebook' || newOffer.source.toLowerCase() === 'google') && (
+                                        <Paper 
+                                            elevation={0} 
+                                            sx={{ 
+                                                p: 3, 
+                                                mb: 3, 
+                                                borderRadius: 2,
+                                                borderLeft: `4px solid ${
+                                                    newOffer.source.toLowerCase() === 'facebook' ? '#1877F2' : '#4285F4'
+                                                }`,
+                                                bgcolor: alpha(
+                                                    newOffer.source.toLowerCase() === 'facebook' ? '#1877F2' : '#4285F4', 
+                                                    0.05
+                                                )
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                {newOffer.source.toLowerCase() === 'facebook' ? 
+                                                    <FacebookIcon sx={{ color: '#1877F2', mr: 1 }} /> : 
+                                                    <GoogleIcon sx={{ color: '#4285F4', mr: 1 }} />
+                                                }
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                                    {newOffer.source}-Specific Settings
+                                                </Typography>
+                                            </Box>
+                                            
+                                            {newOffer.source.toLowerCase() === 'facebook' && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    For Facebook conversions, use <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub1}'}</Typography> for user_id, 
+                                                    <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub2}'}</Typography> for email, and 
+                                                    <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub3}'}</Typography> for phone.
+                                                    These will be automatically hashed for privacy as required by Facebook.
+                                                </Typography>
+                                            )}
+                                            
+                                            {newOffer.source.toLowerCase() === 'google' && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    For Google conversion tracking, use <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{gclid}'}</Typography> or 
+                                                    <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub1}'}</Typography> for Google Click ID.
+                                                    You can also include <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub2}'}</Typography> for email and 
+                                                    <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{sub3}'}</Typography> for phone for enhanced conversions.
+                                                </Typography>
+                                            )}
+                                        </Paper>
                                     )}
-                                </Paper>
-                            )}
-                        </>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClosePostbackTest}>Close</Button>
-                </DialogActions>
-            </Dialog>
+                                </Box>
+                            </TabPanel>
+                        )}
+                    </Box>
+                    
+                    <DialogActions sx={{ p: 3, pt: 0 }}>
+                        <Button 
+                            variant="outlined" 
+                            onClick={handleClose}
+                            sx={{ borderRadius: 2, px: 3 }}
+                        >
+                            Cancel
+                        </Button>
+                        <GradientButton 
+                            onClick={handleSubmit} 
+                            endIcon={<AddIcon />}
+                            sx={{ px: 3 }}
+                        >
+                            Create Offer
+                        </GradientButton>
+                    </DialogActions>
+                </Dialog>
 
-            {/* Snackbar for notifications */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={handleSnackbarClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-                <Alert 
-                    onClose={handleSnackbarClose} 
-                    severity={snackbar.severity}
-                    variant="filled"
+                {/* Postback Testing Dialog */}
+                <Dialog 
+                    open={postbackTestDialogOpen} 
+                    onClose={handleClosePostbackTest}
+                    fullWidth
+                    maxWidth="md"
+                    PaperProps={{
+                        sx: {
+                            borderRadius: 3,
+                            overflow: 'hidden'
+                        }
+                    }}
                 >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
+                    <Box sx={{ bgcolor: theme.palette.warning.main, color: 'white', p: 3 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                            <VisibilityIcon sx={{ mr: 1.5 }} /> Test Postback URL
+                        </Typography>
+                        {selectedOffer && (
+                            <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                                {selectedOffer.offers_name} {selectedOffer.source && `- ${selectedOffer.source}`}
+                            </Typography>
+                        )}
+                    </Box>
+                    
+                    <DialogContent>
+                        {selectedOffer && (
+                            <>
+                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                    Postback URL Template:
+                                </Typography>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        p: 2, 
+                                        mb: 3, 
+                                        bgcolor: alpha(theme.palette.warning.main, 0.05),
+                                        borderRadius: 2
+                                    }}
+                                >
+                                    <Typography 
+                                        variant="body2" 
+                                        sx={{ 
+                                            fontFamily: 'monospace',
+                                            wordBreak: 'break-all'
+                                        }}
+                                    >
+                                        {selectedOffer.postbackUrl || 'No postback URL configured'}
+                                    </Typography>
+                                </Paper>
+                                
+                                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                                    Test Parameters:
+                                </Typography>
+                                
+                                <StyledCard sx={{ mb: 3 }}>
+                                    <CardContent>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Click ID"
+                                                    name="click_id"
+                                                    value={testPostbackData.click_id}
+                                                    onChange={handleTestDataChange}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Payout"
+                                                    name="payout"
+                                                    value={testPostbackData.payout}
+                                                    onChange={handleTestDataChange}
+                                                    InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start">$</InputAdornment>
+                                                        ),
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Revenue"
+                                                    name="revenue"
+                                                    value={testPostbackData.revenue}
+                                                    onChange={handleTestDataChange}
+                                                    InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start">$</InputAdornment>
+                                                        ),
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Conversion ID"
+                                                    name="conversion_id"
+                                                    value={testPostbackData.conversion_id}
+                                                    onChange={handleTestDataChange}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Event Name"
+                                                    name="event_name"
+                                                    value={testPostbackData.event_name}
+                                                    onChange={handleTestDataChange}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={4}>
+                                                <StyledTextField
+                                                    fullWidth
+                                                    label="Campaign ID"
+                                                    name="campaign_id"
+                                                    value={testPostbackData.campaign_id}
+                                                    onChange={handleTestDataChange}
+                                                />
+                                            </Grid>
+                                            
+                                            {/* Show Facebook-specific fields if the source is Facebook */}
+                                            {selectedOffer.source && selectedOffer.source.toLowerCase() === 'facebook' && (
+                                                <>
+                                                    <Grid item xs={12} md={12}>
+                                                        <Divider sx={{ my: 1 }}>
+                                                            <Chip 
+                                                                icon={<FacebookIcon />} 
+                                                                label="Facebook-Specific Parameters" 
+                                                                sx={{ px: 1 }}
+                                                            />
+                                                        </Divider>
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="User ID (sub1)"
+                                                            name="sub1"
+                                                            value={testPostbackData.sub1}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="Email (sub2)"
+                                                            name="sub2"
+                                                            value={testPostbackData.sub2}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="Phone (sub3)"
+                                                            name="sub3"
+                                                            value={testPostbackData.sub3}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                </>
+                                            )}
+                                            
+                                            {/* Show Google-specific fields if the source is Google */}
+                                            {selectedOffer.source && selectedOffer.source.toLowerCase() === 'google' && (
+                                                <>
+                                                    <Grid item xs={12} md={12}>
+                                                        <Divider sx={{ my: 1 }}>
+                                                            <Chip 
+                                                                icon={<GoogleIcon />} 
+                                                                label="Google-Specific Parameters" 
+                                                                sx={{ px: 1 }}
+                                                            />
+                                                        </Divider>
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="GCLID"
+                                                            name="gclid"
+                                                            value={testPostbackData.gclid}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="Email (sub2)"
+                                                            name="sub2"
+                                                            value={testPostbackData.sub2}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={4}>
+                                                        <StyledTextField
+                                                            fullWidth
+                                                            label="Phone (sub3)"
+                                                            name="sub3"
+                                                            value={testPostbackData.sub3}
+                                                            onChange={handleTestDataChange}
+                                                        />
+                                                    </Grid>
+                                                </>
+                                            )}
+                                        </Grid>
+                                    </CardContent>
+                                </StyledCard>
+                                
+                                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                                    <Button
+                                        variant="outlined"
+                                        onClick={handleGenerateTestUrl}
+                                        disabled={!selectedOffer.postbackUrl}
+                                        startIcon={<CodeIcon />}
+                                        sx={{ borderRadius: 2 }}
+                                    >
+                                        Generate Test URL
+                                    </Button>
+                                    <GradientButton
+                                        onClick={handleTestPostback}
+                                        disabled={!selectedOffer.postbackUrl || isTesting}
+                                        colorStart="#f5af19"
+                                        colorEnd="#f12711"
+                                        endIcon={<SendIcon />}
+                                    >
+                                        {isTesting ? 'Testing...' : 'Send Test Postback'}
+                                    </GradientButton>
+                                </Box>
+                                
+                                {processedUrl && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                            Generated URL:
+                                        </Typography>
+                                        <Box sx={{ position: 'relative' }}>
+                                            <StyledTextField
+                                                fullWidth
+                                                value={processedUrl}
+                                                multiline
+                                                rows={2}
+                                                InputProps={{
+                                                    readOnly: true,
+                                                    sx: { 
+                                                        borderRadius: 2,
+                                                        fontFamily: 'monospace',
+                                                        fontSize: '0.85rem',
+                                                        pr: 5
+                                                    }
+                                                }}
+                                            />
+                                            <Box sx={{ position: 'absolute', right: 8, top: 8 }}>
+                                                <AnimatedIconButton
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(processedUrl);
+                                                        setSnackbar({
+                                                            open: true,
+                                                            message: 'URL copied to clipboard',
+                                                            severity: 'success'
+                                                        });
+                                                    }}
+                                                    title="Copy URL"
+                                                >
+                                                    <ContentCopyIcon />
+                                                </AnimatedIconButton>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                )}
+                                
+                                {testResult && (
+                                    <Paper 
+                                        elevation={0}
+                                        sx={{ 
+                                            p: 3, 
+                                            bgcolor: testResult.success ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                                            borderRadius: 2,
+                                            borderLeft: `4px solid ${testResult.success ? theme.palette.success.main : theme.palette.error.main}`,
+                                            mb: 3
+                                        }}
+                                    >
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center' }}>
+                                            {testResult.success ? 
+                                                <><CheckCircleIcon sx={{ mr: 1, color: theme.palette.success.main }} /> Test Successful</> : 
+                                                <><CancelIcon sx={{ mr: 1, color: theme.palette.error.main }} /> Test Failed</>
+                                            }
+                                        </Typography>
+                                        
+                                        <Typography variant="body2">
+                                            {testResult.message}
+                                        </Typography>
+                                        
+                                        {testResult.success && testResult.data && (
+                                            <Box sx={{ mt: 2 }}>
+                                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Response Data:</Typography>
+                                                <Paper 
+                                                    elevation={0}
+                                                    sx={{ 
+                                                        p: 2, 
+                                                        bgcolor: 'background.paper', 
+                                                        borderRadius: 2
+                                                    }}
+                                                >
+                                                    <Typography 
+                                                        variant="body2" 
+                                                        sx={{ 
+                                                            fontFamily: 'monospace',
+                                                            whiteSpace: 'pre-wrap'
+                                                        }}
+                                                    >
+                                                        {JSON.stringify(testResult.data, null, 2)}
+                                                    </Typography>
+                                                </Paper>
+                                            </Box>
+                                        )}
+                                    </Paper>
+                                )}
+                            </>
+                        )}
+                    </DialogContent>
+                    
+                    <DialogActions sx={{ p: 3, pt: 0 }}>
+                        <Button 
+                            onClick={handleClosePostbackTest}
+                            sx={{ borderRadius: 2, px: 3 }}
+                            variant="outlined"
+                        >
+                            Close
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Snackbar for notifications */}
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={handleSnackbarClose}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert 
+                        onClose={handleSnackbarClose} 
+                        severity={snackbar.severity}
+                        variant="filled"
+                        sx={{ 
+                            width: '100%',
+                            borderRadius: 2,
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
+            </Container>
         </Layout>
     );
 };
