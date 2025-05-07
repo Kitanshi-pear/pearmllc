@@ -668,15 +668,15 @@ export default function CampaignsPage() {
       flex: 1,
       valueGetter: (params) => {
         // First check for direct name field (prioritize this as it matches the database schema)
-        if (params?.row?.name) {
+        if (params?.row?.name !== undefined) {
           return params.row.name;
         }
         
-        // Then check for alternative field names
+        // Then check for alternative field names without hardcoded fallbacks
         return params?.row?.campaign_name || 
                params?.row?.title || 
                params?.row?.campaignName || 
-               "Unnamed Campaign";
+               '';  // Return empty string instead of hardcoded default
       }
     },
     {
@@ -727,8 +727,8 @@ export default function CampaignsPage() {
           return `Source ID: ${params.row.traffic_channel_id}`;
         }
         
-        // Finally, return "Unknown" as fallback
-        return "Unknown";
+        // Return empty string as fallback
+        return '';
       }
     },
     { 
@@ -929,10 +929,15 @@ export default function CampaignsPage() {
             id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
           };
           
-          // Handle campaign name according to schema
-          // Prioritize 'name' field but fallback to alternatives if needed
-          if (!normalizedCampaign.name && (campaign.campaign_name || campaign.title || campaign.campaignName)) {
-            normalizedCampaign.name = campaign.campaign_name || campaign.title || campaign.campaignName;
+          // Handle campaign name according to schema - without adding defaults
+          // Only normalize if an alternative name field exists but name doesn't
+          if (campaign.name === undefined && 
+              (campaign.campaign_name !== undefined || 
+              campaign.title !== undefined || 
+              campaign.campaignName !== undefined)) {
+            normalizedCampaign.name = campaign.campaign_name || 
+                                     campaign.title || 
+                                     campaign.campaignName;
           }
           
           // Process TrafficChannel relationship
@@ -1041,10 +1046,15 @@ export default function CampaignsPage() {
         id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
       };
       
-      // Handle campaign name according to schema
-      // Prioritize 'name' field but fallback to alternatives if needed
-      if (!normalizedCampaign.name && (campaign.campaign_name || campaign.title || campaign.campaignName)) {
-        normalizedCampaign.name = campaign.campaign_name || campaign.title || campaign.campaignName;
+      // Handle campaign name according to schema - without adding defaults
+      // Only normalize if an alternative name field exists but name doesn't
+      if (campaign.name === undefined && 
+          (campaign.campaign_name !== undefined || 
+           campaign.title !== undefined || 
+           campaign.campaignName !== undefined)) {
+        normalizedCampaign.name = campaign.campaign_name || 
+                                 campaign.title || 
+                                 campaign.campaignName;
       }
       
       // Process TrafficChannel relationship
