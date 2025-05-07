@@ -151,9 +151,12 @@ const channelTemplates = {
   }
 };
 
-// Helper component for platform connection status - Redesigned
+// Helper component for platform connection status - Redesigned with debug logging
 const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect }) => {
   const theme = useTheme();
+  
+  // Added console logging to help debug connection status
+  console.log(`Rendering PlatformConnectionStatus for ${platform}: isConnected=${isConnected}`);
   
   return (
     <Paper 
@@ -330,7 +333,37 @@ const TrafficChannels = () => {
     }
   }, []);
 
-  // Listen for messages from popup window
+  // NEW: Effect to update connection status when authentication changes
+  useEffect(() => {
+    // This effect runs when authStatus or selectedRow changes
+    if (selectedRow && openSecondModal) {
+      // If we're in edit mode and the modal is open, check connection status
+      const platform = selectedRow.aliasChannel;
+      let isConnected = false;
+      
+      if (platform === 'Facebook') isConnected = authStatus.facebook;
+      else if (platform === 'Google') isConnected = authStatus.google;
+      else if (platform === 'TikTok') isConnected = authStatus.tiktok;
+      
+      console.log(`Connection status effect: platform=${platform}, isConnected=${isConnected}`);
+      
+      // Update the connection status in the form
+      setFormData(prev => ({
+        ...prev,
+        isConnected: isConnected
+      }));
+      
+      // Also update the connection status tracking
+      if (selectedRow.id) {
+        setChannelConnectionStatus(prev => ({
+          ...prev,
+          [selectedRow.id]: isConnected
+        }));
+      }
+    }
+  }, [authStatus, selectedRow, openSecondModal]);
+
+  // Listen for messages from popup window - ENHANCED
   useEffect(() => {
     const handleMessage = (event) => {
       // Only accept messages from our domain
@@ -388,8 +421,9 @@ const TrafficChannels = () => {
           }
         }
         
-        // Save the connection status changes
-        handleSubmit();
+        // IMPORTANT: Use saveConnectionStatus instead of handleSubmit
+        // This prevents the modal from closing while saving the connection
+        saveConnectionStatus(platformLower, true);
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
@@ -435,6 +469,41 @@ const TrafficChannels = () => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedRow]);
+
+  // NEW: Function to save connection status without closing modal
+  const saveConnectionStatus = async (platform, isConnected) => {
+    if (!selectedRow) return;
+    
+    try {
+      console.log(`Saving connection status for ${platform}: ${isConnected}`);
+      
+      // Create a minimal update payload
+      const updateData = {
+        ...formData,
+        isConnected: isConnected
+      };
+      
+      // Call API to update channel connection status
+      const response = await axios.put(`${API_URL}/${selectedRow.id}`, updateData);
+      
+      // Update local state with response data
+      setRows(prevRows => 
+        prevRows.map(row => 
+          row.id === selectedRow.id ? response.data : row
+        )
+      );
+      
+      console.log(`Connection status for ${platform} saved successfully`);
+    } catch (error) {
+      console.error(`Error saving connection status for ${platform}:`, error);
+      // Show error message but keep modal open
+      setSnackbar({
+        open: true,
+        message: `Failed to save connection status: ${error.message}`,
+        severity: "warning" // Use warning to indicate partial success (connected but not saved)
+      });
+    }
+  };
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -522,9 +591,11 @@ const TrafficChannels = () => {
     )
   );
 
-  // Helper to determine if platform connection is available
+  // ENHANCED: Helper to determine if platform connection is available (case-insensitive)
   const isPlatformConnectable = (platformName) => {
-    return ["Facebook", "Google", "TikTok"].includes(platformName);
+    if (!platformName) return false;
+    const platformLower = platformName.toLowerCase();
+    return ["facebook", "google", "tiktok"].includes(platformLower);
   };
 
   // Handle authentication for platforms using popup
@@ -733,9 +804,15 @@ const TrafficChannels = () => {
     }
   };
 
-  // Form submission
+  // ENHANCED: Form submission with better modal handling
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    
+    // Log to debug
+    console.log("Submitting form, editMode:", editMode);
+    console.log("Selected channel:", selectedChannel);
+    console.log("Is platform connectable:", isPlatformConnectable(formData.aliasChannel));
+    console.log("Auth popup open:", authPopupOpen);
     
     // Validate form
     if (!validateBasicSettings()) {
@@ -765,7 +842,7 @@ const TrafficChannels = () => {
         // Update connection status tracking
         setChannelConnectionStatus(prev => ({
           ...prev,
-          [selectedRow.id]: formData.isConnected
+          [selectedRow.id]: response.data.isConnected || formData.isConnected
         }));
         
         setSnackbar({
@@ -797,10 +874,16 @@ const TrafficChannels = () => {
         setEditMode(true);
       }
       
-      // IMPORTANT: Do NOT close the modal for connectable platforms
-      // The whole point is to keep the modal open to show the updated connection status
-      if (!isPlatformConnectable(formData.aliasChannel) && !authPopupOpen) {
+      // IMPORTANT: Modified condition to be more robust - only close for non-connectable platforms
+      // This is the critical change that ensures the modal stays open after authentication
+      const shouldCloseModal = !isPlatformConnectable(formData.aliasChannel) && !authPopupOpen;
+      
+      console.log("Should close modal:", shouldCloseModal);
+      
+      if (shouldCloseModal) {
         setOpenSecondModal(false);
+      } else {
+        console.log("Keeping modal open for connectable platform:", formData.aliasChannel);
       }
     } catch (error) {
       console.error("Error saving channel:", error);
@@ -858,18 +941,32 @@ const TrafficChannels = () => {
     }
   };
 
-  // Function to check if current channel is connected
+  // ENHANCED: Function to check if current channel is connected
   const isChannelConnected = (platform) => {
+    console.log(`Checking connection status for ${platform}`);
+    
     // For an existing channel being edited
     if (editMode && selectedRow) {
-      return channelConnectionStatus[selectedRow.id] || false;
+      const status = channelConnectionStatus[selectedRow.id];
+      console.log(`Existing channel status for ${selectedRow.id}: ${status}`);
+      return status || false;
     }
     
     // For a new channel, check global auth status
-    if (platform === 'Facebook') return authStatus.facebook;
-    if (platform === 'Google') return authStatus.google;
-    if (platform === 'TikTok') return authStatus.tiktok;
+    if (platform === 'Facebook') {
+      console.log(`Facebook global auth status: ${authStatus.facebook}`);
+      return authStatus.facebook;
+    }
+    if (platform === 'Google') {
+      console.log(`Google global auth status: ${authStatus.google}`);
+      return authStatus.google;
+    }
+    if (platform === 'TikTok') {
+      console.log(`TikTok global auth status: ${authStatus.tiktok}`);
+      return authStatus.tiktok;
+    }
     
+    console.log(`No status found for ${platform}, using form status: ${formData.isConnected}`);
     return formData.isConnected || false;
   };
 
@@ -1929,7 +2026,7 @@ const TrafficChannels = () => {
 
   return (
     <Layout>
-              <Box
+      <Box
         sx={{
           display: "flex",
           flexDirection: "column",
