@@ -304,24 +304,29 @@ const TrafficChannels = () => {
     if (success === 'true' && platform && session) {
       // We're in a popup window that received successful OAuth callback
       console.log("Authentication successful, sending message to parent window");
+      
+      // Send message to parent window
       window.opener.postMessage({
         type: 'auth_success',
         platform,
         session
       }, window.location.origin);
       
-      // Don't close the popup here, let the parent window handle it
-      // The parent window will close this popup after receiving the message
+      // Close popup after sending message
+      window.close();
     } else if (error === 'true' && platform) {
       // We're in a popup window that received an OAuth error
       console.log("Authentication failed, sending error to parent window");
+      
+      // Send error message to parent window
       window.opener.postMessage({
         type: 'auth_error',
         platform,
         message: message || 'Authentication failed'
       }, window.location.origin);
       
-      // Don't close the popup here either
+      // Close popup after sending message
+      window.close();
     }
   }, []);
 
@@ -550,27 +555,16 @@ const TrafficChannels = () => {
           authInterval.current = null;
           
           if (authPopupOpen) {
-            // Popup was closed without completing authentication
+            // Only show cancellation message if we haven't received success/error messages
+            // This prevents showing "cancelled" when it actually succeeded
             setAuthPopupOpen(false);
             setLoading(prev => ({ ...prev, [platformLower]: false }));
             
-            setSnackbar({
-              open: true,
-              message: `${platform} authentication was cancelled`,
-              severity: 'info'
-            });
+            // Don't show the cancellation message as it might interfere with success message
+            // We'll let the message from the callback handle this
           }
         }
       }, 1000);
-      
-      // Automatically close the popup after 10 seconds (safety measure)
-      setTimeout(() => {
-        if (authWindow.current && !authWindow.current.closed) {
-          authWindow.current.close();
-          setAuthPopupOpen(false);
-          setLoading(prev => ({ ...prev, [platformLower]: false }));
-        }
-      }, 60000); // 1 minute timeout as a safety fallback
     } catch (error) {
       console.error(`Error initiating ${platform} auth:`, error);
       setLoading(prev => ({ ...prev, [platformLower]: false }));
