@@ -18,12 +18,26 @@ import {
   Alert,
   CircularProgress,
   Stack,
-  Tooltip
+  Tooltip,
+  Avatar,
+  Container,
+  useTheme,
+  useMediaQuery,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Tabs,
+  Tab,
+  alpha
 } from '@mui/material';
 import Layout from "./Layout";
 import axios from 'axios';
 
 // Simulated icons that would be imported in a real application
+// In a real app, use MUI icons or another icon library
 const InfoIcon = () => <div style={{ width: 20, height: 20, background: '#1976d2', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>i</div>;
 const DeleteIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🗑️</div>;
 const EditIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✏️</div>;
@@ -31,6 +45,8 @@ const DateRangeIcon = () => <div style={{ width: 20, height: 20, display: 'flex'
 const CheckIcon = () => <div style={{ width: 20, height: 20, color: 'green', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✓</div>;
 const CancelIcon = () => <div style={{ width: 20, height: 20, color: 'red', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✗</div>;
 const LockIcon = () => <div style={{ width: 20, height: 20, color: 'gray', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🔒</div>;
+const SearchIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🔍</div>;
+const AddIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>+</div>;
 
 // API endpoint for traffic channels
 const API_URL = "https://pearmllc.onrender.com/api/traffic";
@@ -49,7 +65,7 @@ const formatPercent = (num) => {
   return `${(Number(num) * 100).toFixed(2)}%`;
 };
 
-// Template options with predefined settings
+// Template options with predefined settings - Same as your original
 const channelTemplates = {
   Facebook: {
     channelName: "Facebook Ads",
@@ -58,7 +74,7 @@ const channelTemplates = {
     costUpdateFrequency: "15 Minutes",
     currency: "USD",
     defaultEventName: "Purchase",
-    isConnected: false, // Always start as not connected
+    isConnected: false,
     customParameters: Array(20).fill().map((_, index) => {
       if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
       if (index === 1) return { name: "sub2", macro: "{{adset.id}}", description: "adset_id", role: "Gid" };
@@ -81,7 +97,7 @@ const channelTemplates = {
     costUpdateFrequency: "15 Minutes",
     currency: "USD",
     defaultEventName: "Purchase",
-    isConnected: false, // Always start as not connected
+    isConnected: false,
     customParameters: Array(20).fill().map((_, index) => {
       if (index === 0) return { name: "sub1", macro: "{{creative.id}}", description: "creative_id", role: "Aid" };
       if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
@@ -104,7 +120,7 @@ const channelTemplates = {
     costUpdateFrequency: "15 Minutes",
     currency: "USD",
     defaultEventName: "Purchase",
-    isConnected: false, // Always start as not connected
+    isConnected: false,
     customParameters: Array(20).fill().map((_, index) => {
       if (index === 0) return { name: "sub1", macro: "{{ad.id}}", description: "ad_id", role: "Aid" };
       if (index === 1) return { name: "sub2", macro: "{{adgroup.id}}", description: "adgroup_id", role: "Gid" };
@@ -127,7 +143,7 @@ const channelTemplates = {
     s2sPostbackUrl: "",
     clickRefId: "",
     externalId: "",
-    isConnected: false, // Always start as not connected
+    isConnected: false,
     customParameters: Array(20).fill().map((_, index) => (
       { name: `sub${index + 1}`, macro: "", description: "hint", role: "" }
     )),
@@ -135,29 +151,60 @@ const channelTemplates = {
   }
 };
 
-// Helper component for platform connection status
+// Helper component for platform connection status - Redesigned
 const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect }) => {
+  const theme = useTheme();
+  
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="h6">{platform} API integration</Typography>
-        <Tooltip title="Integration information">
-          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-        </Tooltip>
+    <Paper 
+      elevation={0} 
+      sx={{ 
+        p: 2, 
+        mb: 3, 
+        borderRadius: 2,
+        border: `1px solid ${isConnected ? theme.palette.success.light : theme.palette.error.light}`,
+        bgcolor: isConnected ? alpha(theme.palette.success.light, 0.1) : alpha(theme.palette.error.light, 0.1)
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {platform === 'Facebook' && (
+              <Avatar sx={{ bgcolor: '#1877F2', width: 32, height: 32 }}>f</Avatar>
+            )}
+            {platform === 'Google' && (
+              <Avatar sx={{ bgcolor: '#4285F4', width: 32, height: 32 }}>G</Avatar>
+            )}
+            {platform === 'TikTok' && (
+              <Avatar sx={{ bgcolor: '#000000', width: 32, height: 32 }}>T</Avatar>
+            )}
+            <Typography variant="subtitle1" fontWeight="medium">{platform} API integration</Typography>
+          </Box>
+          <Tooltip title="Integration information">
+            <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+          </Tooltip>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label={isConnected ? "Connected" : "Not connected"} 
+            color={isConnected ? "success" : "error"}
+            size="small"
+            icon={isConnected ? <CheckIcon /> : <CancelIcon />}
+          />
+        </Box>
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="body2" color={isConnected ? "success.main" : "error.main"}>
-          {isConnected ? "Connected" : "Not connected"}
-        </Typography>
-        {isConnected ? <CheckIcon /> : <CancelIcon />}
-      </Box>
-    </Box>
+    </Paper>
   );
 };
 
 // Main component
 const TrafficChannels = () => {
-  // State management
+  // Theme for responsive design
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.down('md'));
+
+  // State management - Same as original
   const [authStatus, setAuthStatus] = useState({
     facebook: false,
     google: false,
@@ -198,7 +245,7 @@ const TrafficChannels = () => {
   const authInterval = useRef(null);
   const authPlatform = useRef(null);
   
-  // Form data with all potential platform-specific fields
+  // Form data - Same as original
   const [formData, setFormData] = useState({
     // Basic settings
     channelName: "",
@@ -382,7 +429,6 @@ const TrafficChannels = () => {
           const newConnectionStatus = {};
           response.data.forEach(row => {
             // Determine connection status based on API data
-            // This might need to be adjusted based on your actual API response structure
             newConnectionStatus[row.id] = row.isConnected || 
                                         (row.apiAccessToken && row.aliasChannel === 'Facebook') || 
                                         (row.googleAdsAccountId && row.aliasChannel === 'Google');
@@ -758,19 +804,19 @@ const TrafficChannels = () => {
     // In a real app, this would navigate to a details page
   };
 
-  // Helper function to get channel icon
+  // Helper function to get channel icon with modern styling
   const getChannelIcon = (channelName) => {
-    const iconSize = { width: 20, height: 20 };
+    if (!channelName) return <Avatar sx={{ width: 32, height: 32, bgcolor: '#f5f5f5', color: '#666' }}>?</Avatar>;
     
-    switch(channelName?.toLowerCase()) {
+    switch(channelName.toLowerCase()) {
       case 'facebook':
-        return <div style={{ ...iconSize, backgroundColor: '#4267B2', borderRadius: '50%' }}>f</div>;
+        return <Avatar sx={{ width: 32, height: 32, bgcolor: '#1877F2' }}>f</Avatar>;
       case 'google':
-        return <div style={{ ...iconSize, backgroundColor: '#4285F4', borderRadius: '50%' }}>G</div>;
+        return <Avatar sx={{ width: 32, height: 32, bgcolor: '#4285F4' }}>G</Avatar>;
       case 'tiktok':
-        return <div style={{ ...iconSize, backgroundColor: '#000000', borderRadius: '50%' }}>T</div>;
+        return <Avatar sx={{ width: 32, height: 32, bgcolor: '#000000' }}>T</Avatar>;
       default:
-        return <InfoIcon />;
+        return <Avatar sx={{ width: 32, height: 32, bgcolor: '#f5f5f5', color: '#666' }}>{channelName?.charAt(0).toUpperCase() || '?'}</Avatar>;
     }
   };
 
@@ -782,7 +828,7 @@ const TrafficChannels = () => {
       : formData.isConnected || authStatus.facebook;
     
     return (
-      <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
+      <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
         <PlatformConnectionStatus 
           platform="Facebook"
           isConnected={isConnected}
@@ -792,36 +838,51 @@ const TrafficChannels = () => {
         
         <Button
           variant="contained"
-          color="primary"
-          startIcon={<div style={{ width: 24, height: 24, backgroundColor: '#4267B2', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>f</div>}
+          startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#1877F2' }}>f</Avatar>}
           onClick={() => handleAuth('facebook')}
           disabled={loading.facebook || authPopupOpen}
-          sx={{ mb: 2, bgcolor: '#1877F2', '&:hover': { bgcolor: '#166FE5' } }}
+          sx={{ 
+            mb: 3, 
+            py: 1.2, 
+            px: 3, 
+            borderRadius: 2,
+            bgcolor: '#1877F2', 
+            '&:hover': { bgcolor: '#166FE5' },
+            textTransform: 'none',
+            fontWeight: 'medium',
+            boxShadow: 2
+          }}
         >
-          {loading.facebook ? <CircularProgress size={24} /> : isConnected ? "Reconnect Facebook" : "Connect Facebook"}
+          {loading.facebook ? <CircularProgress size={24} color="inherit" /> : isConnected ? "Reconnect Facebook" : "Connect with Facebook"}
         </Button>
         
         {authPopupOpen && authPlatform.current === 'facebook' && (
-          <Alert severity="info" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             Facebook authentication window opened. Please complete the process in the popup window.
           </Alert>
         )}
         
-        <Box sx={{ mt: 2, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box display="flex" alignItems="center" gap={1}>
+        <Paper elevation={0} sx={{ p: 3, bgcolor: alpha(theme.palette.info.light, 0.1), borderRadius: 2, mb: 4 }}>
+          <Box display="flex" alignItems="flex-start" gap={1.5}>
             <InfoIcon />
-            <Typography variant="body2">Please allow access to your Facebook profile to activate integrations:</Typography>
+            <Box>
+              <Typography variant="body2" fontWeight="medium" gutterBottom>
+                Please allow access to your Facebook profile to activate integrations:
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, ml: 0.5 }}>#1 Click on "Connect" and accept integration permissions</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, ml: 0.5 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" sx={{ pl: 3 }}>#1 Click on "Connect" and accept integration permissions</Typography>
-          <Typography variant="body2" sx={{ pl: 3 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
-        </Box>
+        </Paper>
         
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Facebook default data source (pixel)</Typography>
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" fontWeight="medium" sx={{ mb: 3 }}>
+            Facebook default data source (pixel)
+          </Typography>
           
-          <Grid container spacing={2}>
+          <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Pixel ID</Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>Pixel ID</Typography>
               <TextField
                 fullWidth
                 name="pixelId"
@@ -830,11 +891,19 @@ const TrafficChannels = () => {
                 placeholder="Pixel ID"
                 variant="outlined"
                 size="small"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    '& fieldset': {
+                      borderColor: alpha(theme.palette.text.primary, 0.2),
+                    },
+                  }
+                }}
               />
             </Grid>
             
             <Grid item xs={12}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Conversions API Access token</Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>Conversions API Access token</Typography>
               <TextField
                 fullWidth
                 name="apiAccessToken"
@@ -843,11 +912,16 @@ const TrafficChannels = () => {
                 placeholder="Conversions API Access token"
                 variant="outlined"
                 size="small"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                  }
+                }}
               />
             </Grid>
             
             <Grid item xs={12}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Default Event name</Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>Default Event name</Typography>
               <TextField
                 fullWidth
                 name="defaultEventName"
@@ -856,11 +930,16 @@ const TrafficChannels = () => {
                 placeholder="Default Event name"
                 variant="outlined"
                 size="small"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                  }
+                }}
               />
             </Grid>
             
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Payout type</Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>Payout type</Typography>
               <Select
                 fullWidth
                 name="payoutType"
@@ -868,6 +947,11 @@ const TrafficChannels = () => {
                 onChange={handleFormChange}
                 displayEmpty
                 size="small"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                  }
+                }}
               >
                 <MenuItem value="">Select</MenuItem>
                 <MenuItem value="CPA">CPA</MenuItem>
@@ -877,7 +961,7 @@ const TrafficChannels = () => {
             </Grid>
             
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Value</Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>Value</Typography>
               <TextField
                 fullWidth
                 name="value"
@@ -886,11 +970,23 @@ const TrafficChannels = () => {
                 placeholder="Value"
                 variant="outlined"
                 size="small"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                  }
+                }}
               />
             </Grid>
             
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mt: 1,
+                p: 1.5,
+                borderRadius: 1.5,
+                border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`,
+              }}>
                 <input
                   type="checkbox"
                   checked={formData.customConversionMatching}
@@ -902,8 +998,9 @@ const TrafficChannels = () => {
                     }
                   })}
                   name="customConversionMatching"
+                  style={{ marginRight: 10 }}
                 />
-                <Typography variant="body2" sx={{ ml: 1 }}>
+                <Typography variant="body2">
                   Custom Conversion Matching
                 </Typography>
               </Box>
@@ -922,7 +1019,7 @@ const TrafficChannels = () => {
       : formData.isConnected || authStatus.google;
     
     return (
-      <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
+      <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
         <PlatformConnectionStatus 
           platform="Google"
           isConnected={isConnected}
@@ -930,9 +1027,9 @@ const TrafficChannels = () => {
           onConnect={() => handleAuth('google')}
         />
         
-        <Grid container spacing={2}>
+        <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} md={8}>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Google Ads Account ID *</Typography>
+            <Typography variant="body2" color="textSecondary" gutterBottom>Google Ads Account ID *</Typography>
             <TextField
               fullWidth
               name="googleAdsAccountId"
@@ -941,6 +1038,11 @@ const TrafficChannels = () => {
               placeholder="Google Ads Account ID"
               variant="outlined"
               size="small"
+              sx={{ 
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 1.5,
+                }
+              }}
             />
           </Grid>
           
@@ -949,133 +1051,183 @@ const TrafficChannels = () => {
               variant="outlined"
               onClick={() => handleAuth('google')}
               disabled={loading.google || authPopupOpen}
-              startIcon={<div style={{ width: 20, height: 20, backgroundColor: '#4285F4', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>G</div>}
+              startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#4285F4' }}>G</Avatar>}
               fullWidth
-              sx={{ mb: 0.5 }}
+              sx={{ 
+                borderRadius: 1.5, 
+                py: 1, 
+                border: '1px solid #4285F4', 
+                color: '#4285F4', 
+                textTransform: 'none',
+                '&:hover': {
+                  bgcolor: alpha('#4285F4', 0.05),
+                  border: '1px solid #4285F4'
+                }
+              }}
             >
-              {loading.google ? <CircularProgress size={24} /> : isConnected ? "Reconnect Google" : "Sign in with Google"}
+              {loading.google ? <CircularProgress size={24} color="inherit" /> : isConnected ? "Reconnect" : "Sign in with Google"}
             </Button>
           </Grid>
         </Grid>
         
         {authPopupOpen && authPlatform.current === 'google' && (
-          <Alert severity="info" sx={{ mb: 2, mt: 2 }}>
+          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             Google authentication window opened. Please complete the process in the popup window.
           </Alert>
         )}
         
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1, mb: 3 }}>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1, mb: 3, opacity: 0.85 }}>
           Our platform will update costs via API and send conversions for the connected ad account
         </Typography>
         
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>Google MCC Account ID (optional)</Typography>
-        <TextField
-          fullWidth
-          name="googleMccAccountId"
-          value={formData.googleMccAccountId}
-          onChange={handleFormChange}
-          placeholder="Google MCC Account ID (optional)"
-          variant="outlined"
-          size="small"
-          sx={{ mb: 1 }}
-        />
-        
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-          Add MCC account id to send conversions to it and not ad account (optional).<br />
-          Please make sure you have access to ad account and MCC with the e-mail you used for integration.
-        </Typography>
-        
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Conversion Matching</Typography>
+          <Typography variant="body2" color="textSecondary" gutterBottom>Google MCC Account ID (optional)</Typography>
+          <TextField
+            fullWidth
+            name="googleMccAccountId"
+            value={formData.googleMccAccountId}
+            onChange={handleFormChange}
+            placeholder="Google MCC Account ID (optional)"
+            variant="outlined"
+            size="small"
+            sx={{ 
+              mb: 1.5,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 1.5,
+              }
+            }}
+          />
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Conversion Type *</Typography>
-                <Tooltip title="Conversion type information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
-                <LockIcon />
-                <Typography variant="body2" sx={{ color: '#9ca3af' }}>ADD MORE</Typography>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Conversion name *</Typography>
-                <Tooltip title="Conversion name information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Category *</Typography>
-                <Tooltip title="Category information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Include in "conversions" *</Typography>
-                <Tooltip title="Include in 'conversions' information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-            </Grid>
-          </Grid>
+          <Paper elevation={0} sx={{ p: 2, bgcolor: alpha(theme.palette.info.main, 0.08), borderRadius: 2, mb: 4 }}>
+            <Typography variant="body2" color="textSecondary">
+              Add MCC account id to send conversions to it and not ad account (optional).<br />
+              Please make sure you have access to ad account and MCC with the e-mail you used for integration.
+            </Typography>
+          </Paper>
+        </Box>
+        
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" fontWeight="medium" sx={{ mb: 3 }}>
+            Conversion Matching
+          </Typography>
+          
+          <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mb: 4 }}>
+            <TableContainer>
+              <Table>
+                <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                  <TableRow>
+                    <TableCell width="25%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Conversion Type *</Typography>
+                        <Tooltip title="Conversion type information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell width="25%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Conversion name *</Typography>
+                        <Tooltip title="Conversion name information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell width="25%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Category *</Typography>
+                        <Tooltip title="Category information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell width="25%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Include in "conversions" *</Typography>
+                        <Tooltip title="Include in 'conversions' information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={4} sx={{ textAlign: 'center', py: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: alpha(theme.palette.text.primary, 0.6) }}>
+                        <LockIcon />
+                        <Typography variant="body2">ADD MORE</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
         </Box>
         
         <Box>
-          <Typography variant="h6" sx={{ mb: 2 }}>Campaign Manager 360</Typography>
+          <Typography variant="h6" fontWeight="medium" sx={{ mb: 3 }}>
+            Campaign Manager 360
+          </Typography>
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Conversion Type *</Typography>
-                <Tooltip title="Conversion type information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
-                <LockIcon />
-                <Typography variant="body2" sx={{ color: '#9ca3af' }}>ADD MORE</Typography>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Profile ID *</Typography>
-                <Tooltip title="Profile ID information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="textSecondary">Floodlight activity ID *</Typography>
-                <Tooltip title="Floodlight activity ID information">
-                  <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
-                </Tooltip>
-              </Box>
-            </Grid>
-          </Grid>
+          <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mb: 4 }}>
+            <TableContainer>
+              <Table>
+                <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                  <TableRow>
+                    <TableCell width="33%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Conversion Type *</Typography>
+                        <Tooltip title="Conversion type information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell width="33%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Profile ID *</Typography>
+                        <Tooltip title="Profile ID information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                    <TableCell width="33%">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">Floodlight activity ID *</Typography>
+                        <Tooltip title="Floodlight activity ID information">
+                          <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={3} sx={{ textAlign: 'center', py: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: alpha(theme.palette.text.primary, 0.6) }}>
+                        <LockIcon />
+                        <Typography variant="body2">ADD MORE</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
         </Box>
         
-        <Box sx={{ mt: 4, color: '#6b7280', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box display="flex" alignItems="center" gap={1}>
+        <Paper elevation={0} sx={{ p: 3, bgcolor: alpha(theme.palette.info.light, 0.1), borderRadius: 2, mt: 4 }}>
+          <Box display="flex" alignItems="flex-start" gap={1.5}>
             <InfoIcon />
-            <Typography variant="body2">Please allow access to your Google Ads account to activate integrations:</Typography>
+            <Box>
+              <Typography variant="body2" fontWeight="medium" gutterBottom>
+                Please allow access to your Google Ads account to activate integrations:
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, ml: 0.5 }}>#1 Click on "Connect" and accept integration permissions</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, ml: 0.5 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
+            </Box>
           </Box>
-          <Typography variant="body2" sx={{ pl: 3 }}>#1 Click on "Connect" and accept integration permissions</Typography>
-          <Typography variant="body2" sx={{ pl: 3 }}>#2 Once accepted, fill in all the mandatory fields and save the changes.</Typography>
-        </Box>
+        </Paper>
       </Box>
     );
   };
@@ -1090,144 +1242,169 @@ const TrafficChannels = () => {
     const displayParams = formData.customParameters.slice(0, Math.max(visibleParams, 10));
     
     return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 3 }}>Additional parameters</Typography>
+      <Box sx={{ px: 3, py: 4 }}>
+        <Typography variant="h6" fontWeight="medium" sx={{ mb: 3 }}>Additional parameters</Typography>
         
-        {displayParams.map((param, index) => (
-          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={3}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
-                Parameter *
-              </Typography>
-              <TextField
-                fullWidth
-                value={param.name}
-                onChange={(e) => handleParamChange(index, 'name', e.target.value)}
-                placeholder={`sub${index + 1}`}
-                variant="outlined"
-                size="small"
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={3}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
-                Macro/token *
-              </Typography>
-              <TextField
-                fullWidth
-                value={param.macro}
-                onChange={(e) => handleParamChange(index, 'macro', e.target.value)}
-                placeholder={index < 3 ? `{{ad.id}}` : ""}
-                variant="outlined"
-                size="small"
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={3}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
-                Name / Description *
-              </Typography>
-              <TextField
-                fullWidth
-                value={param.description}
-                onChange={(e) => handleParamChange(index, 'description', e.target.value)}
-                placeholder={index < 3 ? "ad_id" : "hint"}
-                variant="outlined"
-                size="small"
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={3}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
-                Select role
-              </Typography>
-              <Select
-                fullWidth
-                value={param.role || ""}
-                onChange={(e) => handleParamChange(index, 'role', e.target.value)}
-                displayEmpty
-                size="small"
-              >
-                <MenuItem value="">Select</MenuItem>
-                <MenuItem value="Aid">Aid</MenuItem>
-                <MenuItem value="Gid">Gid</MenuItem>
-                <MenuItem value="Cid">Cid</MenuItem>
-                <MenuItem value="Rt ad">Rt ad</MenuItem>
-                <MenuItem value="Rt adgroup">Rt adgroup</MenuItem>
-                <MenuItem value="Rt campaign">Rt campaign</MenuItem>
-                <MenuItem value="Rt placement">Rt placement</MenuItem>
-                <MenuItem value="Rt source">Rt source</MenuItem>
-                <MenuItem value="Rt medium">Rt medium</MenuItem>
-              </Select>
-            </Grid>
-          </Grid>
-        ))}
+        <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+                <TableRow>
+                  <TableCell width="25%">
+                    <Typography variant="body2" fontWeight="medium">Parameter *</Typography>
+                  </TableCell>
+                  <TableCell width="25%">
+                    <Typography variant="body2" fontWeight="medium">Macro/token *</Typography>
+                  </TableCell>
+                  <TableCell width="25%">
+                    <Typography variant="body2" fontWeight="medium">Name / Description *</Typography>
+                  </TableCell>
+                  <TableCell width="25%">
+                    <Typography variant="body2" fontWeight="medium">Select role</Typography>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {displayParams.map((param, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <TextField
+                        fullWidth
+                        value={param.name}
+                        onChange={(e) => handleParamChange(index, 'name', e.target.value)}
+                        placeholder={`sub${index + 1}`}
+                        variant="outlined"
+                        size="small"
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 1.5,
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        fullWidth
+                        value={param.macro}
+                        onChange={(e) => handleParamChange(index, 'macro', e.target.value)}
+                        placeholder={index < 3 ? `{{ad.id}}` : ""}
+                        variant="outlined"
+                        size="small"
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 1.5,
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        fullWidth
+                        value={param.description}
+                        onChange={(e) => handleParamChange(index, 'description', e.target.value)}
+                        placeholder={index < 3 ? "ad_id" : "hint"}
+                        variant="outlined"
+                        size="small"
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 1.5,
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        fullWidth
+                        value={param.role || ""}
+                        onChange={(e) => handleParamChange(index, 'role', e.target.value)}
+                        displayEmpty
+                        size="small"
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 1.5,
+                          }
+                        }}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        <MenuItem value="Aid">Aid</MenuItem>
+                        <MenuItem value="Gid">Gid</MenuItem>
+                        <MenuItem value="Cid">Cid</MenuItem>
+                        <MenuItem value="Rt ad">Rt ad</MenuItem>
+                        <MenuItem value="Rt adgroup">Rt adgroup</MenuItem>
+                        <MenuItem value="Rt campaign">Rt campaign</MenuItem>
+                        <MenuItem value="Rt placement">Rt placement</MenuItem>
+                        <MenuItem value="Rt source">Rt source</MenuItem>
+                        <MenuItem value="Rt medium">Rt medium</MenuItem>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {displayParams.length < 5 && (
+                  <TableRow>
+                    <TableCell colSpan={4} sx={{ textAlign: 'center', p: 2 }}>
+                      <Button 
+                        startIcon={<AddIcon />}
+                        sx={{ 
+                          color: theme.palette.primary.main,
+                          textTransform: 'none',
+                          fontWeight: 'normal',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.05)
+                          }
+                        }}
+                      >
+                        Add Parameter
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       </Box>
     );
   };
 
-  // Render the main tabs based on the channel type
+  // Render the main tabs based on the channel type - Modernized
   const renderTabs = () => {
+    const tabs = [
+      { label: "Basic Settings", value: 0 },
+      { label: "Facebook Integration", value: 1, show: selectedChannel === 'Facebook' },
+      { label: "Google Integration", value: 2, show: selectedChannel === 'Google' },
+      { label: "Additional Parameters", value: 3 }
+    ].filter(tab => tab.show !== false);
+    
     return (
       <Box sx={{ width: '100%', mb: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0' }}>
-            <Box
-              sx={{
-                p: 2,
-                cursor: 'pointer',
-                borderBottom: currentTab === 0 ? '2px solid #1976d2' : 'none',
-                fontWeight: currentTab === 0 ? 'bold' : 'normal',
-                color: currentTab === 0 ? '#1976d2' : 'inherit'
-              }}
-              onClick={() => setCurrentTab(0)}
-            >
-              Basic Settings
-            </Box>
-            
-            {selectedChannel === 'Facebook' && (
-              <Box
-                sx={{
-                  p: 2,
-                  cursor: 'pointer',
-                  borderBottom: currentTab === 1 ? '2px solid #1976d2' : 'none',
-                  fontWeight: currentTab === 1 ? 'bold' : 'normal',
-                  color: currentTab === 1 ? '#1976d2' : 'inherit'
-                }}
-                onClick={() => setCurrentTab(1)}
-              >
-                Facebook Integration
-              </Box>
-            )}
-            
-            {selectedChannel === 'Google' && (
-              <Box
-                sx={{
-                  p: 2,
-                  cursor: 'pointer',
-                  borderBottom: currentTab === 2 ? '2px solid #1976d2' : 'none',
-                  fontWeight: currentTab === 2 ? 'bold' : 'normal',
-                  color: currentTab === 2 ? '#1976d2' : 'inherit'
-                }}
-                onClick={() => setCurrentTab(2)}
-              >
-                Google Integration
-              </Box>
-            )}
-            
-            <Box
-              sx={{
-                p: 2,
-                cursor: 'pointer',
-                borderBottom: currentTab === 3 ? '2px solid #1976d2' : 'none',
-                fontWeight: currentTab === 3 ? 'bold' : 'normal',
-                color: currentTab === 3 ? '#1976d2' : 'inherit'
-              }}
-              onClick={() => setCurrentTab(3)}
-            >
-              Additional Parameters
-            </Box>
-          </Box>
+          <Tabs 
+            value={currentTab} 
+            onChange={(e, newValue) => setCurrentTab(newValue)}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : "standard"}
+            allowScrollButtonsMobile
+            sx={{
+              '& .MuiTabs-indicator': {
+                backgroundColor: theme.palette.primary.main,
+                height: 3,
+              },
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                fontWeight: 500,
+                minWidth: isMobile ? 'auto' : 120,
+                '&.Mui-selected': {
+                  color: theme.palette.primary.main,
+                  fontWeight: 600,
+                },
+              },
+            }}
+          >
+            {tabs.map((tab) => (
+              <Tab key={tab.value} label={tab.label} value={tab.value} />
+            ))}
+          </Tabs>
         </Box>
         
         <Box sx={{ mt: 2 }}>
@@ -1235,7 +1412,7 @@ const TrafficChannels = () => {
             <Box sx={{ p: 2 }}>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Channel name *
                   </Typography>
                   <TextField
@@ -1248,11 +1425,16 @@ const TrafficChannels = () => {
                     placeholder="e.g., Facebook Ads"
                     variant="outlined"
                     size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   />
                 </Grid>
                 
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Alias channel
                   </Typography>
                   <TextField
@@ -1265,11 +1447,16 @@ const TrafficChannels = () => {
                     placeholder="e.g., Facebook"
                     variant="outlined"
                     size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   />
                 </Grid>
                 
                 <Grid item xs={12} md={12}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Cost update depth:
                   </Typography>
                   <Select
@@ -1281,7 +1468,12 @@ const TrafficChannels = () => {
                     displayEmpty
                     variant="outlined"
                     size="small"
-                    sx={{ mb: 0.5 }}
+                    sx={{ 
+                      mb: 0.5,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   >
                     <MenuItem value="">Select depth</MenuItem>
                     <MenuItem value="None">None</MenuItem>
@@ -1289,14 +1481,14 @@ const TrafficChannels = () => {
                     <MenuItem value="Adset Level">Adset Level</MenuItem>
                     <MenuItem value="Ad Level">Ad Level</MenuItem>
                   </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
                     Please select the cost update depth from the available options.
                     The default setting is the maximum depth available for your account plan.
                   </Typography>
                 </Grid>
                 
                 <Grid item xs={12} md={12}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Cost update frequency:
                   </Typography>
                   <Select
@@ -1307,7 +1499,12 @@ const TrafficChannels = () => {
                     error={!!formErrors.costUpdateFrequency}
                     variant="outlined"
                     size="small"
-                    sx={{ mb: 0.5 }}
+                    sx={{ 
+                      mb: 0.5,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   >
                     <MenuItem value="None">None</MenuItem>
                     <MenuItem value="60 Minutes">60 Minutes</MenuItem>
@@ -1315,14 +1512,14 @@ const TrafficChannels = () => {
                     <MenuItem value="15 Minutes">15 Minutes</MenuItem>
                     <MenuItem value="5 Minutes">5 Minutes</MenuItem>
                   </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
                     These are the current settings for your account. If you would like to change the frequency of
                     cost updates - please contact support.
                   </Typography>
                 </Grid>
                 
                 <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Currency
                   </Typography>
                   <Select
@@ -1333,7 +1530,12 @@ const TrafficChannels = () => {
                     error={!!formErrors.currency}
                     variant="outlined"
                     size="small"
-                    sx={{ mb: 0.5 }}
+                    sx={{ 
+                      mb: 0.5,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   >
                     <MenuItem value="USD">USD</MenuItem>
                     <MenuItem value="EUR">EUR</MenuItem>
@@ -1356,13 +1558,13 @@ const TrafficChannels = () => {
                     <MenuItem value="BRL">BRL</MenuItem>
                     <MenuItem value="ZAR">ZAR</MenuItem>
                   </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
                     If no currency is selected, the value selected in the profile will be used.
                   </Typography>
                 </Grid>
                 
                 <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     S2S Postback URL
                   </Typography>
                   <TextField
@@ -1373,11 +1575,16 @@ const TrafficChannels = () => {
                     placeholder="https://pearmllc.onrender.com/postback?click_id={click_id}"
                     variant="outlined"
                     size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   />
                 </Grid>
                 
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     Click Ref ID
                   </Typography>
                   <TextField
@@ -1388,11 +1595,16 @@ const TrafficChannels = () => {
                     placeholder="Click Ref ID"
                     variant="outlined"
                     size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   />
                 </Grid>
                 
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
                     External ID
                   </Typography>
                   <TextField
@@ -1403,6 +1615,11 @@ const TrafficChannels = () => {
                     placeholder="External ID"
                     variant="outlined"
                     size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1.5,
+                      }
+                    }}
                   />
                 </Grid>
               </Grid>
@@ -1417,144 +1634,197 @@ const TrafficChannels = () => {
     );
   };
 
-  // DataGrid-like table component
-  const SimpleDataGrid = ({ rows, columns }) => {
+  // Modern DataGrid component
+  const ModernDataGrid = ({ rows, columns, loading }) => {
     return (
-      <Box sx={{ width: '100%', overflow: 'auto', border: '1px solid #e0e0e0' }}>
-        <Box sx={{ bgcolor: '#f8f9fa', fontWeight: 'bold', display: 'flex', borderBottom: '1px solid #e0e0e0' }}>
-          {columns.map((col, i) => (
-            <Box key={i} sx={{ flex: col.flex || 'none', width: col.width || 'auto', p: 1.5, fontWeight: 'bold' }}>
-              {col.headerName}
-            </Box>
-          ))}
-        </Box>
-        
-        {rows.length === 0 ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-            <Typography color="text.secondary">
-              No channels found. Create your first channel to get started.
-            </Typography>
-          </Box>
-        ) : (
-          rows.map((row, rowIndex) => (
-            <Box 
-              key={rowIndex} 
-              sx={{ 
-                display: 'flex', 
-                borderBottom: '1px solid #e0e0e0',
-                '&:hover': { bgcolor: '#f5f5f5', cursor: 'pointer' }
-              }}
-              onClick={() => handleRowClick(row)}
-            >
-              {columns.map((col, colIndex) => (
-                <Box 
-                  key={colIndex} 
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, height: '100%', overflow: 'auto' }}>
+        <Table stickyHeader>
+          <TableHead>
+            <TableRow sx={{ '& th': { bgcolor: alpha(theme.palette.primary.main, 0.04) } }}>
+              {columns.map((col, i) => (
+                <TableCell 
+                  key={i} 
+                  align={col.align || 'left'}
+                  width={col.width}
                   sx={{ 
-                    flex: col.flex || 'none', 
-                    width: col.width || 'auto', 
-                    p: 1.5,
-                    color: col.field === 'profit' || col.field === 'roi' 
-                      ? row[col.field] >= 0 ? 'green' : 'red' 
-                      : 'inherit'
+                    fontWeight: 'bold', 
+                    py: 2, 
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  {col.renderCell ? (
-                    col.renderCell({ row, value: row[col.field] })
-                  ) : col.valueFormatter ? (
-                    col.valueFormatter({ value: row[col.field] })
-                  ) : (
-                    row[col.field]
-                  )}
-                </Box>
+                  {col.headerName}
+                </TableCell>
               ))}
-            </Box>
-          ))
-        )}
-      </Box>
+            </TableRow>
+          </TableHead>
+          
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
+                  <CircularProgress size={40} />
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <Typography color="text.secondary" variant="body1">
+                      No channels found
+                    </Typography>
+                    <Typography color="text.secondary" variant="body2" sx={{ maxWidth: 400, textAlign: 'center' }}>
+                      Create your first channel to start tracking your traffic and performance metrics.
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      onClick={handleOpenModal} 
+                      startIcon={<AddIcon />}
+                      sx={{ mt: 1, borderRadius: 6, px: 3, py: 1, textTransform: 'none' }}
+                    >
+                      Add Channel
+                    </Button>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row, rowIndex) => (
+                <TableRow 
+                  key={rowIndex} 
+                  hover
+                  onClick={() => handleRowClick(row)}
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                    '&:last-child td, &:last-child th': { border: 0 }
+                  }}
+                >
+                  {columns.map((col, colIndex) => (
+                    <TableCell 
+                      key={colIndex} 
+                      align={col.align || 'left'}
+                      sx={{ 
+                        color: col.field === 'profit' || col.field === 'roi' 
+                          ? row[col.field] >= 0 ? theme.palette.success.main : theme.palette.error.main 
+                          : 'inherit',
+                        py: 1.75
+                      }}
+                    >
+                      {col.renderCell ? (
+                        col.renderCell({ row, value: row[col.field] })
+                      ) : col.valueFormatter ? (
+                        col.valueFormatter({ value: row[col.field] })
+                      ) : (
+                        row[col.field]
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     );
   };
 
-  // Define the table columns
+  // Define the table columns with modern styling
   const tableColumns = [
     {
       field: 'channelName',
       headerName: 'Channel',
-      flex: 1,
+      width: '20%',
       renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {getChannelIcon(params.row.aliasChannel)}
-          <Typography variant="body2">{params.value}</Typography>
-          {params.row.status === 'Inactive' && (
-            <Chip size="small" label="Inactive" color="default" />
-          )}
-          {isPlatformConnectable(params.row.aliasChannel) && (
-            <Chip 
-              size="small" 
-              label={channelConnectionStatus[params.row.id] ? "Connected" : "Not Connected"} 
-              color={channelConnectionStatus[params.row.id] ? "success" : "warning"} 
-            />
-          )}
+          <Box>
+            <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              {params.row.status === 'Inactive' && (
+                <Chip size="small" label="Inactive" color="default" sx={{ height: 20, fontSize: '0.65rem' }} />
+              )}
+              {isPlatformConnectable(params.row.aliasChannel) && (
+                <Chip 
+                  size="small" 
+                  label={channelConnectionStatus[params.row.id] ? "Connected" : "Not Connected"} 
+                  color={channelConnectionStatus[params.row.id] ? "success" : "warning"} 
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+              )}
+            </Box>
+          </Box>
         </Box>
       ),
     },
     {
       field: 'costUpdateDepth',
       headerName: 'Update Depth',
-      width: 150,
+      width: '10%',
     },
     {
       field: 'costUpdateFrequency',
-      headerName: 'Update Frequency',
-      width: 170,
+      headerName: 'Frequency',
+      width: '10%',
     },
     {
       field: 'clicks',
       headerName: 'Clicks',
-      width: 90,
+      width: '8%',
+      align: 'right',
       valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
     },
     {
       field: 'conversions',
-      headerName: 'Conversions',
-      width: 120,
+      headerName: 'Conv.',
+      width: '8%',
+      align: 'right',
       valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
     },
     {
       field: 'revenue',
       headerName: 'Revenue',
-      width: 120,
-      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
+      width: '10%',
+      align: 'right',
+      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
     },
     {
       field: 'cost',
       headerName: 'Cost',
-      width: 120,
-      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
+      width: '10%',
+      align: 'right',
+      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
     },
     {
       field: 'profit',
       headerName: 'Profit',
-      width: 120,
-      valueFormatter: (params) => params?.value !== undefined ? `$${formatNumber(params.value)}` : "$0",
+      width: '10%',
+      align: 'right',
+      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
     },
     {
       field: 'roi',
       headerName: 'ROI',
-      width: 90,
+      width: '8%',
+      align: 'right',
       valueFormatter: (params) => params?.value !== undefined ? formatPercent(params.value) : "0%",
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: '6%',
+      align: 'center',
       renderCell: (params) => (
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} onClick={(e) => e.stopPropagation()}>
           <Tooltip title="Edit Channel">
             <IconButton
               size="small"
-                              onClick={(e) => {
+              onClick={(e) => {
                 e.stopPropagation();
                 handleEditChannel(params.row);
+              }}
+              sx={{ 
+                color: theme.palette.primary.main,
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) }
               }}
             >
               <EditIcon />
@@ -1566,6 +1836,10 @@ const TrafficChannels = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 handleDeleteChannel(params.row.id);
+              }}
+              sx={{ 
+                color: theme.palette.error.main,
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) }
               }}
             >
               <DeleteIcon />
@@ -1584,14 +1858,14 @@ const TrafficChannels = () => {
           flexDirection: "column",
           gap: 3,
           p: 3,
-          bgcolor: "#f5f5f5",
+          bgcolor: "#f8fafc",
           minHeight: "calc(100vh - 80px)",
           position: "relative",
         }}
       >
         {/* HEADER WITH PERSISTENT BUTTONS */}
         <Paper
-          elevation={2}
+          elevation={0}
           sx={{
             display: "flex",
             justifyContent: "space-between",
@@ -1600,9 +1874,10 @@ const TrafficChannels = () => {
             top: 0,
             zIndex: 10,
             bgcolor: "#ffffff",
-            py: 2,
+            py: 2.5,
             px: 3,
-            borderRadius: 2
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
           }}
         >
           <Typography variant="h5" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
@@ -1613,7 +1888,14 @@ const TrafficChannels = () => {
               variant="outlined"
               color="primary"
               onClick={handleOpenModal}
-              sx={{ py: 1, px: 2, borderRadius: 1.5 }}
+              sx={{ 
+                py: 1.2, 
+                px: 3, 
+                borderRadius: 8,
+                borderWidth: 1.5,
+                textTransform: 'none',
+                fontWeight: 'medium'
+              }}
               size="medium"
             >
               New From Template
@@ -1622,56 +1904,102 @@ const TrafficChannels = () => {
               variant="contained"
               color="primary"
               onClick={() => handleOpenSecondModal(null)}
-              sx={{ py: 1, px: 2, borderRadius: 1.5 }}
+              sx={{ 
+                py: 1.2, 
+                px: 3, 
+                borderRadius: 8,
+                textTransform: 'none',
+                fontWeight: 'medium',
+                boxShadow: '0 4px 10px rgba(25, 118, 210, 0.2)'
+              }}
               size="medium"
+              startIcon={<AddIcon />}
             >
-              Create New Channel
+              Create Channel
             </Button>
           </Stack>
         </Paper>
 
         {/* FILTER FIELD & DATE RANGE */}
-        <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-          <Grid container spacing={2} alignItems="center">
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 2.5, 
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={4}>
               <TextField
-                label="Filter Channels"
+                placeholder="Search channels..."
                 variant="outlined"
                 size="small"
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 fullWidth
                 InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
                   endAdornment: filterText && (
                     <InputAdornment position="end">
                       <IconButton
                         size="small"
                         onClick={() => setFilterText("")}
+                        edge="end"
                       >
                         <DeleteIcon />
                       </IconButton>
                     </InputAdornment>
                   ),
+                  sx: { 
+                    borderRadius: 6,
+                    bgcolor: alpha(theme.palette.common.black, 0.02)
+                  }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: 'transparent',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: alpha(theme.palette.primary.main, 0.2),
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
                 }}
               />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                {filteredRows.length} {filteredRows.length === 1 ? 'channel' : 'channels'}
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1, ml: 1 }}>
+                {filteredRows.length} {filteredRows.length === 1 ? 'channel' : 'channels'} found
               </Typography>
             </Grid>
             
             <Grid item xs={12} md={8}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'flex-end' }}>
-                <input
+                <TextField
                   type="date"
                   value={dateRange.startDate.toISOString().split('T')[0]}
                   onChange={(e) => handleDateRangeChange('startDate', new Date(e.target.value))}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
                 />
-                <input
+                <TextField
                   type="date"
                   value={dateRange.endDate.toISOString().split('T')[0]}
                   onChange={(e) => handleDateRangeChange('endDate', new Date(e.target.value))}
-                  style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
                 />
                 <Button 
                   variant="outlined" 
@@ -1684,6 +2012,17 @@ const TrafficChannels = () => {
                       endDate: new Date()
                     });
                   }}
+                  sx={{ 
+                    borderRadius: 6, 
+                    textTransform: 'none',
+                    py: 1,
+                    fontWeight: 'normal',
+                    borderColor: alpha(theme.palette.primary.main, 0.3),
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                      bgcolor: alpha(theme.palette.primary.main, 0.04)
+                    }
+                  }}
                 >
                   Last 30 Days
                 </Button>
@@ -1693,21 +2032,30 @@ const TrafficChannels = () => {
         </Paper>
 
         {/* DataGrid */}
-        <Paper elevation={2} sx={{ height: 600, width: "100%", p: 0, overflow: 'hidden', borderRadius: 2 }}>
-          {loading.table ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <SimpleDataGrid 
-              rows={filteredRows} 
-              columns={tableColumns} 
-            />
-          )}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            height: 600, 
+            width: "100%", 
+            overflow: 'hidden', 
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: `1px solid ${alpha(theme.palette.common.black, 0.05)}`
+          }}
+        >
+          <ModernDataGrid 
+            rows={filteredRows} 
+            columns={tableColumns} 
+            loading={loading.table}
+          />
         </Paper>
 
         {/* Template Selection Modal */}
-        <Modal open={openModal} onClose={handleCloseModal}>
+        <Modal 
+          open={openModal} 
+          onClose={handleCloseModal}
+          aria-labelledby="template-modal-title"
+        >
           <Box
             sx={{
               position: "absolute",
@@ -1715,16 +2063,25 @@ const TrafficChannels = () => {
               left: "50%",
               transform: "translate(-50%, -50%)",
               bgcolor: "white",
-              borderRadius: 2,
+              borderRadius: 3,
               boxShadow: 24,
               p: 4,
-              width: "80%",
+              width: "85%",
               maxWidth: "1000px",
               maxHeight: "90vh",
               overflow: "auto"
             }}
           >
-            <Typography variant="h5" align="center" sx={{ mb: 4, fontWeight: "bold" }}>
+            <Typography 
+              variant="h5" 
+              align="center" 
+              id="template-modal-title"
+              sx={{ 
+                mb: 4, 
+                fontWeight: 600,
+                color: theme.palette.text.primary
+              }}
+            >
               Choose Your Traffic Channel Template
             </Typography>
             
@@ -1738,41 +2095,39 @@ const TrafficChannels = () => {
                     alignItems: "center",
                     p: 3,
                     height: '100%',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.2s ease-in-out',
                     borderRadius: 3,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     '&:hover': {
                       transform: 'translateY(-5px)',
-                      boxShadow: 5
+                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
                     },
                     cursor: 'pointer'
                   }}
                   onClick={() => handleOpenSecondModal("Facebook")}
                 >
-                  <Box sx={{ bgcolor: '#f0f2f5', p: 2, borderRadius: '50%', mb: 2 }}>
-                    <div style={{ 
-                      width: "60px", 
-                      height: "60px", 
-                      backgroundColor: '#4267B2', 
-                      borderRadius: '50%', 
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '30px',
-                      fontWeight: 'bold'
-                    }}>f</div>
+                  <Box sx={{ mb: 2 }}>
+                    <Avatar sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      bgcolor: '#1877F2',
+                      boxShadow: `0 8px 16px ${alpha('#1877F2', 0.3)}`
+                    }}>
+                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>f</Typography>
+                    </Avatar>
                   </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: "bold" }}>
+                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
                     Facebook Ads
                   </Typography>
                   <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: "bold" }}>
+                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
                     API Integrations:
                   </Typography>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 1 }} />
+                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
                   </Box>
                   <Button 
                     variant="contained" 
@@ -1781,9 +2136,13 @@ const TrafficChannels = () => {
                       mt: 'auto', 
                       py: 1,
                       px: 3,
-                      borderRadius: 2,
+                      borderRadius: 6,
                       textTransform: 'none',
-                      fontWeight: 'bold'
+                      fontWeight: 'medium',
+                      bgcolor: '#1877F2',
+                      '&:hover': {
+                        bgcolor: '#166FE5'
+                      }
                     }}
                   >
                     Add Facebook
@@ -1800,52 +2159,53 @@ const TrafficChannels = () => {
                     alignItems: "center",
                     p: 3,
                     height: '100%',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.2s ease-in-out',
                     borderRadius: 3,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     '&:hover': {
                       transform: 'translateY(-5px)',
-                      boxShadow: 5
+                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
                     },
                     cursor: 'pointer'
                   }}
                   onClick={() => handleOpenSecondModal("Google")}
                 >
-                  <Box sx={{ bgcolor: '#f8f9fa', p: 2, borderRadius: '50%', mb: 2 }}>
-                    <div style={{ 
-                      width: "60px", 
-                      height: "60px", 
-                      backgroundColor: '#4285F4', 
-                      borderRadius: '50%', 
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '30px',
-                      fontWeight: 'bold'
-                    }}>G</div>
+                  <Box sx={{ mb: 2 }}>
+                    <Avatar sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      bgcolor: '#4285F4',
+                      boxShadow: `0 8px 16px ${alpha('#4285F4', 0.3)}`
+                    }}>
+                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>G</Typography>
+                    </Avatar>
                   </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: "bold" }}>
+                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
                     Google Ads
                   </Typography>
                   <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: "bold" }}>
+                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
                     API Integrations:
                   </Typography>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 1 }} />
+                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
                   </Box>
                   <Button 
                     variant="contained" 
-                    color="primary" 
                     sx={{ 
                       mt: 'auto', 
                       py: 1,
                       px: 3,
-                      borderRadius: 2,
+                      borderRadius: 6,
                       textTransform: 'none',
-                      fontWeight: 'bold'
+                      fontWeight: 'medium',
+                      bgcolor: '#4285F4',
+                      '&:hover': {
+                        bgcolor: '#3367D6'
+                      }
                     }}
                   >
                     Add Google
@@ -1862,52 +2222,53 @@ const TrafficChannels = () => {
                     alignItems: "center",
                     p: 3,
                     height: '100%',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.2s ease-in-out',
                     borderRadius: 3,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     '&:hover': {
                       transform: 'translateY(-5px)',
-                      boxShadow: 5
+                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
                     },
                     cursor: 'pointer'
                   }}
                   onClick={() => handleOpenSecondModal("TikTok")}
                 >
-                  <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: '50%', mb: 2 }}>
-                    <div style={{ 
-                      width: "60px", 
-                      height: "60px", 
-                      backgroundColor: '#000000', 
-                      borderRadius: '50%', 
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '28px',
-                      fontWeight: 'bold'
-                    }}>T</div>
+                  <Box sx={{ mb: 2 }}>
+                    <Avatar sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      bgcolor: '#000000',
+                      boxShadow: `0 8px 16px ${alpha('#000000', 0.2)}`
+                    }}>
+                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>T</Typography>
+                    </Avatar>
                   </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: "bold" }}>
+                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
                     TikTok Ads
                   </Typography>
                   <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: "bold" }}>
+                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
                     API Integrations:
                   </Typography>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Campaign pause" color="secondary" sx={{ borderRadius: 1 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 1 }} />
+                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Campaign pause" color="secondary" sx={{ borderRadius: 6 }} />
+                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
                   </Box>
                   <Button 
                     variant="contained" 
-                    color="primary" 
                     sx={{ 
                       mt: 'auto', 
                       py: 1,
                       px: 3,
-                      borderRadius: 2,
+                      borderRadius: 6,
                       textTransform: 'none',
-                      fontWeight: 'bold'
+                      fontWeight: 'medium',
+                      bgcolor: '#000000',
+                      '&:hover': {
+                        bgcolor: '#333333'
+                      }
                     }}
                   >
                     Add TikTok
@@ -1920,15 +2281,30 @@ const TrafficChannels = () => {
               <Button 
                 variant="outlined" 
                 onClick={handleCloseModal}
-                sx={{ px: 3, py: 1, borderRadius: 2 }}
+                sx={{ 
+                  px: 3, 
+                  py: 1, 
+                  borderRadius: 6,
+                  textTransform: 'none',
+                  fontWeight: 'medium'
+                }}
               >
                 Cancel
               </Button>
               <Button 
                 variant="contained" 
-                color="secondary" 
                 onClick={() => handleOpenSecondModal(null)}
-                sx={{ px: 3, py: 1, borderRadius: 2 }}
+                sx={{ 
+                  px: 3, 
+                  py: 1, 
+                  borderRadius: 6,
+                  textTransform: 'none',
+                  fontWeight: 'medium',
+                  bgcolor: theme.palette.secondary.main,
+                  '&:hover': {
+                    bgcolor: theme.palette.secondary.dark
+                  }
+                }}
               >
                 Custom Channel
               </Button>
@@ -1937,7 +2313,11 @@ const TrafficChannels = () => {
         </Modal>
 
         {/* Channel Setup Modal */}
-        <Modal open={openSecondModal} onClose={handleCloseSecondModal}>
+        <Modal 
+          open={openSecondModal} 
+          onClose={handleCloseSecondModal}
+          aria-labelledby="channel-setup-modal-title"
+        >
           <Box
             sx={{
               position: "absolute",
@@ -1945,12 +2325,12 @@ const TrafficChannels = () => {
               left: "50%",
               transform: "translate(-50%, -50%)",
               bgcolor: "white",
-              borderRadius: 2,
-              boxShadow: 3,
+              borderRadius: 3,
+              boxShadow: 24,
               maxHeight: "90vh",
               overflowY: "auto",
-              width: "85%",
-              maxWidth: "1000px"
+              width: "90%",
+              maxWidth: "1100px"
             }}
           >
             <Box
@@ -1960,32 +2340,43 @@ const TrafficChannels = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                p: 2,
-                boxShadow: 1,
+                p: 2.5,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
                 zIndex: 10,
                 backgroundColor: "white",
-                borderTopLeftRadius: 2,
-                borderTopRightRadius: 2,
+                borderTopLeftRadius: 3,
+                borderTopRightRadius: 3,
               }}
             >
-              <Typography variant="h6" fontWeight="bold">
+              <Typography variant="h6" fontWeight="bold" id="channel-setup-modal-title">
                 {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
               </Typography>
               <Box sx={{ display: "flex", gap: 2 }}>
                 <Button 
                   variant="outlined" 
                   onClick={handleCloseSecondModal}
+                  sx={{ 
+                    borderRadius: 6,
+                    textTransform: 'none',
+                    fontWeight: 'medium'
+                  }}
                 >
-                  CLOSE
+                  Cancel
                 </Button>
                 <Button 
                   variant="contained" 
                   color="primary" 
                   onClick={handleSubmit}
                   disabled={loading.save}
-                  startIcon={loading.save ? <CircularProgress size={20} /> : null}
+                  startIcon={loading.save ? <CircularProgress size={20} color="inherit" /> : null}
+                  sx={{ 
+                    borderRadius: 6,
+                    textTransform: 'none',
+                    fontWeight: 'medium',
+                    px: 3
+                  }}
                 >
-                  SAVE
+                  {loading.save ? "Saving..." : "Save Changes"}
                 </Button>
               </Box>
             </Box>
@@ -2004,7 +2395,9 @@ const TrafficChannels = () => {
           <Alert
             onClose={handleCloseSnackbar}
             severity={snackbar.severity}
-            sx={{ width: '100%', boxShadow: 3, borderRadius: 2 }}
+            elevation={6}
+            variant="filled"
+            sx={{ width: '100%', borderRadius: 2 }}
           >
             {snackbar.message}
           </Alert>
