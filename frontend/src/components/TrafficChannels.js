@@ -394,129 +394,118 @@ const TrafficChannels = () => {
   }, [authStatus, selectedRow, openSecondModal]);
 
   // Improved handleAuth function for popup-based authentication
-  // Update the handleAuth function to ensure immediate window closure
-const handleAuth = (platform) => {
-  const platformLower = platform.toLowerCase();
-  
-  // Set loading state
-  setLoading(prev => ({ ...prev, [platformLower]: true }));
-  
-  // Define popup dimensions
-  const width = 600;
-  const height = 700;
-  const left = window.screen.width / 2 - width / 2;
-  const top = window.screen.height / 2 - height / 2;
-  
-  // Open popup window
-  const popup = window.open(
-    `${API_URL}/auth/${platformLower}`,
-    `${platformLower}Auth`,
-    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-  );
-  
-  // Store reference to the popup
-  window.authPopup = popup;
-  
-  // Add listener for messages from popup
-  const authMessageListener = (event) => {
-    // Verify origin for security
-    if (event.origin !== window.location.origin) return;
+  const handleAuth = (platform) => {
+    const platformLower = platform.toLowerCase();
     
-    // Process auth result - handle both auth_success and auth_error message types
-    if (event.data) {
-      if (event.data.type === 'auth_success') {
-        // Handle successful authentication
-        const { platform, session } = event.data;
-        
-        console.log(`Auth successful for ${platform}`);
-        
-        // Close the popup immediately
-        if (popup && !popup.closed) {
-          popup.close();
-        }
-        
-        // Store session token
-        localStorage.setItem('sessionToken', session);
-        
-        // Update auth status for the platform
-        setAuthStatus(prev => ({
-          ...prev,
-          [platformLower]: true
-        }));
-        
-        // Update connection status
-        if (selectedRow && selectedRow.id) {
-          setChannelConnectionStatus(prev => ({
+    // Set loading state
+    setLoading(prev => ({ ...prev, [platformLower]: true }));
+    
+    // Define popup dimensions
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    // Open popup window
+    const popup = window.open(
+      `${API_URL}/auth/${platformLower}`,
+      `${platformLower}Auth`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+    );
+    
+    // Store reference to the popup
+    window.authPopup = popup;
+    
+    // Add listener for messages from popup
+    const authMessageListener = (event) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+      
+      // Process auth result - handle both auth_success and auth_error message types
+      if (event.data) {
+        if (event.data.type === 'auth_success') {
+          // Handle successful authentication
+          const { platform, session } = event.data;
+          
+          console.log(`Auth successful for ${platform}`);
+          
+          // Store session token
+          localStorage.setItem('sessionToken', session);
+          
+          // Update auth status for the platform
+          setAuthStatus(prev => ({
             ...prev,
-            [selectedRow.id]: true
+            [platformLower]: true
           }));
           
-          // Update form data connection status
-          setFormData(prev => ({
-            ...prev,
-            isConnected: true
-          }));
+          // Update connection status
+          if (selectedRow && selectedRow.id) {
+            setChannelConnectionStatus(prev => ({
+              ...prev,
+              [selectedRow.id]: true
+            }));
+            
+            // Update form data connection status
+            setFormData(prev => ({
+              ...prev,
+              isConnected: true
+            }));
+            
+            // Save connection status to API
+            saveConnectionStatus(platformLower, true);
+          }
           
-          // Save connection status to API
-          saveConnectionStatus(platformLower, true);
+          // Show success message
+          setSnackbar({
+            open: true,
+            message: `${platform} account connected successfully`,
+            severity: 'success'
+          });
+          
+        } else if (event.data.type === 'auth_error') {
+          // Handle authentication error
+          const { platform, message } = event.data;
+          
+          console.log(`Auth failed for ${platform}: ${message}`);
+          
+          // Show error message
+          setSnackbar({
+            open: true,
+            message: `Failed to connect to ${platform}: ${message || 'Authentication failed'}`,
+            severity: 'error'
+          });
         }
         
-        // Show success message
-        setSnackbar({
-          open: true,
-          message: `${platform} account connected successfully`,
-          severity: 'success'
-        });
-        
-      } else if (event.data.type === 'auth_error') {
-        // Handle authentication error
-        const { platform, message } = event.data;
-        
-        console.log(`Auth failed for ${platform}: ${message}`);
-        
-        // Close the popup immediately even on error
-        if (popup && !popup.closed) {
-          popup.close();
-        }
-        
-        // Show error message
-        setSnackbar({
-          open: true,
-          message: `Failed to connect to ${platform}: ${message || 'Authentication failed'}`,
-          severity: 'error'
-        });
-      }
-      
-      // Reset loading state
-      setLoading(prev => ({ ...prev, [platformLower]: false }));
-      
-      // Remove event listener once we're done
-      window.removeEventListener('message', authMessageListener);
-    }
-  };
-  
-  // Add event listener for messages from popup
-  window.addEventListener('message', authMessageListener);
-  
-  // Fallback cleanup for closed popup
-  const checkPopupClosed = setInterval(() => {
-    if (!popup || popup.closed) {
-      clearInterval(checkPopupClosed);
-      window.removeEventListener('message', authMessageListener);
-      
-      // Reset loading state if popup was closed without completing auth
-      if (loading[platformLower]) {
+        // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        setSnackbar({
-          open: true,
-          message: `${platform} authentication was cancelled`,
-          severity: 'warning'
-        });
+        // Remove event listener once we're done
+        window.removeEventListener('message', authMessageListener);
       }
-    }
-  }, 1000);
-};
+    };
+    
+    // Add event listener for messages from popup
+    window.addEventListener('message', authMessageListener);
+    
+    // Fallback cleanup for closed popup
+    const checkPopupClosed = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(checkPopupClosed);
+        window.removeEventListener('message', authMessageListener);
+        
+        // Reset loading state if popup was closed without completing auth
+        if (loading[platformLower]) {
+          setLoading(prev => ({ ...prev, [platformLower]: false }));
+          
+          setSnackbar({
+            open: true,
+            message: `${platform} authentication was cancelled`,
+            severity: 'warning'
+          });
+        }
+      }
+    }, 1000);
+  };
 
   // Function to save connection status without closing modal
   const saveConnectionStatus = async (platform, isConnected) => {
