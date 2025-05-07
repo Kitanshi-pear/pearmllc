@@ -377,10 +377,17 @@ const TrafficChannels = () => {
         // Save the form changes to update the connection status
         handleSubmit();
         
-        // Automatically close the modal after successful connection
+        // Determine which tab to show based on the platform
+        const platformTabMap = {
+          'facebook': 1,
+          'google': 2,
+          'tiktok': 1  // Assuming TikTok uses same tab as Facebook for now, adjust if needed
+        };
+        
+        // Switch to the Basic Settings tab
         setTimeout(() => {
-          setOpenSecondModal(false);
-        }, 1500); // Delay closure to show the success state
+          setCurrentTab(0);
+        }, 1000);
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
