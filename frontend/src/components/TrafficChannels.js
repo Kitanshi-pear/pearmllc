@@ -521,7 +521,7 @@ const TrafficChannels = () => {
       console.log("Received message from popup:", event.data);
       
       // Process auth result from the message
-      if (event.data && (event.data.type === 'auth_success' || event.data.type === 'auth_error')) {
+      if (event.data && (event.data.type === 'auth_success')) {
         const isSuccess = event.data.type === 'auth_success';
         const { platform, session, message } = event.data;
         
