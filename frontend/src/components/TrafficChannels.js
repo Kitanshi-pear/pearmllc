@@ -156,9 +156,6 @@ const channelTemplates = {
 const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect }) => {
   const theme = useTheme();
   
-  // Added console logging to help debug connection status
-  console.log(`Rendering PlatformConnectionStatus for ${platform}: isConnected=${isConnected}`);
-  
   return (
     <Paper 
       elevation={0} 
@@ -216,9 +213,6 @@ const TrafficChannels = () => {
     google: false,
     tiktok: false
   });
-  
-  // Store the OAuth callback parameters in state to handle them after data loads
-  const [oauthCallback, setOauthCallback] = useState(null);
   
   const [rows, setRows] = useState([]);
   const [filterText, setFilterText] = useState("");
@@ -292,151 +286,6 @@ const TrafficChannels = () => {
     isConnected: false,
     status: "Active"
   });
-
-  // Split the OAuth callback handling into two parts - detection and processing
-  useEffect(() => {
-    // Check URL for OAuth callback parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const platform = urlParams.get('platform');
-    const success = urlParams.get('success');
-    const session = urlParams.get('session');
-    const error = urlParams.get('error');
-    const message = urlParams.get('message');
-    
-    // If we have OAuth callback parameters, store them
-    if (platform) {
-      console.log(`Detected OAuth callback: platform=${platform}, success=${success}`);
-      
-      // Store the callback parameters
-      setOauthCallback({
-        platform,
-        success,
-        session,
-        error,
-        message
-      });
-      
-      // Clean up URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []); // Empty dependency array ensures it only runs once on mount
-
-  // Use another effect to process the callback once we have data
-  useEffect(() => {
-    // If we have OAuth callback parameters and the rows have loaded
-    if (oauthCallback && rows.length > 0) {
-      const { platform, success, session, error, message } = oauthCallback;
-      
-      // Get stored modal state from sessionStorage
-      const storedModalState = sessionStorage.getItem('trafficChannelModalState');
-      
-      if (storedModalState) {
-        try {
-          const modalState = JSON.parse(storedModalState);
-          console.log("Retrieved stored modal state:", modalState);
-          
-          // Even if we can't find the specific channel, we still open the modal and tab
-          // Open modal first with the correct tab
-          setEditMode(modalState.editMode || false);
-          setOpenSecondModal(true);
-          
-          // Set the correct tab immediately
-          if (platform.toLowerCase() === 'facebook') {
-            setCurrentTab(1);
-          } else if (platform.toLowerCase() === 'google') {
-            setCurrentTab(2);
-          } else if (platform.toLowerCase() === 'tiktok') {
-            setCurrentTab(3);
-          } else {
-            setCurrentTab(modalState.currentTab || 0);
-          }
-          
-          // Restore form data
-          if (modalState.formData) {
-            setFormData({
-              ...modalState.formData,
-              isConnected: success === 'true'
-            });
-          }
-          
-          // Now finish processing the success or error
-          if (success === 'true' && session) {
-            // Successful authentication
-            
-            // Store session token
-            localStorage.setItem('sessionToken', session);
-            
-            // Update auth status for the platform
-            setAuthStatus(prev => ({
-              ...prev,
-              [platform.toLowerCase()]: true
-            }));
-            
-            // Show success message
-            setSnackbar({
-              open: true,
-              message: `${platform} account connected successfully`,
-              severity: 'success'
-            });
-            
-            // Reset loading state
-            setLoading(prev => ({ ...prev, [platform.toLowerCase()]: false }));
-            
-            // If we have a stored row ID, find the channel data
-            if (modalState.selectedRow) {
-              // Find the channel in the rows data
-              const channel = rows.find(row => row.id === modalState.selectedRow);
-              
-              if (channel) {
-                // Update connection status
-                setChannelConnectionStatus(prev => ({
-                  ...prev,
-                  [modalState.selectedRow]: true
-                }));
-                
-                // Restore selected row
-                setSelectedRow(channel);
-                setSelectedChannel(modalState.selectedChannel);
-                
-                // Save the connection status to the API
-                saveConnectionStatus(platform.toLowerCase(), true);
-              }
-            }
-          } else if (error === 'true' || success === 'false') {
-            // Failed authentication
-            
-            // Show error message
-            setSnackbar({
-              open: true,
-              message: `Failed to connect to ${platform}: ${message || 'Authentication failed'}`,
-              severity: 'error'
-            });
-            
-            // Reset loading state
-            setLoading(prev => ({ ...prev, [platform.toLowerCase()]: false }));
-            
-            // Still restore modal state to let user try again
-            if (modalState.selectedRow) {
-              const channel = rows.find(row => row.id === modalState.selectedRow);
-              
-              if (channel) {
-                setSelectedRow(channel);
-                setSelectedChannel(modalState.selectedChannel);
-              }
-            }
-          }
-          
-          // Clear stored modal state
-          sessionStorage.removeItem('trafficChannelModalState');
-          
-          // Clear the callback now that we've processed it
-          setOauthCallback(null);
-        } catch (error) {
-          console.error("Error parsing stored modal state:", error);
-        }
-      }
-    }
-  }, [oauthCallback, rows]); // Depends on oauthCallback and rows
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -528,8 +377,6 @@ const TrafficChannels = () => {
       else if (platform === 'Google') isConnected = authStatus.google;
       else if (platform === 'TikTok') isConnected = authStatus.tiktok;
       
-      console.log(`Connection status effect: platform=${platform}, isConnected=${isConnected}`);
-      
       // Update the connection status in the form
       setFormData(prev => ({
         ...prev,
@@ -546,13 +393,119 @@ const TrafficChannels = () => {
     }
   }, [authStatus, selectedRow, openSecondModal]);
 
+  // Improved handleAuth function for popup-based authentication
+  const handleAuth = (platform) => {
+    const platformLower = platform.toLowerCase();
+    
+    // Set loading state
+    setLoading(prev => ({ ...prev, [platformLower]: true }));
+    
+    // Define popup dimensions
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    // Open popup window
+    const popup = window.open(
+      `${API_URL}/auth/${platformLower}`,
+      `${platformLower}Auth`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+    );
+    
+    // Store reference to the popup
+    window.authPopup = popup;
+    
+    // Add listener for messages from popup
+    const authMessageListener = (event) => {
+      // Verify origin for security
+      const apiUrlObj = new URL(API_URL);
+      if (event.origin !== apiUrlObj.origin) return;
+      
+      // Process auth result
+      if (event.data && event.data.type === 'auth_callback') {
+        const { platform, success, session, error, message } = event.data;
+        
+        console.log(`Auth callback received: platform=${platform}, success=${success}`);
+        
+        if (success) {
+          // Store session token
+          localStorage.setItem('sessionToken', session);
+          
+          // Update auth status for the platform
+          setAuthStatus(prev => ({
+            ...prev,
+            [platformLower]: true
+          }));
+          
+          // Update connection status
+          if (selectedRow && selectedRow.id) {
+            setChannelConnectionStatus(prev => ({
+              ...prev,
+              [selectedRow.id]: true
+            }));
+            
+            // Update form data connection status
+            setFormData(prev => ({
+              ...prev,
+              isConnected: true
+            }));
+            
+            // Save connection status to API
+            saveConnectionStatus(platformLower, true);
+          }
+          
+          // Show success message
+          setSnackbar({
+            open: true,
+            message: `${platform} account connected successfully`,
+            severity: 'success'
+          });
+        } else {
+          // Show error message
+          setSnackbar({
+            open: true,
+            message: `Failed to connect to ${platform}: ${message || 'Authentication failed'}`,
+            severity: 'error'
+          });
+        }
+        
+        // Reset loading state
+        setLoading(prev => ({ ...prev, [platformLower]: false }));
+        
+        // Remove event listener once we're done
+        window.removeEventListener('message', authMessageListener);
+      }
+    };
+    
+    // Add event listener for messages from popup
+    window.addEventListener('message', authMessageListener);
+    
+    // Fallback cleanup for closed popup
+    const checkPopupClosed = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(checkPopupClosed);
+        window.removeEventListener('message', authMessageListener);
+        
+        // Reset loading state if popup was closed without completing auth
+        if (loading[platformLower]) {
+          setLoading(prev => ({ ...prev, [platformLower]: false }));
+          
+          setSnackbar({
+            open: true,
+            message: `${platform} authentication was cancelled`,
+            severity: 'warning'
+          });
+        }
+      }
+    }, 1000);
+  };
+
   // Function to save connection status without closing modal
   const saveConnectionStatus = async (platform, isConnected) => {
     if (!selectedRow) return;
     
     try {
-      console.log(`Saving connection status for ${platform}: ${isConnected}`);
-      
       // Create an update payload
       const updateData = {
         ...formData,
@@ -568,15 +521,13 @@ const TrafficChannels = () => {
           row.id === selectedRow.id ? response.data : row
         )
       );
-      
-      console.log(`Connection status for ${platform} saved successfully`);
     } catch (error) {
       console.error(`Error saving connection status for ${platform}:`, error);
       // Show error message but keep modal open
       setSnackbar({
         open: true,
         message: `Failed to save connection status: ${error.message}`,
-        severity: "warning" // Use warning to indicate partial success (connected but not saved)
+        severity: "warning"
       });
     }
   };
@@ -593,32 +544,6 @@ const TrafficChannels = () => {
     if (!platformName) return false;
     const platformLower = platformName.toLowerCase();
     return ["facebook", "google", "tiktok"].includes(platformLower);
-  };
-
-  // Update the handleAuth function to store which tab we're on
-  const handleAuth = (platform) => {
-    const platformLower = platform.toLowerCase();
-    
-    // Set loading state
-    setLoading(prev => ({ ...prev, [platformLower]: true }));
-    
-    // Store current modal state in sessionStorage before redirecting
-    const modalState = {
-      isOpen: true,
-      editMode: editMode,
-      selectedRow: selectedRow ? selectedRow.id : null,
-      selectedChannel: selectedChannel,
-      currentTab: currentTab, // Store the current tab
-      formData: formData
-    };
-    
-    console.log("Storing modal state before redirect:", modalState);
-    
-    // Save to sessionStorage
-    sessionStorage.setItem('trafficChannelModalState', JSON.stringify(modalState));
-    
-    // Full page redirect to auth endpoint
-    window.location.href = `${API_URL}/auth/${platformLower}`;
   };
 
   // Form change handler for basic fields
@@ -756,14 +681,9 @@ const TrafficChannels = () => {
     }
   };
 
-  // Form submission with enhanced modal handling
+  // Form submission
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    
-    // Log to debug
-    console.log("Submitting form, editMode:", editMode);
-    console.log("Selected channel:", selectedChannel);
-    console.log("Is platform connectable:", isPlatformConnectable(formData.aliasChannel));
     
     // Validate form
     if (!validateBasicSettings()) {
@@ -828,12 +748,8 @@ const TrafficChannels = () => {
       // Only close modal for non-connectable platforms
       const shouldCloseModal = !isPlatformConnectable(formData.aliasChannel);
       
-      console.log("Should close modal:", shouldCloseModal);
-      
       if (shouldCloseModal) {
         setOpenSecondModal(false);
-      } else {
-        console.log("Keeping modal open for connectable platform:", formData.aliasChannel);
       }
     } catch (error) {
       console.error("Error saving channel:", error);
@@ -851,17 +767,8 @@ const TrafficChannels = () => {
   const handleOpenModal = () => setOpenModal(true);
   const handleCloseModal = () => setOpenModal(false);
   
+  // Simplified modal close function
   const handleCloseSecondModal = () => {
-    // Check if we should warn the user about pending auth state
-    const pendingAuthState = sessionStorage.getItem('trafficChannelModalState');
-    if (pendingAuthState) {
-      const confirmClose = window.confirm('You have a pending authentication process. Closing this window will cancel it. Continue?');
-      if (!confirmClose) return;
-      
-      // Clear stored state if user confirms close
-      sessionStorage.removeItem('trafficChannelModalState');
-    }
-    
     setOpenSecondModal(false);
     setFormData({
       ...channelTemplates.Custom,
@@ -903,34 +810,25 @@ const TrafficChannels = () => {
 
   // More reliable function to check if current channel is connected
   const isChannelConnected = (platform) => {
-    console.log(`Checking connection status for ${platform}`);
-    
     // For an existing channel being edited
     if (editMode && selectedRow) {
       const status = channelConnectionStatus[selectedRow.id];
-      console.log(`Existing channel status for ${selectedRow.id}: ${status}`);
       return status || false;
     }
     
     // For a new channel, check global auth status
     const platformLower = platform.toLowerCase();
     if (authStatus[platformLower]) {
-      console.log(`${platform} global auth status: ${authStatus[platformLower]}`);
       return true;
     }
     
-    console.log(`No status found for ${platform}, using form status: ${formData.isConnected}`);
     return formData.isConnected || false;
   };
 
-  // Render Facebook connection section with updated tab setting
+  // Render Facebook connection section
   const renderFacebookConnection = () => {
-    // We know Facebook integration is tab index 1
-    const FACEBOOK_TAB_INDEX = 1;
-    
     // Check if the current channel is connected
     const isConnected = isChannelConnected('Facebook');
-    const isAuthInProgress = Boolean(sessionStorage.getItem('trafficChannelModalState'));
     
     return (
       <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
@@ -944,12 +842,8 @@ const TrafficChannels = () => {
         <Button
           variant="contained"
           startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#1877F2' }}>f</Avatar>}
-          onClick={() => {
-            // Set the current tab to Facebook before redirecting
-            setCurrentTab(FACEBOOK_TAB_INDEX);
-            handleAuth('Facebook');
-          }}
-          disabled={loading.facebook || isAuthInProgress}
+          onClick={() => handleAuth('Facebook')}
+          disabled={loading.facebook}
           sx={{ 
             mb: 3, 
             py: 1.2, 
@@ -971,15 +865,8 @@ const TrafficChannels = () => {
           )}
         </Button>
         
-        {/* Show info alert during authentication */}
-        {isAuthInProgress && (
-          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-            Authentication in progress. Please complete the process in the redirected window.
-          </Alert>
-        )}
-        
         {/* Show success message when connected */}
-        {isConnected && !isAuthInProgress && (
+        {isConnected && (
           <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
             Your Facebook account is successfully connected. You can now use Facebook integrations.
           </Alert>
@@ -1134,14 +1021,10 @@ const TrafficChannels = () => {
     );
   };
 
-  // Render Google connection section with updated tab setting
+  // Render Google connection section
   const renderGoogleConnection = () => {
-    // We know Google integration is tab index 2
-    const GOOGLE_TAB_INDEX = 2;
-    
     // Check if the current channel is connected
     const isConnected = isChannelConnected('Google');
-    const isAuthInProgress = Boolean(sessionStorage.getItem('trafficChannelModalState'));
     
     return (
       <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
@@ -1174,12 +1057,8 @@ const TrafficChannels = () => {
           <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
               variant="outlined"
-              onClick={() => {
-                // Set the current tab to Google before redirecting
-                setCurrentTab(GOOGLE_TAB_INDEX);
-                handleAuth('Google');
-              }}
-              disabled={loading.google || isAuthInProgress}
+              onClick={() => handleAuth('Google')}
+              disabled={loading.google}
               startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#4285F4' }}>G</Avatar>}
               fullWidth
               sx={{ 
@@ -1205,15 +1084,8 @@ const TrafficChannels = () => {
           </Grid>
         </Grid>
         
-        {/* Show info alert during authentication */}
-        {isAuthInProgress && (
-          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-            Authentication in progress. Please complete the process in the redirected window.
-          </Alert>
-        )}
-        
         {/* Show success message when connected */}
-        {isConnected && !isAuthInProgress && (
+        {isConnected && (
           <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
             Your Google account is successfully connected. You can now use Google integrations.
           </Alert>
