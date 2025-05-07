@@ -368,9 +368,6 @@ const TrafficChannels = () => {
           isConnected: true
         }));
         
-        // Save the form changes to update the connection status
-        handleSubmit();
-        
         // Show success message
         setSnackbar({
           open: true,
@@ -381,10 +378,18 @@ const TrafficChannels = () => {
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        // Keep modal open to show connected status - don't close the popup
-        if (authWindow.current && !authWindow.current.closed) {
-          authWindow.current.close();
+        // IMPORTANT: Force close the popup window immediately
+        if (authWindow.current) {
+          try {
+            authWindow.current.close();
+            console.log("Popup window closed successfully");
+          } catch (error) {
+            console.error("Error closing popup:", error);
+          }
         }
+        
+        // Save the connection status changes
+        handleSubmit();
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
@@ -403,21 +408,28 @@ const TrafficChannels = () => {
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
         // Close the popup on error too
-        if (authWindow.current && !authWindow.current.closed) {
-          authWindow.current.close();
+        if (authWindow.current) {
+          try {
+            authWindow.current.close();
+            console.log("Popup window closed on error");
+          } catch (error) {
+            console.error("Error closing popup:", error);
+          }
         }
       }
       
       // Reset auth popup state
       setAuthPopupOpen(false);
       authPlatform.current = null;
-      authWindow.current = null;
       
       // Clear interval
       if (authInterval.current) {
         clearInterval(authInterval.current);
         authInterval.current = null;
       }
+      
+      // Set the auth window reference to null AFTER closing it
+      authWindow.current = null;
     };
     
     window.addEventListener('message', handleMessage);
@@ -534,6 +546,15 @@ const TrafficChannels = () => {
       const left = (window.innerWidth - width) / 2 + window.screenX;
       const top = (window.innerHeight - height) / 2 + window.screenY;
       
+      // First ensure the previous popup is closed
+      if (authWindow.current) {
+        try {
+          authWindow.current.close();
+        } catch (e) {
+          console.log("Error closing previous popup:", e);
+        }
+      }
+      
       // Open popup for authentication
       authWindow.current = window.open(
         `${API_URL}/auth/${platformLower}`,
@@ -542,7 +563,7 @@ const TrafficChannels = () => {
       );
       
       // Check if popup was blocked
-      if (!authWindow.current || authWindow.current.closed) {
+      if (!authWindow.current) {
         throw new Error('Popup was blocked. Please allow popups for this site.');
       }
       
@@ -556,12 +577,11 @@ const TrafficChannels = () => {
           
           if (authPopupOpen) {
             // Only show cancellation message if we haven't received success/error messages
-            // This prevents showing "cancelled" when it actually succeeded
             setAuthPopupOpen(false);
             setLoading(prev => ({ ...prev, [platformLower]: false }));
             
-            // Don't show the cancellation message as it might interfere with success message
-            // We'll let the message from the callback handle this
+            // Reset auth window reference
+            authWindow.current = null;
           }
         }
       }, 1000);
@@ -574,6 +594,7 @@ const TrafficChannels = () => {
         severity: 'error'
       });
       setAuthPopupOpen(false);
+      authWindow.current = null;
     }
   };
 
@@ -776,9 +797,9 @@ const TrafficChannels = () => {
         setEditMode(true);
       }
       
-      // Don't automatically close the modal if it's a connectable platform
-      // Keep the modal open to show connection status
-      if (!isPlatformConnectable(formData.aliasChannel)) {
+      // IMPORTANT: Do NOT close the modal for connectable platforms
+      // The whole point is to keep the modal open to show the updated connection status
+      if (!isPlatformConnectable(formData.aliasChannel) && !authPopupOpen) {
         setOpenSecondModal(false);
       }
     } catch (error) {
@@ -837,7 +858,7 @@ const TrafficChannels = () => {
     }
   };
 
-  // Function to check if current channel is connected - FIXED
+  // Function to check if current channel is connected
   const isChannelConnected = (platform) => {
     // For an existing channel being edited
     if (editMode && selectedRow) {
@@ -883,12 +904,26 @@ const TrafficChannels = () => {
             boxShadow: 2
           }}
         >
-          {loading.facebook ? <CircularProgress size={24} color="inherit" /> : isConnected ? "Reconnect Facebook" : "Connect with Facebook"}
+          {loading.facebook ? (
+            <CircularProgress size={24} color="inherit" /> 
+          ) : isConnected ? (
+            "Reconnect Facebook"
+          ) : (
+            "Connect with Facebook"
+          )}
         </Button>
         
+        {/* Show info alert only during active authentication */}
         {authPopupOpen && authPlatform.current === 'facebook' && (
           <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             Facebook authentication window opened. Please complete the process in the popup window.
+          </Alert>
+        )}
+        
+        {/* Show success message when connected */}
+        {isConnected && !authPopupOpen && (
+          <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+            Your Facebook account is successfully connected. You can now use Facebook integrations.
           </Alert>
         )}
         
@@ -1093,14 +1128,28 @@ const TrafficChannels = () => {
                 }
               }}
             >
-              {loading.google ? <CircularProgress size={24} color="inherit" /> : isConnected ? "Reconnect" : "Sign in with Google"}
+              {loading.google ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : isConnected ? (
+                "Reconnect" 
+              ) : (
+                "Sign in with Google"
+              )}
             </Button>
           </Grid>
         </Grid>
         
+        {/* Show info alert only during active authentication */}
         {authPopupOpen && authPlatform.current === 'google' && (
           <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             Google authentication window opened. Please complete the process in the popup window.
+          </Alert>
+        )}
+        
+        {/* Show success message when connected */}
+        {isConnected && !authPopupOpen && (
+          <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+            Your Google account is successfully connected. You can now use Google integrations.
           </Alert>
         )}
         
