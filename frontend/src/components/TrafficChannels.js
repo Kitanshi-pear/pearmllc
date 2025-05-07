@@ -381,7 +381,7 @@ const TrafficChannels = () => {
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        // NOW close the popup - this happens after all the state updates and form submission
+        // Keep modal open to show connected status - don't close the popup
         if (authWindow.current && !authWindow.current.closed) {
           authWindow.current.close();
         }
@@ -480,7 +480,7 @@ const TrafficChannels = () => {
         
         if (sessionToken) {
           // Make API call to check authentication status
-          const response = await axios.get(`${API_URL}/auth`, {
+          const response = await axios.get(`${API_URL}/auth/status`, {
             headers: {
               Authorization: `Bearer ${sessionToken}`
             }
@@ -741,6 +741,12 @@ const TrafficChannels = () => {
           )
         );
         
+        // Update connection status tracking
+        setChannelConnectionStatus(prev => ({
+          ...prev,
+          [selectedRow.id]: formData.isConnected
+        }));
+        
         setSnackbar({
           open: true,
           message: "Channel updated successfully",
@@ -771,6 +777,7 @@ const TrafficChannels = () => {
       }
       
       // Don't automatically close the modal if it's a connectable platform
+      // Keep the modal open to show connection status
       if (!isPlatformConnectable(formData.aliasChannel)) {
         setOpenSecondModal(false);
       }
@@ -830,12 +837,25 @@ const TrafficChannels = () => {
     }
   };
 
+  // Function to check if current channel is connected - FIXED
+  const isChannelConnected = (platform) => {
+    // For an existing channel being edited
+    if (editMode && selectedRow) {
+      return channelConnectionStatus[selectedRow.id] || false;
+    }
+    
+    // For a new channel, check global auth status
+    if (platform === 'Facebook') return authStatus.facebook;
+    if (platform === 'Google') return authStatus.google;
+    if (platform === 'TikTok') return authStatus.tiktok;
+    
+    return formData.isConnected || false;
+  };
+
   // Render Facebook connection section
   const renderFacebookConnection = () => {
     // Check if the current channel is connected
-    const isConnected = (editMode && selectedRow) 
-      ? channelConnectionStatus[selectedRow.id] || false 
-      : formData.isConnected || authStatus.facebook;
+    const isConnected = isChannelConnected('Facebook');
     
     return (
       <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
@@ -1024,9 +1044,7 @@ const TrafficChannels = () => {
   // Render Google connection section
   const renderGoogleConnection = () => {
     // Check if the current channel is connected
-    const isConnected = (editMode && selectedRow) 
-      ? channelConnectionStatus[selectedRow.id] || false 
-      : formData.isConnected || authStatus.google;
+    const isConnected = isChannelConnected('Google');
     
     return (
       <Box sx={{ px: 3, py: 4, borderBottom: "1px solid #eee" }}>
