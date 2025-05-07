@@ -1864,11 +1864,10 @@ const TrafficChannels = () => {
 
   return (
     <Layout>
-      <Box
+              <Box
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 3,
           p: 3,
           bgcolor: "#f8fafc",
           minHeight: "calc(100vh - 80px)",
@@ -1889,7 +1888,8 @@ const TrafficChannels = () => {
             py: 2.5,
             px: 3,
             borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            mb: 2
           }}
         >
           <Typography variant="h5" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
@@ -1938,7 +1938,8 @@ const TrafficChannels = () => {
           sx={{ 
             p: 2.5, 
             borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            mb: 2
           }}
         >
           <Grid container spacing={3} alignItems="center">
@@ -2052,7 +2053,8 @@ const TrafficChannels = () => {
             overflow: 'hidden', 
             borderRadius: 2,
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-            border: `1px solid ${alpha(theme.palette.common.black, 0.05)}`
+            border: `1px solid ${alpha(theme.palette.common.black, 0.05)}`,
+            mb: 2
           }}
         >
           <ModernDataGrid 
