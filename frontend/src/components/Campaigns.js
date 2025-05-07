@@ -602,57 +602,66 @@ export default function CampaignsPage() {
 
   // Fetch offers and traffic channels when component mounts
   useEffect(() => {
-    // Fetch offers
-    fetch(`${API_URL}/api/offers`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setOffersList(data);
+    // Load all necessary data in parallel for better performance
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Define all fetch operations
+        const fetchOffers = fetch(`${API_URL}/api/offers`).then(res => res.json());
+        const fetchDomains = fetch(`${API_URL}/api/domains`).then(res => res.json());
+        const fetchTrafficChannels = fetch(`${API_URL}/api/traffic`).then(res => res.json());
+        
+        // Execute all fetches in parallel
+        const [offersData, domainsData, trafficChannelsData] = await Promise.all([
+          fetchOffers,
+          fetchDomains,
+          fetchTrafficChannels
+        ]);
+        
+        // Process offers data
+        if (Array.isArray(offersData)) {
+          console.log("Offers data loaded successfully:", offersData.length, "offers");
+          setOffersList(offersData);
         } else {
-          console.error("Offers data is not an array:", data);
+          console.error("Offers data is not an array:", offersData);
           setOffersList([]);
         }
-      })
-      .catch(err => {
-        console.error('Error fetching offers:', err);
-        setOffersList([]);
-      });
-      
-    // Fetch domains for tracking URL generation
-    fetch(`${API_URL}/api/domains`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const cleaned = data.map(domain => ({
+        
+        // Process domains data
+        if (Array.isArray(domainsData)) {
+          const cleaned = domainsData.map(domain => ({
             id: domain.id,
-            url: domain.url.replace(/^https?:\/\//, '')
+            url: domain.url?.replace(/^https?:\/\//, '') || ''
           }));
+          console.log("Domains data loaded successfully:", cleaned.length, "domains");
           setDomains(cleaned);
         } else {
-          console.error("Domains data is not an array:", data);
+          console.error("Domains data is not an array:", domainsData);
           setDomains([]);
         }
-      })
-      .catch(err => {
-        console.error('Error fetching domains:', err);
-        setDomains([]);
-      });
-      
-    // Fetch traffic channels for name lookup
-    fetch(`${API_URL}/api/traffic`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setTrafficChannels(data);
+        
+        // Process traffic channels data
+        if (Array.isArray(trafficChannelsData)) {
+          console.log("Traffic channels loaded successfully:", trafficChannelsData.length, "channels");
+          setTrafficChannels(trafficChannelsData);
         } else {
-          console.error("Traffic channels data is not an array:", data);
+          console.error("Traffic channels data is not an array:", trafficChannelsData);
           setTrafficChannels([]);
         }
-      })
-      .catch((err) => {
-        console.error("Error fetching traffic channels:", err);
-        setTrafficChannels([]);
-      });
+        
+        // Now fetch campaigns with all reference data loaded
+        fetchCampaigns();
+      } catch (err) {
+        console.error("Error loading initial data:", err);
+        setLoading(false);
+        setSnackbarMessage("Error loading initial data. Please try again.");
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
+      }
+    };
+    
+    fetchData();
   }, []);
 
   // Enhanced columns with proper data mapping for campaign name and traffic channel
@@ -660,23 +669,37 @@ export default function CampaignsPage() {
     { 
       field: "id", 
       headerName: "ID", 
-      width: 70
+      width: 70,
+      renderCell: (params) => {
+        // Ensure we always display the ID as a string
+        return <div>{String(params.row.id || '')}</div>;
+      }
     },
     { 
       field: "name", 
       headerName: "Campaign Name", 
       flex: 1,
-      valueGetter: (params) => {
-        // First check for direct name field (prioritize this as it matches the database schema)
-        if (params?.row?.name !== undefined) {
-          return params.row.name;
-        }
+      renderCell: (params) => {
+        // Always check row exists and show debug on hover
+        if (!params.row) return null;
         
-        // Then check for alternative field names without hardcoded fallbacks
-        return params?.row?.campaign_name || 
-               params?.row?.title || 
-               params?.row?.campaignName || 
-               '';  // Return empty string instead of hardcoded default
+        const campaignName = params.row.name || 
+                            params.row.campaign_name || 
+                            params.row.title || 
+                            params.row.campaignName || '';
+        
+        return (
+          <Tooltip title={`Campaign ID: ${params.row.id}, Fields: ${Object.keys(params.row).join(', ')}`}>
+            <div style={{ 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              width: '100%'
+            }}>
+              {campaignName}
+            </div>
+          </Tooltip>
+        );
       }
     },
     {
@@ -684,10 +707,10 @@ export default function CampaignsPage() {
       headerName: "Status",
       width: 120,
       renderCell: (params) => {
-        const value = params?.row?.status || "INACTIVE";
+        const value = (params.row?.status || "INACTIVE").toUpperCase();
         return (
           <Chip 
-            label={value} 
+            label={value}
             color={value === "ACTIVE" ? "success" : "default"} 
             size="small"
           />
@@ -698,37 +721,40 @@ export default function CampaignsPage() {
       field: "traffic_channel_id",
       headerName: "Traffic Source",
       width: 150,
-      valueGetter: (params) => {
-        // Check for nested TrafficChannel object (includes channelName as shown in schema)
-        if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
-          return params.row.TrafficChannel.channelName;
-        }
+      renderCell: (params) => {
+        if (!params.row) return null;
         
-        // Check lowercase trafficChannel variant
-        if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
-          return params.row.trafficChannel.channelName;
-        }
+        // Try multiple ways to get the traffic channel name
+        let channelName = '';
         
-        // Check for directly stored traffic_channel_name field
-        if (params?.row?.traffic_channel_name) {
-          return params.row.traffic_channel_name;
+        // 1. First check TrafficChannel relationship - uppercase/original schema
+        if (params.row.TrafficChannel?.channelName) {
+          channelName = params.row.TrafficChannel.channelName;
         }
-        
-        // Look up from locally cached traffic channels using traffic_channel_id
-        if (params?.row?.traffic_channel_id) {
-          const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
-          if (channel) {
-            return channel.channelName;
+        // 2. Check lowercase variant of relationship
+        else if (params.row.trafficChannel?.channelName) {
+          channelName = params.row.trafficChannel.channelName;
+        }
+        // 3. Check direct traffic_channel_name field
+        else if (params.row.traffic_channel_name) {
+          channelName = params.row.traffic_channel_name;
+        }
+        // 4. Look up channel name from ID
+        else if (params.row.traffic_channel_id) {
+          const channel = trafficChannels.find(c => String(c.id) === String(params.row.traffic_channel_id));
+          if (channel?.channelName) {
+            channelName = channel.channelName;
+          } else {
+            // If no match found, just show the ID
+            channelName = `ID: ${params.row.traffic_channel_id}`;
           }
         }
         
-        // If all else fails, show the ID with a label
-        if (params?.row?.traffic_channel_id) {
-          return `Source ID: ${params.row.traffic_channel_id}`;
-        }
-        
-        // Return empty string as fallback
-        return '';
+        return (
+          <Tooltip title={`Channel ID: ${params.row.traffic_channel_id || 'N/A'}`}>
+            <div>{channelName}</div>
+          </Tooltip>
+        );
       }
     },
     { 
@@ -740,7 +766,10 @@ export default function CampaignsPage() {
       field: "costValue", 
       headerName: "Cost", 
       width: 80,
-      valueFormatter: (params) => `$${parseFloat(params?.value || 0).toFixed(2)}`
+      valueFormatter: (params) => {
+        const value = parseFloat(params?.value || 0);
+        return isNaN(value) ? "$0.00" : `$${value.toFixed(2)}`;
+      }
     },
     {
       field: "clicks",
@@ -808,26 +837,39 @@ export default function CampaignsPage() {
       field: "offer_id",
       headerName: "Offer",
       width: 120,
-      valueGetter: (params) => {
-        if (!params?.row?.offer_id) return "";
+      renderCell: (params) => {
+        if (!params.row) return null;
         
-        // Find offer name from the offers list if available
-        const offerItem = offersList.find(
-          offer => offer.Serial_No === params.row.offer_id
-        );
+        let offerName = '';
         
-        if (offerItem) {
-          return offerItem.Offer_name;
-        } else if (params.row.Offer && params.row.Offer.name) {
-          // Try to get from nested Offer object
-          return params.row.Offer.name;
-        } else if (params.row.offer && params.row.offer.name) {
-          // Try lowercase variant
-          return params.row.offer.name;
+        // Try to find offer name from the offers list
+        if (params.row.offer_id) {
+          const offerItem = offersList.find(
+            offer => String(offer.Serial_No) === String(params.row.offer_id)
+          );
+          
+          if (offerItem?.Offer_name) {
+            offerName = offerItem.Offer_name;
+          } 
+          // Try nested Offer relationship (uppercase)
+          else if (params.row.Offer?.name) {
+            offerName = params.row.Offer.name;
+          } 
+          // Try nested offer relationship (lowercase)
+          else if (params.row.offer?.name) {
+            offerName = params.row.offer.name;
+          }
+          // Fall back to ID if name not found
+          else {
+            offerName = `ID: ${params.row.offer_id}`;
+          }
         }
         
-        // Just return the ID with a label
-        return `Offer ID: ${params.row.offer_id}`;
+        return (
+          <Tooltip title={`Offer ID: ${params.row.offer_id || 'N/A'}`}>
+            <div>{offerName}</div>
+          </Tooltip>
+        );
       }
     },
     {
@@ -851,11 +893,12 @@ export default function CampaignsPage() {
                 try {
                   // Function to copy tracking URL
                   const domain = params.row.domain?.url || 
-                                (params.row.domain_id && domains.find(d => d.id === params.row.domain_id)?.url) || 
+                                (params.row.domain_id && domains.find(d => String(d.id) === String(params.row.domain_id))?.url) || 
                                 "";
                   const trackingUrl = `https://${domain}/api/track/click?campaign_id=${params.row.id}&tc=${params.row.traffic_channel_id || ''}`;
                   navigator.clipboard.writeText(trackingUrl);
                   setSnackbarMessage("Tracking URL copied to clipboard!");
+                  setSnackbarSeverity("success");
                   setSnackbarOpen(true);
                 } catch (err) {
                   console.error("Error copying tracking URL:", err);
@@ -917,66 +960,64 @@ export default function CampaignsPage() {
           console.log("Raw first campaign data:", JSON.stringify(campaignsData[0], null, 2));
         }
         
+        // Make sure all IDs are consistently string type to prevent comparison issues
+        const ensureStringId = (id) => id !== undefined ? String(id) : undefined;
+        
         // Enhanced data normalization with focus on campaign name and traffic channel
         const campaignsWithIds = campaignsData.map((campaign) => {
-          // Log original field names for debugging
-          console.log("Original campaign fields:", Object.keys(campaign).join(", "));
+          // Make a deep copy to avoid mutating the original
+          const normalizedCampaign = JSON.parse(JSON.stringify(campaign));
           
-          // Prepare normalized campaign object
-          const normalizedCampaign = {
-            ...campaign,
-            // Ensure ID field exists
-            id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
-          };
+          // Ensure ID exists and is a string
+          normalizedCampaign.id = ensureStringId(campaign.id || campaign._id || campaign.campaign_id || Date.now());
           
-          // Handle campaign name according to schema - without adding defaults
-          // Only normalize if an alternative name field exists but name doesn't
-          if (campaign.name === undefined && 
-              (campaign.campaign_name !== undefined || 
-              campaign.title !== undefined || 
-              campaign.campaignName !== undefined)) {
-            normalizedCampaign.name = campaign.campaign_name || 
-                                     campaign.title || 
-                                     campaign.campaignName;
+          // Convert other IDs to strings to ensure consistent matching
+          if (normalizedCampaign.traffic_channel_id !== undefined) {
+            normalizedCampaign.traffic_channel_id = ensureStringId(normalizedCampaign.traffic_channel_id);
           }
           
-          // Process TrafficChannel relationship
-          if (campaign.TrafficChannel) {
-            console.log("TrafficChannel data found:", campaign.TrafficChannel);
-            
-            // Store the original relationship
-            normalizedCampaign.TrafficChannel = campaign.TrafficChannel;
-            
-            // Also store the channel name directly for easier access
-            if (campaign.TrafficChannel.channelName) {
-              normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
-            }
+          if (normalizedCampaign.offer_id !== undefined) {
+            normalizedCampaign.offer_id = ensureStringId(normalizedCampaign.offer_id);
+          }
+          
+          if (normalizedCampaign.domain_id !== undefined) {
+            normalizedCampaign.domain_id = ensureStringId(normalizedCampaign.domain_id);
+          }
+          
+          // Ensure status is uppercase if it exists
+          if (normalizedCampaign.status) {
+            normalizedCampaign.status = normalizedCampaign.status.toUpperCase();
+          }
+          
+          // Process TrafficChannel relationship if it exists
+          if (campaign.TrafficChannel && campaign.TrafficChannel.channelName) {
+            normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
           } 
           // Process lowercase variant if present
-          else if (campaign.trafficChannel) {
-            normalizedCampaign.trafficChannel = campaign.trafficChannel;
-            
-            if (campaign.trafficChannel.channelName) {
-              normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
-            }
+          else if (campaign.trafficChannel && campaign.trafficChannel.channelName) {
+            normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
           }
-          // If we don't have a direct relationship but have the channel ID,
-          // try to look up the name from our cached traffic channels
-          else if (campaign.traffic_channel_id && !normalizedCampaign.traffic_channel_name) {
-            const channel = trafficChannels.find(c => c.id === campaign.traffic_channel_id);
-            if (channel) {
+          // If traffic_channel_id exists but no name, try to find name from cached list
+          else if (normalizedCampaign.traffic_channel_id) {
+            const channel = trafficChannels.find(c => 
+              ensureStringId(c.id) === normalizedCampaign.traffic_channel_id
+            );
+            
+            if (channel && channel.channelName) {
               normalizedCampaign.traffic_channel_name = channel.channelName;
             }
           }
           
+          // Log what we're going to return for debugging
+          console.log(`Normalized campaign ${normalizedCampaign.id}:`, 
+                      `name=${normalizedCampaign.name || '(undefined)'}`, 
+                      `traffic=${normalizedCampaign.traffic_channel_name || '(undefined)'}`);
+          
           return normalizedCampaign;
         });
         
-        // Show normalized first campaign for debugging
-        if (campaignsWithIds.length > 0) {
-          console.log("Normalized first campaign:", campaignsWithIds[0]);
-        }
-        
+        // Set the campaigns with full debug info
+        console.log(`Setting ${campaignsWithIds.length} normalized campaigns`);
         setCampaigns(campaignsWithIds);
         
         // Fetch metrics for these campaigns
@@ -1037,56 +1078,64 @@ export default function CampaignsPage() {
       }
     }
     
+    // Make sure all IDs are consistently string type to prevent comparison issues
+    const ensureStringId = (id) => id !== undefined ? String(id) : undefined;
+    
     // Enhanced data normalization with focus on campaign name and traffic channel
     const campaignsWithIds = campaignsData.map((campaign) => {
-      // Prepare normalized campaign object
-      const normalizedCampaign = {
-        ...campaign,
-        // Ensure ID field exists
-        id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
-      };
+      // Make a deep copy to avoid mutating the original
+      const normalizedCampaign = JSON.parse(JSON.stringify(campaign));
       
-      // Handle campaign name according to schema - without adding defaults
-      // Only normalize if an alternative name field exists but name doesn't
-      if (campaign.name === undefined && 
-          (campaign.campaign_name !== undefined || 
-           campaign.title !== undefined || 
-           campaign.campaignName !== undefined)) {
-        normalizedCampaign.name = campaign.campaign_name || 
-                                 campaign.title || 
-                                 campaign.campaignName;
+      // Ensure ID exists and is a string
+      normalizedCampaign.id = ensureStringId(campaign.id || campaign._id || campaign.campaign_id || Date.now());
+      
+      // Convert other IDs to strings to ensure consistent matching
+      if (normalizedCampaign.traffic_channel_id !== undefined) {
+        normalizedCampaign.traffic_channel_id = ensureStringId(normalizedCampaign.traffic_channel_id);
       }
       
-      // Process TrafficChannel relationship
-      if (campaign.TrafficChannel) {
-        // Store the original relationship
-        normalizedCampaign.TrafficChannel = campaign.TrafficChannel;
-        
-        // Also store the channel name directly for easier access
-        if (campaign.TrafficChannel.channelName) {
-          normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
-        }
+      if (normalizedCampaign.offer_id !== undefined) {
+        normalizedCampaign.offer_id = ensureStringId(normalizedCampaign.offer_id);
+      }
+      
+      if (normalizedCampaign.domain_id !== undefined) {
+        normalizedCampaign.domain_id = ensureStringId(normalizedCampaign.domain_id);
+      }
+      
+      // Ensure status is uppercase if it exists
+      if (normalizedCampaign.status) {
+        normalizedCampaign.status = normalizedCampaign.status.toUpperCase();
+      }
+      
+      // Process TrafficChannel relationship if it exists
+      if (campaign.TrafficChannel && campaign.TrafficChannel.channelName) {
+        normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
       } 
       // Process lowercase variant if present
-      else if (campaign.trafficChannel) {
-        normalizedCampaign.trafficChannel = campaign.trafficChannel;
-        
-        if (campaign.trafficChannel.channelName) {
-          normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
-        }
+      else if (campaign.trafficChannel && campaign.trafficChannel.channelName) {
+        normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
       }
-      // If we don't have a direct relationship but have the channel ID,
-      // try to look up the name from our cached traffic channels
-      else if (campaign.traffic_channel_id && !normalizedCampaign.traffic_channel_name) {
-        const channel = trafficChannels.find(c => c.id === campaign.traffic_channel_id);
-        if (channel) {
+      // If traffic_channel_id exists but no name, try to find name from cached list
+      else if (normalizedCampaign.traffic_channel_id) {
+        const channel = trafficChannels.find(c => 
+          ensureStringId(c.id) === normalizedCampaign.traffic_channel_id
+        );
+        
+        if (channel && channel.channelName) {
           normalizedCampaign.traffic_channel_name = channel.channelName;
         }
       }
       
+      // Log what we're going to return for debugging
+      console.log(`Normalized campaign ${normalizedCampaign.id}:`, 
+                  `name=${normalizedCampaign.name || '(undefined)'}`, 
+                  `traffic=${normalizedCampaign.traffic_channel_name || '(undefined)'}`);
+      
       return normalizedCampaign;
     });
     
+    // Set the campaigns with full debug info
+    console.log(`Setting ${campaignsWithIds.length} normalized campaigns`);
     setCampaigns(campaignsWithIds);
     
     // Fetch metrics for these campaigns
@@ -1178,16 +1227,6 @@ export default function CampaignsPage() {
         });
     });
   };
-
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
-  
-  useEffect(() => {
-    if (campaigns.length > 0) {
-      fetchMetrics(campaigns.map(c => c.id));
-    }
-  }, [dateRange]);
 
   // The rest of the component functions
   const handleCreateClick = () => {
@@ -1290,6 +1329,10 @@ export default function CampaignsPage() {
             autoHeight
             sx={{ minHeight: 400 }}
             getRowId={(row) => row.id}
+            onRowClick={(params) => {
+              // Debug on row click
+              console.log("Row clicked:", params.row);
+            }}
           />
         )}
       </Paper>
