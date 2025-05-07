@@ -310,8 +310,8 @@ const TrafficChannels = () => {
         session
       }, window.location.origin);
       
-      // Close popup after sending message
-      window.close();
+      // Don't close the popup here, let the parent window handle it
+      // The parent window will close this popup after receiving the message
     } else if (error === 'true' && platform) {
       // We're in a popup window that received an OAuth error
       console.log("Authentication failed, sending error to parent window");
@@ -321,8 +321,7 @@ const TrafficChannels = () => {
         message: message || 'Authentication failed'
       }, window.location.origin);
       
-      // Close popup after sending message
-      window.close();
+      // Don't close the popup here either
     }
   }, []);
 
@@ -364,6 +363,9 @@ const TrafficChannels = () => {
           isConnected: true
         }));
         
+        // Save the form changes to update the connection status
+        handleSubmit();
+        
         // Show success message
         setSnackbar({
           open: true,
@@ -374,8 +376,10 @@ const TrafficChannels = () => {
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        // Save the form changes to update the connection status
-        handleSubmit();
+        // NOW close the popup - this happens after all the state updates and form submission
+        if (authWindow.current && !authWindow.current.closed) {
+          authWindow.current.close();
+        }
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
@@ -392,16 +396,16 @@ const TrafficChannels = () => {
         
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
+        
+        // Close the popup on error too
+        if (authWindow.current && !authWindow.current.closed) {
+          authWindow.current.close();
+        }
       }
       
       // Reset auth popup state
       setAuthPopupOpen(false);
       authPlatform.current = null;
-      
-      // Close popup if it's still open
-      if (authWindow.current && !authWindow.current.closed) {
-        authWindow.current.close();
-      }
       authWindow.current = null;
       
       // Clear interval
