@@ -406,6 +406,9 @@ const TrafficChannels = () => {
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
     
+    // Store the popup reference globally so the message event has access to it
+    window.currentAuthPopup = null;
+    
     // Open popup window
     const popup = window.open(
       `${API_URL}/auth/${platformLower}`,
@@ -413,22 +416,32 @@ const TrafficChannels = () => {
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
     );
     
-    // Store reference to the popup
-    window.authPopup = popup;
+    // Store reference globally
+    window.currentAuthPopup = popup;
     
     // Add listener for messages from popup
     const authMessageListener = (event) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) return;
       
-      // Process auth result - handle both auth_success and auth_error message types
-      if (event.data) {
-        if (event.data.type === 'auth_success') {
-          // Handle successful authentication
-          const { platform, session } = event.data;
-          
-          console.log(`Auth successful for ${platform}`);
-          
+      console.log("Received message from popup:", event.data);
+      
+      // Process auth result from the message
+      if (event.data && (event.data.type === 'auth_success' || event.data.type === 'auth_error')) {
+        const isSuccess = event.data.type === 'auth_success';
+        const { platform, session, message } = event.data;
+        
+        // IMPORTANT: Force close the popup immediately
+        if (window.currentAuthPopup && !window.currentAuthPopup.closed) {
+          try {
+            console.log("Attempting to close popup window...");
+            window.currentAuthPopup.close();
+          } catch (e) {
+            console.error("Error closing popup:", e);
+          }
+        }
+        
+        if (isSuccess) {
           // Store session token
           localStorage.setItem('sessionToken', session);
           
@@ -438,7 +451,7 @@ const TrafficChannels = () => {
             [platformLower]: true
           }));
           
-          // Update connection status
+          // Update connection status if in edit mode
           if (selectedRow && selectedRow.id) {
             setChannelConnectionStatus(prev => ({
               ...prev,
@@ -461,13 +474,7 @@ const TrafficChannels = () => {
             message: `${platform} account connected successfully`,
             severity: 'success'
           });
-          
-        } else if (event.data.type === 'auth_error') {
-          // Handle authentication error
-          const { platform, message } = event.data;
-          
-          console.log(`Auth failed for ${platform}: ${message}`);
-          
+        } else {
           // Show error message
           setSnackbar({
             open: true,
@@ -479,21 +486,24 @@ const TrafficChannels = () => {
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        // Remove event listener once we're done
+        // Remove event listener
         window.removeEventListener('message', authMessageListener);
+        
+        // Clear the global reference
+        window.currentAuthPopup = null;
       }
     };
     
     // Add event listener for messages from popup
     window.addEventListener('message', authMessageListener);
     
-    // Fallback cleanup for closed popup
-    const checkPopupClosed = setInterval(() => {
+    // Monitor the popup state
+    const checkPopupInterval = setInterval(() => {
       if (!popup || popup.closed) {
-        clearInterval(checkPopupClosed);
+        clearInterval(checkPopupInterval);
         window.removeEventListener('message', authMessageListener);
         
-        // Reset loading state if popup was closed without completing auth
+        // Reset loading state if no message was received
         if (loading[platformLower]) {
           setLoading(prev => ({ ...prev, [platformLower]: false }));
           
@@ -503,8 +513,11 @@ const TrafficChannels = () => {
             severity: 'warning'
           });
         }
+        
+        // Clear the global reference
+        window.currentAuthPopup = null;
       }
-    }, 1000);
+    }, 500); // Check more frequently
   };
 
   // Function to save connection status without closing modal
