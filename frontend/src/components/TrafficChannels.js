@@ -376,18 +376,6 @@ const TrafficChannels = () => {
         
         // Save the form changes to update the connection status
         handleSubmit();
-        
-        // Determine which tab to show based on the platform
-        const platformTabMap = {
-          'facebook': 1,
-          'google': 2,
-          'tiktok': 1  // Assuming TikTok uses same tab as Facebook for now, adjust if needed
-        };
-        
-        // Switch to the Basic Settings tab
-        setTimeout(() => {
-          setCurrentTab(0);
-        }, 1000);
       } else if (event.data && event.data.type === 'auth_error') {
         // Handle authentication error
         const { platform, message } = event.data;
@@ -570,6 +558,15 @@ const TrafficChannels = () => {
           }
         }
       }, 1000);
+      
+      // Automatically close the popup after 10 seconds (safety measure)
+      setTimeout(() => {
+        if (authWindow.current && !authWindow.current.closed) {
+          authWindow.current.close();
+          setAuthPopupOpen(false);
+          setLoading(prev => ({ ...prev, [platformLower]: false }));
+        }
+      }, 60000); // 1 minute timeout as a safety fallback
     } catch (error) {
       console.error(`Error initiating ${platform} auth:`, error);
       setLoading(prev => ({ ...prev, [platformLower]: false }));
