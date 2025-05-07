@@ -343,7 +343,7 @@ const TrafficChannels = () => {
         
         if (sessionToken) {
           // Make API call to check authentication status
-          const response = await axios.get(`${API_URL}/auth`, {
+          const response = await axios.get(`${API_URL}/auth/status`, {
             headers: {
               Authorization: `Bearer ${sessionToken}`
             }
@@ -419,16 +419,16 @@ const TrafficChannels = () => {
     // Add listener for messages from popup
     const authMessageListener = (event) => {
       // Verify origin for security
-      const apiUrlObj = new URL(API_URL);
-      if (event.origin !== apiUrlObj.origin) return;
+      if (event.origin !== window.location.origin) return;
       
-      // Process auth result
-      if (event.data && event.data.type === 'auth_callback') {
-        const { platform, success, session, error, message } = event.data;
-        
-        console.log(`Auth callback received: platform=${platform}, success=${success}`);
-        
-        if (success) {
+      // Process auth result - handle both auth_success and auth_error message types
+      if (event.data) {
+        if (event.data.type === 'auth_success') {
+          // Handle successful authentication
+          const { platform, session } = event.data;
+          
+          console.log(`Auth successful for ${platform}`);
+          
           // Store session token
           localStorage.setItem('sessionToken', session);
           
@@ -461,7 +461,13 @@ const TrafficChannels = () => {
             message: `${platform} account connected successfully`,
             severity: 'success'
           });
-        } else {
+          
+        } else if (event.data.type === 'auth_error') {
+          // Handle authentication error
+          const { platform, message } = event.data;
+          
+          console.log(`Auth failed for ${platform}: ${message}`);
+          
           // Show error message
           setSnackbar({
             open: true,
