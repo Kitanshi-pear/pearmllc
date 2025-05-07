@@ -152,7 +152,7 @@ const channelTemplates = {
   }
 };
 
-// Helper component for platform connection status
+// Helper component for platform connection status with improved UI
 const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect }) => {
   const theme = useTheme();
   
@@ -185,13 +185,43 @@ const PlatformConnectionStatus = ({ platform, isConnected, isLoading, onConnect 
             <div style={{ cursor: 'pointer' }}><InfoIcon /></div>
           </Tooltip>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Chip 
             label={isConnected ? "Connected" : "Not connected"} 
             color={isConnected ? "success" : "error"}
             size="small"
             icon={isConnected ? <CheckIcon /> : <CancelIcon />}
           />
+          
+          <Button
+            variant={isConnected ? "outlined" : "contained"}
+            onClick={onConnect}
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={16} /> : null}
+            sx={{ 
+              py: 0.8, 
+              px: 2, 
+              borderRadius: 6,
+              textTransform: 'none',
+              fontSize: '0.8rem',
+              fontWeight: 'medium',
+              bgcolor: isConnected ? 'transparent' : platform === 'Facebook' ? '#1877F2' : 
+                     platform === 'Google' ? '#4285F4' : '#000000',
+              borderColor: platform === 'Facebook' ? '#1877F2' : 
+                          platform === 'Google' ? '#4285F4' : '#000000',
+              color: isConnected ? (platform === 'Facebook' ? '#1877F2' : 
+                    platform === 'Google' ? '#4285F4' : '#000000') : 'white',
+              '&:hover': {
+                bgcolor: isConnected ? 'rgba(0,0,0,0.04)' : 
+                        platform === 'Facebook' ? '#166FE5' : 
+                        platform === 'Google' ? '#3367D6' : '#333333',
+                borderColor: platform === 'Facebook' ? '#1877F2' : 
+                            platform === 'Google' ? '#4285F4' : '#000000',
+              }
+            }}
+          >
+            {isConnected ? "Reconnect" : "Connect"}
+          </Button>
         </Box>
       </Box>
     </Paper>
@@ -286,6 +316,56 @@ const TrafficChannels = () => {
     isConnected: false,
     status: "Active"
   });
+
+  // Force refresh connection status function
+  const forceRefreshConnectionStatus = async () => {
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      
+      if (sessionToken) {
+        // Make API call to check authentication status
+        const response = await axios.get(`${API_URL}/auth/status`, {
+          headers: {
+            Authorization: `Bearer ${sessionToken}`
+          }
+        });
+        
+        // Update auth status based on API response
+        if (response.data) {
+          const newAuthStatus = {
+            facebook: response.data.facebook?.connected || false,
+            google: response.data.google?.connected || false,
+            tiktok: response.data.tiktok?.connected || false
+          };
+          
+          setAuthStatus(newAuthStatus);
+          
+          // Update connection status for the current channel if in edit mode
+          if (selectedRow && selectedRow.id) {
+            const platform = selectedRow.aliasChannel.toLowerCase();
+            const isConnected = 
+              platform === 'facebook' ? newAuthStatus.facebook : 
+              platform === 'google' ? newAuthStatus.google : 
+              platform === 'tiktok' ? newAuthStatus.tiktok : false;
+            
+            // Update channel connection status
+            setChannelConnectionStatus(prev => ({
+              ...prev,
+              [selectedRow.id]: isConnected
+            }));
+            
+            // Update form data connection status
+            setFormData(prev => ({
+              ...prev,
+              isConnected: isConnected
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error refreshing connection status:", error);
+    }
+  };
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -393,7 +473,7 @@ const TrafficChannels = () => {
     }
   }, [authStatus, selectedRow, openSecondModal]);
 
-  // Improved handleAuth function for popup-based authentication
+  // Improved handleAuth function with reliable popup closing
   const handleAuth = (platform) => {
     const platformLower = platform.toLowerCase();
     
@@ -416,8 +496,22 @@ const TrafficChannels = () => {
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
     );
     
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      // Popup was blocked or closed immediately
+      setSnackbar({
+        open: true,
+        message: `Unable to open ${platform} login. Please allow popups for this site.`,
+        severity: 'error'
+      });
+      setLoading(prev => ({ ...prev, [platformLower]: false }));
+      return;
+    }
+    
     // Store reference globally
     window.currentAuthPopup = popup;
+    
+    // Keep focus on the popup to ensure a better user experience
+    popup.focus();
     
     // Add listener for messages from popup
     const authMessageListener = (event) => {
@@ -432,7 +526,7 @@ const TrafficChannels = () => {
         const { platform, session, message } = event.data;
         
         // IMPORTANT: Force close the popup immediately
-        if (window.currentAuthPopup && !window.currentAuthPopup.closed) {
+        if (window.currentAuthPopup) {
           try {
             console.log("Attempting to close popup window...");
             window.currentAuthPopup.close();
@@ -444,6 +538,9 @@ const TrafficChannels = () => {
         if (isSuccess) {
           // Store session token
           localStorage.setItem('sessionToken', session);
+          
+          // Force refresh connection status to ensure UI is updated
+          forceRefreshConnectionStatus();
           
           // Update auth status for the platform
           setAuthStatus(prev => ({
@@ -497,11 +594,16 @@ const TrafficChannels = () => {
     // Add event listener for messages from popup
     window.addEventListener('message', authMessageListener);
     
-    // Monitor the popup state
+    // Monitor the popup state with a shorter interval for more responsiveness
     const checkPopupInterval = setInterval(() => {
       if (!popup || popup.closed) {
         clearInterval(checkPopupInterval);
         window.removeEventListener('message', authMessageListener);
+        
+        // Refresh connection status one more time to be sure
+        setTimeout(() => {
+          forceRefreshConnectionStatus();
+        }, 500);
         
         // Reset loading state if no message was received
         if (loading[platformLower]) {
@@ -517,7 +619,7 @@ const TrafficChannels = () => {
         // Clear the global reference
         window.currentAuthPopup = null;
       }
-    }, 500); // Check more frequently
+    }, 300); // Check more frequently
   };
 
   // Function to save connection status without closing modal
