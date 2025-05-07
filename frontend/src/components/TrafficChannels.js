@@ -492,7 +492,7 @@ const TrafficChannels = () => {
         
         if (sessionToken) {
           // Make API call to check authentication status
-          const response = await axios.get(`${API_URL}/auth/status`, {
+          const response = await axios.get(`${API_URL}/auth`, {
             headers: {
               Authorization: `Bearer ${sessionToken}`
             }
