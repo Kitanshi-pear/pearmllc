@@ -655,7 +655,7 @@ export default function CampaignsPage() {
       });
   }, []);
 
-  // Enhanced columns with proper data mapping - THE KEY PART THAT WAS FIXED
+  // Enhanced columns with proper data mapping for campaign name and traffic channel
   const columns = [
     { 
       field: "id", 
@@ -667,8 +667,16 @@ export default function CampaignsPage() {
       headerName: "Campaign Name", 
       flex: 1,
       valueGetter: (params) => {
-        // Don't provide fallback values, just return the actual campaign name
-        return params?.row?.name || params?.row?.campaign_name || params?.row?.title || params?.row?.campaignName;
+        // First check for direct name field (prioritize this as it matches the database schema)
+        if (params?.row?.name) {
+          return params.row.name;
+        }
+        
+        // Then check for alternative field names
+        return params?.row?.campaign_name || 
+               params?.row?.title || 
+               params?.row?.campaignName || 
+               "Unnamed Campaign";
       }
     },
     {
@@ -691,32 +699,36 @@ export default function CampaignsPage() {
       headerName: "Traffic Source",
       width: 150,
       valueGetter: (params) => {
-        // First check for the name in directly accessible properties
-        if (params?.row?.traffic_channel_name) {
-          return params.row.traffic_channel_name;
-        }
-        
-        // Check nested models in various forms
+        // Check for nested TrafficChannel object (includes channelName as shown in schema)
         if (params?.row?.TrafficChannel && params.row.TrafficChannel.channelName) {
           return params.row.TrafficChannel.channelName;
         }
         
+        // Check lowercase trafficChannel variant
         if (params?.row?.trafficChannel && params.row.trafficChannel.channelName) {
           return params.row.trafficChannel.channelName;
         }
         
-        // Look up from our locally cached traffic channels
+        // Check for directly stored traffic_channel_name field
+        if (params?.row?.traffic_channel_name) {
+          return params.row.traffic_channel_name;
+        }
+        
+        // Look up from locally cached traffic channels using traffic_channel_id
         if (params?.row?.traffic_channel_id) {
           const channel = trafficChannels.find(c => c.id === params.row.traffic_channel_id);
           if (channel) {
             return channel.channelName;
           }
-          // Just return the ID itself with no text
-          return params.row.traffic_channel_id;
         }
         
-        // Return empty string if nothing was found
-        return "";
+        // If all else fails, show the ID with a label
+        if (params?.row?.traffic_channel_id) {
+          return `Source ID: ${params.row.traffic_channel_id}`;
+        }
+        
+        // Finally, return "Unknown" as fallback
+        return "Unknown";
       }
     },
     { 
@@ -814,8 +826,8 @@ export default function CampaignsPage() {
           return params.row.offer.name;
         }
         
-        // Just return the ID without additional text
-        return params.row.offer_id;
+        // Just return the ID with a label
+        return `Offer ID: ${params.row.offer_id}`;
       }
     },
     {
@@ -905,28 +917,54 @@ export default function CampaignsPage() {
           console.log("Raw first campaign data:", JSON.stringify(campaignsData[0], null, 2));
         }
         
-        // Add proper field mapping before setting state
+        // Enhanced data normalization with focus on campaign name and traffic channel
         const campaignsWithIds = campaignsData.map((campaign) => {
           // Log original field names for debugging
           console.log("Original campaign fields:", Object.keys(campaign).join(", "));
           
-          // Log nested relationship data if exists
-          if (campaign.TrafficChannel) {
-            console.log("TrafficChannel data:", campaign.TrafficChannel);
-          }
-          
-          // Keep more of the original data while adding normalized fields
-          return {
+          // Prepare normalized campaign object
+          const normalizedCampaign = {
             ...campaign,
             // Ensure ID field exists
             id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
-            
-            // Capture traffic channel name from various places
-            traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
-                               (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
-                               campaign.traffic_channel_name ||
-                               (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName)
           };
+          
+          // Handle campaign name according to schema
+          // Prioritize 'name' field but fallback to alternatives if needed
+          if (!normalizedCampaign.name && (campaign.campaign_name || campaign.title || campaign.campaignName)) {
+            normalizedCampaign.name = campaign.campaign_name || campaign.title || campaign.campaignName;
+          }
+          
+          // Process TrafficChannel relationship
+          if (campaign.TrafficChannel) {
+            console.log("TrafficChannel data found:", campaign.TrafficChannel);
+            
+            // Store the original relationship
+            normalizedCampaign.TrafficChannel = campaign.TrafficChannel;
+            
+            // Also store the channel name directly for easier access
+            if (campaign.TrafficChannel.channelName) {
+              normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
+            }
+          } 
+          // Process lowercase variant if present
+          else if (campaign.trafficChannel) {
+            normalizedCampaign.trafficChannel = campaign.trafficChannel;
+            
+            if (campaign.trafficChannel.channelName) {
+              normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
+            }
+          }
+          // If we don't have a direct relationship but have the channel ID,
+          // try to look up the name from our cached traffic channels
+          else if (campaign.traffic_channel_id && !normalizedCampaign.traffic_channel_name) {
+            const channel = trafficChannels.find(c => c.id === campaign.traffic_channel_id);
+            if (channel) {
+              normalizedCampaign.traffic_channel_name = channel.channelName;
+            }
+          }
+          
+          return normalizedCampaign;
         });
         
         // Show normalized first campaign for debugging
@@ -976,7 +1014,7 @@ export default function CampaignsPage() {
       });
   };
     
-  // Handle successful API response
+  // Handle successful API response with improved data normalization
   const handleSuccessfulResponse = (res, logMessage) => {
     console.log(logMessage, res.data);
     
@@ -994,20 +1032,49 @@ export default function CampaignsPage() {
       }
     }
     
-    // Add proper field mapping before setting state
+    // Enhanced data normalization with focus on campaign name and traffic channel
     const campaignsWithIds = campaignsData.map((campaign) => {
-      // Standardize campaign fields
-      return {
+      // Prepare normalized campaign object
+      const normalizedCampaign = {
         ...campaign,
         // Ensure ID field exists
         id: campaign.id || campaign._id || campaign.campaign_id || Date.now().toString(36),
-        
-        // Capture traffic channel info from various places
-        traffic_channel_name: (campaign.TrafficChannel && campaign.TrafficChannel.channelName) ||
-                             (campaign.trafficChannel && campaign.trafficChannel.channelName) ||
-                             campaign.traffic_channel_name ||
-                             (typeof campaign.traffic_channel_id === 'object' && campaign.traffic_channel_id.channelName)
       };
+      
+      // Handle campaign name according to schema
+      // Prioritize 'name' field but fallback to alternatives if needed
+      if (!normalizedCampaign.name && (campaign.campaign_name || campaign.title || campaign.campaignName)) {
+        normalizedCampaign.name = campaign.campaign_name || campaign.title || campaign.campaignName;
+      }
+      
+      // Process TrafficChannel relationship
+      if (campaign.TrafficChannel) {
+        // Store the original relationship
+        normalizedCampaign.TrafficChannel = campaign.TrafficChannel;
+        
+        // Also store the channel name directly for easier access
+        if (campaign.TrafficChannel.channelName) {
+          normalizedCampaign.traffic_channel_name = campaign.TrafficChannel.channelName;
+        }
+      } 
+      // Process lowercase variant if present
+      else if (campaign.trafficChannel) {
+        normalizedCampaign.trafficChannel = campaign.trafficChannel;
+        
+        if (campaign.trafficChannel.channelName) {
+          normalizedCampaign.traffic_channel_name = campaign.trafficChannel.channelName;
+        }
+      }
+      // If we don't have a direct relationship but have the channel ID,
+      // try to look up the name from our cached traffic channels
+      else if (campaign.traffic_channel_id && !normalizedCampaign.traffic_channel_name) {
+        const channel = trafficChannels.find(c => c.id === campaign.traffic_channel_id);
+        if (channel) {
+          normalizedCampaign.traffic_channel_name = channel.channelName;
+        }
+      }
+      
+      return normalizedCampaign;
     });
     
     setCampaigns(campaignsWithIds);

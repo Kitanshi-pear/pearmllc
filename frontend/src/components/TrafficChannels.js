@@ -216,6 +216,10 @@ const TrafficChannels = () => {
     google: false,
     tiktok: false
   });
+  
+  // Store the OAuth callback parameters in state to handle them after data loads
+  const [oauthCallback, setOauthCallback] = useState(null);
+  
   const [rows, setRows] = useState([]);
   const [filterText, setFilterText] = useState("");
   const [openModal, setOpenModal] = useState(false);
@@ -289,7 +293,7 @@ const TrafficChannels = () => {
     status: "Active"
   });
 
-  // Check for OAuth callback parameters when component mounts
+  // Split the OAuth callback handling into two parts - detection and processing
   useEffect(() => {
     // Check URL for OAuth callback parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -299,12 +303,29 @@ const TrafficChannels = () => {
     const error = urlParams.get('error');
     const message = urlParams.get('message');
     
-    // If we have OAuth callback parameters, process them
+    // If we have OAuth callback parameters, store them
     if (platform) {
       console.log(`Detected OAuth callback: platform=${platform}, success=${success}`);
       
-      // Clean up URL parameters to avoid processing again on refresh
+      // Store the callback parameters
+      setOauthCallback({
+        platform,
+        success,
+        session,
+        error,
+        message
+      });
+      
+      // Clean up URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []); // Empty dependency array ensures it only runs once on mount
+
+  // Use another effect to process the callback once we have data
+  useEffect(() => {
+    // If we have OAuth callback parameters and the rows have loaded
+    if (oauthCallback && rows.length > 0) {
+      const { platform, success, session, error, message } = oauthCallback;
       
       // Get stored modal state from sessionStorage
       const storedModalState = sessionStorage.getItem('trafficChannelModalState');
@@ -314,6 +335,31 @@ const TrafficChannels = () => {
           const modalState = JSON.parse(storedModalState);
           console.log("Retrieved stored modal state:", modalState);
           
+          // Even if we can't find the specific channel, we still open the modal and tab
+          // Open modal first with the correct tab
+          setEditMode(modalState.editMode || false);
+          setOpenSecondModal(true);
+          
+          // Set the correct tab immediately
+          if (platform.toLowerCase() === 'facebook') {
+            setCurrentTab(1);
+          } else if (platform.toLowerCase() === 'google') {
+            setCurrentTab(2);
+          } else if (platform.toLowerCase() === 'tiktok') {
+            setCurrentTab(3);
+          } else {
+            setCurrentTab(modalState.currentTab || 0);
+          }
+          
+          // Restore form data
+          if (modalState.formData) {
+            setFormData({
+              ...modalState.formData,
+              isConnected: success === 'true'
+            });
+          }
+          
+          // Now finish processing the success or error
           if (success === 'true' && session) {
             // Successful authentication
             
@@ -348,26 +394,9 @@ const TrafficChannels = () => {
                   [modalState.selectedRow]: true
                 }));
                 
-                // Restore form data with updated connection status
-                setFormData({
-                  ...modalState.formData,
-                  isConnected: true
-                });
-                
-                // Restore modal state
+                // Restore selected row
                 setSelectedRow(channel);
                 setSelectedChannel(modalState.selectedChannel);
-                setEditMode(modalState.editMode);
-                setOpenSecondModal(true);
-                
-                // Set the appropriate tab
-                if (platform.toLowerCase() === 'facebook') {
-                  setCurrentTab(1);
-                } else if (platform.toLowerCase() === 'google') {
-                  setCurrentTab(2);
-                } else {
-                  setCurrentTab(modalState.currentTab);
-                }
                 
                 // Save the connection status to the API
                 saveConnectionStatus(platform.toLowerCase(), true);
@@ -393,22 +422,21 @@ const TrafficChannels = () => {
               if (channel) {
                 setSelectedRow(channel);
                 setSelectedChannel(modalState.selectedChannel);
-                setFormData(modalState.formData);
-                setEditMode(modalState.editMode);
-                setOpenSecondModal(true);
-                setCurrentTab(modalState.currentTab);
               }
             }
           }
           
           // Clear stored modal state
           sessionStorage.removeItem('trafficChannelModalState');
+          
+          // Clear the callback now that we've processed it
+          setOauthCallback(null);
         } catch (error) {
           console.error("Error parsing stored modal state:", error);
         }
       }
     }
-  }, [rows]); // Depends on rows to ensure we have the data
+  }, [oauthCallback, rows]); // Depends on oauthCallback and rows
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -567,7 +595,7 @@ const TrafficChannels = () => {
     return ["facebook", "google", "tiktok"].includes(platformLower);
   };
 
-  // REDIRECT AUTHENTICATION HANDLER
+  // Update the handleAuth function to store which tab we're on
   const handleAuth = (platform) => {
     const platformLower = platform.toLowerCase();
     
@@ -580,7 +608,7 @@ const TrafficChannels = () => {
       editMode: editMode,
       selectedRow: selectedRow ? selectedRow.id : null,
       selectedChannel: selectedChannel,
-      currentTab: currentTab,
+      currentTab: currentTab, // Store the current tab
       formData: formData
     };
     
@@ -895,8 +923,11 @@ const TrafficChannels = () => {
     return formData.isConnected || false;
   };
 
-  // Render Facebook connection section
+  // Render Facebook connection section with updated tab setting
   const renderFacebookConnection = () => {
+    // We know Facebook integration is tab index 1
+    const FACEBOOK_TAB_INDEX = 1;
+    
     // Check if the current channel is connected
     const isConnected = isChannelConnected('Facebook');
     const isAuthInProgress = Boolean(sessionStorage.getItem('trafficChannelModalState'));
@@ -913,7 +944,11 @@ const TrafficChannels = () => {
         <Button
           variant="contained"
           startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#1877F2' }}>f</Avatar>}
-          onClick={() => handleAuth('Facebook')}
+          onClick={() => {
+            // Set the current tab to Facebook before redirecting
+            setCurrentTab(FACEBOOK_TAB_INDEX);
+            handleAuth('Facebook');
+          }}
           disabled={loading.facebook || isAuthInProgress}
           sx={{ 
             mb: 3, 
@@ -1099,8 +1134,11 @@ const TrafficChannels = () => {
     );
   };
 
-  // Render Google connection section
+  // Render Google connection section with updated tab setting
   const renderGoogleConnection = () => {
+    // We know Google integration is tab index 2
+    const GOOGLE_TAB_INDEX = 2;
+    
     // Check if the current channel is connected
     const isConnected = isChannelConnected('Google');
     const isAuthInProgress = Boolean(sessionStorage.getItem('trafficChannelModalState'));
@@ -1136,7 +1174,11 @@ const TrafficChannels = () => {
           <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
               variant="outlined"
-              onClick={() => handleAuth('Google')}
+              onClick={() => {
+                // Set the current tab to Google before redirecting
+                setCurrentTab(GOOGLE_TAB_INDEX);
+                handleAuth('Google');
+              }}
               disabled={loading.google || isAuthInProgress}
               startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#4285F4' }}>G</Avatar>}
               fullWidth
