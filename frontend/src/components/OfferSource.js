@@ -24,6 +24,12 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Container,
+  useTheme,
+  alpha,
+  styled,
+  Badge,
+  Chip,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -32,6 +38,17 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import AddIcon from "@mui/icons-material/Add";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import TuneIcon from "@mui/icons-material/Tune";
+import SendIcon from "@mui/icons-material/Send";
+import CodeIcon from "@mui/icons-material/Code";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ShowChartIcon from "@mui/icons-material/ShowChart";
+import LinkIcon from "@mui/icons-material/Link";
 import Layout from "./Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -56,6 +73,115 @@ import DateFormatter, { DATE_FORMAT } from "./DateFormat";
 
 // Create date formatter instance
 const dateFormatter = new DateFormatter();
+
+// Modern styled components
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 16,
+  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
+  transition: 'transform 0.3s, box-shadow 0.3s',
+  overflow: 'hidden',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+  },
+}));
+
+const GradientButton = styled(Button)(({ theme, colorStart = '#4776E6', colorEnd = '#8E54E9' }) => ({
+  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
+  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
+  transition: 'all 0.3s',
+  color: 'white',
+  fontWeight: 600,
+  '&:hover': {
+    boxShadow: '0 6px 15px rgba(0, 0, 0, 0.25)',
+    transform: 'translateY(-2px)',
+  },
+  '&:active': {
+    transform: 'translateY(1px)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+  },
+}));
+
+const AnimatedIconButton = styled(IconButton)(({ theme }) => ({
+  transition: 'transform 0.2s, background 0.2s',
+  '&:hover': {
+    transform: 'scale(1.1)',
+    background: alpha(theme.palette.primary.main, 0.1),
+  },
+}));
+
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+  border: 'none',
+  borderRadius: 16,
+  '& .MuiDataGrid-columnHeader': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+    padding: '12px 16px',
+    '&:first-of-type': {
+      borderTopLeftRadius: 16,
+    },
+    '&:last-of-type': {
+      borderTopRightRadius: 16,
+    },
+  },
+  '& .MuiDataGrid-columnHeaderTitle': {
+    fontWeight: 600,
+  },
+  '& .MuiDataGrid-cell': {
+    padding: '16px',
+    fontSize: '0.95rem',
+  },
+  '& .MuiDataGrid-row': {
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.04),
+    },
+    '&.Mui-selected': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+      },
+    },
+  },
+}));
+
+const StatusChip = styled(Chip)(({ theme, status }) => ({
+  fontWeight: 600,
+  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+  ...(status === 'active' && {
+    background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+    color: '#05603a',
+  }),
+  ...(status === 'inactive' && {
+    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+    color: '#4b4b4b',
+  }),
+}));
+
+const GradientBox = styled(Box)(({ theme, colorStart = '#a1c4fd', colorEnd = '#c2e9fb' }) => ({
+  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
+  borderRadius: 16,
+  padding: theme.spacing(3),
+  color: theme.palette.getContrastText(theme.palette.primary.light),
+  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
+}));
+
+const TabPanel = (props) => {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+      {...other}
+      style={{ padding: '24px 0' }}
+    >
+      {value === index && <>{children}</>}
+    </div>
+  );
+};
 
 // Enhanced Postback Macros - RedTrack style
 const POSTBACK_MACROS = {
@@ -94,6 +220,8 @@ const parsePostbackUrl = (template, data) => {
 };
 
 const OfferSourcePage = () => {
+  const theme = useTheme();
+  
   // State for dates
   const [dateRange, setDateRange] = useState({
     startDate: dateFormatter.prepareDate(dateFormatter.getDateRange('today').startDate),
@@ -240,12 +368,6 @@ const OfferSourcePage = () => {
         profit: item.profit || 0,
         total_roi: item.total_roi || 0,
         lp_views: item.lp_views || 0,
-        // Conversion API attributes still in API response mapping
-        forward_to_facebook: item.forward_to_facebook || false,
-        forward_to_google: item.forward_to_google || false,
-        facebook_event_name: item.facebook_event_name || "Purchase",
-        google_conversion_id: item.google_conversion_id || "",
-        google_conversion_label: item.google_conversion_label || ""
       }));
 
       setRows(formatted);
@@ -288,7 +410,6 @@ const OfferSourcePage = () => {
       description: row.description || "",
       role: row.role || "",
       is_active: row.is_active !== false,
-      // Conversion API settings removed from edit mapping
     });
     setOpenTemplateModal(true);
   };
@@ -339,7 +460,6 @@ const OfferSourcePage = () => {
         description: newTemplate.description,
         role: newTemplate.role,
         is_active: newTemplate.is_active,
-        // Conversion API settings removed from payload
       };
 
       if (editMode && selectedRowId) {
@@ -382,7 +502,6 @@ const OfferSourcePage = () => {
         description: "",
         role: "",
         is_active: true,
-        // Conversion API settings removed from reset
       });
     } catch (error) {
       console.error("Error saving template:", error.message);
@@ -486,72 +605,87 @@ const OfferSourcePage = () => {
     }
   };
 
-  // Enhanced columns with conversion API settings
+  // Modern source type renderer with custom icons
+  const renderSourceTypeIcon = (type) => {
+    switch (type) {
+      case 'Facebook':
+        return <FontAwesomeIcon icon={faFacebookF} style={{ color: '#1877F2' }} />;
+      case 'Google':
+        return <FontAwesomeIcon icon={faGoogle} style={{ color: '#4285F4' }} />;
+      case 'TikTok':
+        return <Box component="span" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>TT</Box>;
+      default:
+        return <LinkIcon fontSize="small" />;
+    }
+  };
+
+  // Enhanced columns with modern styling
   const columns = [
-    { field: "serial_no", headerName: "Serial No", width: 80, align: "center" },
+    { field: "serial_no", headerName: "#", width: 60, align: "center" },
     {
       field: "source_name",
       headerName: "Source Name",
-      width: 180,
+      width: 230,
       renderCell: (params) => (
         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-          <Typography sx={{ flexGrow: 1 }}>{params.value}</Typography>
-          <IconButton
-            size="small"
-            onClick={() => handleEditClick(params.row)}
-            title="Edit"
+          <Box 
+            sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              mr: 1,
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
+              justifyContent: 'center',
+              background: alpha(theme.palette.primary.main, 0.1)
+            }}
           >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleDeleteClick(params.row)}
-            title="Delete"
-            color="error"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+            {renderSourceTypeIcon(params.row.source_type)}
+          </Box>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography sx={{ fontWeight: 600 }}>{params.value}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {params.row.source_type}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex' }}>
+            <AnimatedIconButton
+              size="small"
+              onClick={() => handleEditClick(params.row)}
+              title="Edit"
+              sx={{ color: theme.palette.primary.main }}
+            >
+              <EditIcon fontSize="small" />
+            </AnimatedIconButton>
+            <AnimatedIconButton
+              size="small"
+              onClick={() => handleDeleteClick(params.row)}
+              title="Delete"
+              sx={{ color: theme.palette.error.main }}
+            >
+              <DeleteIcon fontSize="small" />
+            </AnimatedIconButton>
+          </Box>
         </Box>
       ),
-    },
-    { 
-      field: "source_type", 
-      headerName: "Type", 
-      width: 100,
-      renderCell: (params) => (
-        <Tooltip title={`${params.value} source`}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            width: '100%'
-          }}>
-            <Typography>{params.value}</Typography>
-          </Box>
-        </Tooltip>
-      )
     },
     {
       field: "is_active",
       headerName: "Status",
-      width: 100,
+      width: 120,
       renderCell: (params) => (
-        <Box
-          sx={{
-            backgroundColor: params.value ? "#e6f7e7" : "#ffebee",
-            color: params.value ? "#2e7d32" : "#d32f2f",
-            borderRadius: 1,
-            px: 1,
-            py: 0.5,
-          }}
-        >
-          {params.value ? "Active" : "Inactive"}
-        </Box>
+        <StatusChip
+          label={params.value ? "Active" : "Inactive"}
+          status={params.value ? "active" : "inactive"}
+          icon={params.value ? <CheckCircleIcon /> : <CancelIcon />}
+          size="small"
+        />
       ),
     },
     { 
       field: "postback", 
-      headerName: "Postback", 
-      width: 180,
+      headerName: "Postback URL", 
+      width: 220,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Tooltip title={params.value || "No postback URL"}>
@@ -559,14 +693,18 @@ const OfferSourcePage = () => {
               overflow: "hidden", 
               textOverflow: "ellipsis", 
               whiteSpace: "nowrap",
-              flexGrow: 1 
+              flexGrow: 1,
+              maxWidth: 130,
+              fontFamily: 'monospace',
+              fontSize: '0.85rem',
+              color: theme.palette.text.secondary
             }}>
               {params.value || "—"}
             </Typography>
           </Tooltip>
           {params.value && (
-            <>
-              <IconButton 
+            <Box sx={{ display: 'flex' }}>
+              <AnimatedIconButton 
                 size="small" 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -578,85 +716,154 @@ const OfferSourcePage = () => {
                   });
                 }}
                 title="Copy Postback"
+                sx={{ color: theme.palette.info.main }}
               >
                 <ContentCopyIcon fontSize="small" />
-              </IconButton>
-              <IconButton 
+              </AnimatedIconButton>
+              <AnimatedIconButton 
                 size="small" 
                 onClick={(e) => {
                   e.stopPropagation();
                   handleOpenPostbackTest(params.row);
                 }}
                 title="Test Postback"
+                sx={{ color: theme.palette.warning.main }}
               >
                 <VisibilityIcon fontSize="small" />
-              </IconButton>
-            </>
+              </AnimatedIconButton>
+            </Box>
           )}
         </Box>
       )
     },
-    // Removed "Conversions" column with Facebook/Google integration icons
-    { field: "clicks", headerName: "Clicks", width: 80, type: "number" },
-    { field: "conversion", headerName: "Conv", width: 80, type: "number" },
+    { 
+      field: "clicks", 
+      headerName: "Clicks", 
+      width: 90, 
+      align: "center",
+      headerAlign: "center",
+      renderCell: (params) => (
+        <Typography sx={{ fontWeight: 600 }}>
+          {params.value.toLocaleString()}
+        </Typography>
+      )
+    },
+    { 
+      field: "conversion", 
+      headerName: "Conv", 
+      width: 90, 
+      align: "center",
+      headerAlign: "center",
+      renderCell: (params) => (
+        <Typography sx={{ fontWeight: 600 }}>
+          {params.value.toLocaleString()}
+        </Typography>
+      )
+    },
     { 
       field: "total_cpa", 
       headerName: "CPA ($)", 
-      width: 100, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
+      width: 110,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const value = params.value || 0;
+        return (
+          <Typography sx={{ 
+            fontWeight: 600,
+            color: value > 10 ? theme.palette.error.main : theme.palette.success.main 
+          }}>
+            ${value.toFixed(2)}
+          </Typography>
+        );
       }
     },
     { 
       field: "epc", 
       headerName: "EPC ($)", 
-      width: 100, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
+      width: 110,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const value = params.value || 0;
+        return (
+          <Typography sx={{ 
+            fontWeight: 600,
+            color: value > 0.5 ? theme.palette.success.main : theme.palette.text.primary 
+          }}>
+            ${value.toFixed(2)}
+          </Typography>
+        );
       }
     },
     { 
       field: "total_revenue", 
-      headerName: "Revenue ($)", 
-      width: 120, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
+      headerName: "Revenue", 
+      width: 120,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const value = params.value || 0;
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography sx={{ fontWeight: 600, pr: 1 }}>
+              ${value.toFixed(2)}
+            </Typography>
+          </Box>
+        );
       }
     },
     { 
       field: "profit", 
-      headerName: "Profit ($)", 
-      width: 100, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2);
+      headerName: "Profit", 
+      width: 120,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const value = params.value || 0;
+        const isPositive = value >= 0;
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {isPositive ? 
+              <ArrowUpwardIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5 }} /> :
+              <ArrowDownwardIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5 }} />
+            }
+            <Typography sx={{ 
+              fontWeight: 600,
+              color: isPositive ? theme.palette.success.main : theme.palette.error.main
+            }}>
+              ${Math.abs(value).toFixed(2)}
+            </Typography>
+          </Box>
+        );
       }
     },
     { 
       field: "total_roi", 
-      headerName: "ROI (%)", 
-      width: 100, 
-      type: "number",
-      valueFormatter: (params) => {
-        if (params.value == null) {
-          return '0.00';
-        }
-        return params.value.toFixed(2) + '%';
+      headerName: "ROI", 
+      width: 100,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const value = params.value || 0;
+        const isPositive = value >= 0;
+        return (
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            bgcolor: isPositive ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+            px: 1,
+            py: 0.5,
+            borderRadius: 1
+          }}>
+            <Typography sx={{ 
+              fontWeight: 600,
+              color: isPositive ? theme.palette.success.main : theme.palette.error.main
+            }}>
+              {value.toFixed(2)}%
+            </Typography>
+          </Box>
+        );
       }
     },
   ];
@@ -665,149 +872,368 @@ const OfferSourcePage = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Custom styled modal container
+  const ModalContainer = styled(Box)(({ theme }) => ({
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    width: "900px",
+    maxWidth: "95vw",
+    maxHeight: "90vh",
+    overflow: "auto",
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: 16,
+    boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
+    padding: 0,
+  }));
+
+  // Custom styled tab
+  const StyledTab = styled(Tab)(({ theme }) => ({
+    fontWeight: 600,
+    textTransform: 'none',
+    minWidth: 120,
+  }));
+
   return (
     <Layout>
-      <Box>
-        {/* Title and Add New Source button in the same row */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 3 }}
-        >
-          <Typography variant="h4">Offer Sources</Typography>
-          <Box display="flex" gap={2}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchOfferSources}
-              disabled={loading}
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                setOpenTemplateModal(true);
-                setEditMode(false);
-                setSelectedRowId(null);
-                setNewTemplate({
-                  name: "",
-                  alias: "",
-                  postbackUrl: "",
-                  sourceType: "",
-                  currency: "USD",
-                  offerUrl: "",
-                  clickid: "click_id",
-                  sum: "payout",
-                  parameter: "",
-                  token: "",
-                  description: "",
-                  role: "",
-                  is_active: true,
-                  // Conversion API settings removed from reset
-                });
-              }}
-            >
-              Add New Source
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Title field, DateRangePicker, and Apply button in the same row */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            mb: 3,
-            gap: 2,
-            flexWrap: { xs: "wrap", md: "nowrap" }
-          }}
-        >
-          {/* Date range picker - takes up most of the space */}
-          <Box sx={{ flexGrow: 1 }}>
-            <DateRangePicker onDateRangeChange={handleDateRangeChange} />
-          </Box>
-          
-          {/* Apply button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => fetchOfferSources()}
+      <Container maxWidth="xl">
+        <Box sx={{ pt: 4, pb: 8 }}>
+          {/* Dashboard Header with Stats */}
+          <GradientBox 
+            sx={{ mb: 4 }}
+            colorStart="#4facfe"
+            colorEnd="#00f2fe"
           >
-            Apply
-          </Button>
-        </Box>
-
-        {/* DataGrid for displaying offer sources */}
-        <Box
-          sx={{
-            height: 700,
-            width: "100%",
-            bgcolor: "white",
-            boxShadow: 2,
-            p: 2,
-          }}
-        >
-          {loading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <CircularProgress />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Offer Sources
+                </Typography>
+                <Typography variant="body1">
+                  Manage your traffic sources, postbacks and conversions
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button 
+                  variant="contained" 
+                  color="inherit"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchOfferSources}
+                  disabled={loading}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                    color: theme.palette.primary.main,
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 1)',
+                    }
+                  }}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+                <GradientButton
+                  startIcon={<AddIcon />}
+                  colorStart="#FF416C"
+                  colorEnd="#FF4B2B"
+                  onClick={() => {
+                    setOpenTemplateModal(true);
+                    setEditMode(false);
+                    setSelectedRowId(null);
+                    setNewTemplate({
+                      name: "",
+                      alias: "",
+                      postbackUrl: "",
+                      sourceType: "",
+                      currency: "USD",
+                      offerUrl: "",
+                      clickid: "click_id",
+                      sum: "payout",
+                      parameter: "",
+                      token: "",
+                      description: "",
+                      role: "",
+                      is_active: true,
+                    });
+                  }}
+                >
+                  Add New Source
+                </GradientButton>
+              </Box>
             </Box>
-          ) : (
-            <DataGrid
-              rows={rows}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[5, 10, 15, 20, 50]}
-              disableSelectionOnClick
-              components={{
-                NoRowsOverlay: () => (
-                  <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%">
-                    <Typography variant="h6" color="text.secondary">No Sources Found</Typography>
-                    <Typography variant="body2" color="text.secondary">Add your first traffic source to get started</Typography>
-                  </Box>
-                ),
-              }}
-            />
-          )}
+
+            {/* Stats Overview */}
+            <Grid container spacing={3} sx={{ mt: 3 }}>
+              <Grid item xs={12} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                    backdropFilter: 'blur(5px)', 
+                    borderRadius: 2,
+                    transition: 'transform 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-5px)',
+                    }
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                    <Badge 
+                      badgeContent={rows.length} 
+                      color="primary"
+                      sx={{ 
+                        '& .MuiBadge-badge': {
+                          fontSize: '0.9rem',
+                          height: '1.5rem',
+                          minWidth: '1.5rem',
+                        }
+                      }}
+                    >
+                      <Box sx={{ mr: 2 }}>Sources</Box>
+                    </Badge>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {rows.filter(row => row.is_active).length} active
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                    backdropFilter: 'blur(5px)', 
+                    borderRadius: 2,
+                    transition: 'transform 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-5px)',
+                    }
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                    <ShowChartIcon sx={{ mr: 1 }} /> 
+                    Conversions
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {rows.reduce((total, row) => total + (row.conversion || 0), 0).toLocaleString()}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                    backdropFilter: 'blur(5px)', 
+                    borderRadius: 2,
+                    transition: 'transform 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-5px)',
+                    }
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1 }}>Revenue</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    ${rows.reduce((total, row) => total + (row.total_revenue || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
+                    backdropFilter: 'blur(5px)', 
+                    borderRadius: 2,
+                    transition: 'transform 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-5px)',
+                    }
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1 }}>Profit</Typography>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      fontWeight: 700,
+                      color: rows.reduce((total, row) => total + (row.profit || 0), 0) >= 0 ? 
+                        theme.palette.success.main : theme.palette.error.main
+                    }}
+                  >
+                    ${rows.reduce((total, row) => total + (row.profit || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </GradientBox>
+
+          {/* Filter Controls */}
+          <StyledCard sx={{ mb: 4 }}>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: { xs: "wrap", md: "nowrap" },
+                  gap: 2
+                }}
+              >
+                {/* Date range picker */}
+                <Box sx={{ flexGrow: 1 }}>
+                  <DateRangePicker onDateRangeChange={handleDateRangeChange} />
+                </Box>
+                
+                {/* Filter button */}
+                <Button
+                  variant="outlined"
+                  startIcon={<FilterListIcon />}
+                  sx={{ 
+                    borderRadius: 2,
+                    height: 56
+                  }}
+                >
+                  Filters
+                </Button>
+                
+                {/* Apply button */}
+                <GradientButton
+                  onClick={() => fetchOfferSources()}
+                  sx={{ height: 56 }}
+                >
+                  Apply
+                </GradientButton>
+              </Box>
+            </CardContent>
+          </StyledCard>
+
+          {/* DataGrid for displaying offer sources */}
+          <StyledCard sx={{ mb: 4, overflow: 'visible' }}>
+            <Box sx={{ position: 'relative', height: 700 }}>
+              {loading ? (
+                <Box 
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    zIndex: 10,
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  <CircularProgress />
+                </Box>
+              ) : null}
+              
+              <StyledDataGrid
+                rows={rows}
+                columns={columns}
+                pageSize={10}
+                rowsPerPageOptions={[5, 10, 15, 20, 50]}
+                disableSelectionOnClick
+                components={{
+                  NoRowsOverlay: () => (
+                    <Box 
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        p: 5
+                      }}
+                    >
+                      <img 
+                        src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
+                        alt="No sources" 
+                        style={{ width: 100, height: 100, marginBottom: 24, opacity: 0.5 }}
+                      />
+                      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                        No Traffic Sources Found
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center', maxWidth: 400 }}>
+                        Add your first traffic source to start tracking your campaigns and conversions
+                      </Typography>
+                      <GradientButton
+                        startIcon={<AddIcon />}
+                        onClick={() => {
+                          setOpenTemplateModal(true);
+                          setEditMode(false);
+                        }}
+                      >
+                        Add Your First Source
+                      </GradientButton>
+                    </Box>
+                  ),
+                }}
+                sx={{
+                  '& .MuiDataGrid-virtualScroller': {
+                    overflowX: 'hidden',
+                  }
+                }}
+              />
+            </Box>
+          </StyledCard>
         </Box>
 
         {/* Source Modal with 2 tabs - Basic Details and Postback URL */}
-        <Modal open={openTemplateModal} onClose={() => setOpenTemplateModal(false)}>
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "900px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflow: "auto",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              {editMode ? "Edit Offer Source" : "Add New Source"}
-            </Typography>
-
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-              <Tabs value={tabValue} onChange={handleTabChange}>
-                <Tab label="Basic Details" />
-                <Tab label="Postback URL" />
-              </Tabs>
+        <Modal 
+          open={openTemplateModal} 
+          onClose={() => setOpenTemplateModal(false)}
+          closeAfterTransition
+        >
+          <ModalContainer>
+            <Box sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                {editMode ? "Edit Offer Source" : "Add New Source"}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                {editMode ? "Modify the existing source details" : "Configure a new traffic source to track"}
+              </Typography>
             </Box>
 
-            {/* Tab 1: Basic Details */}
-            {tabValue === 0 && (
-              <>
-                <Card sx={{ mb: 2 }}>
+            <Box sx={{ p: 3 }}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs 
+                  value={tabValue} 
+                  onChange={handleTabChange}
+                  variant="fullWidth"
+                  TabIndicatorProps={{
+                    style: {
+                      height: 3,
+                      borderRadius: '3px',
+                      background: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
+                    }
+                  }}
+                >
+                  <StyledTab 
+                    label="Basic Details" 
+                    icon={<TuneIcon />} 
+                    iconPosition="start"
+                  />
+                  <StyledTab 
+                    label="Postback URL" 
+                    icon={<CodeIcon />}
+                    iconPosition="start"
+                  />
+                </Tabs>
+              </Box>
+
+              {/* Tab 1: Basic Details */}
+              <TabPanel value={tabValue} index={0}>
+                <StyledCard sx={{ mb: 3 }}>
                   <CardContent>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                      Source Information
+                    </Typography>
+                    <Grid container spacing={3}>
                       <Grid item xs={12}>
                         <TextField
                           fullWidth
@@ -821,6 +1247,9 @@ const OfferSourcePage = () => {
                               alias: value.toLowerCase().replace(/\s+/g, "-"),
                             });
                           }}
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -829,20 +1258,36 @@ const OfferSourcePage = () => {
                           label="Alias"
                           value={newTemplate.alias}
                           disabled
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={12} md={6} width={"60%"}>
+                      <Grid item xs={12} md={6}>
                         <FormControl fullWidth>
                           <InputLabel>Source Type</InputLabel>
                           <Select
                             value={newTemplate.sourceType}
                             onChange={handleSourceTypeChange}
                             label="Source Type"
+                            sx={{ borderRadius: 2 }}
                           >
                             <MenuItem value="" disabled>Select Source Type</MenuItem>
                             {source_types.map((type) => (
                               <MenuItem key={type} value={type}>
-                                {type}
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    mr: 1.5,
+                                    width: 24,
+                                    height: 24
+                                  }}>
+                                    {renderSourceTypeIcon(type)}
+                                  </Box>
+                                  {type}
+                                </Box>
                               </MenuItem>
                             ))}
                           </Select>
@@ -850,92 +1295,113 @@ const OfferSourcePage = () => {
                       </Grid>
                     </Grid>
                     
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <InputLabel>Currency</InputLabel>
-                      <Select
-                        value={newTemplate.currency}
+                    <Box sx={{ mt: 3 }}>
+                      <FormControl fullWidth>
+                        <InputLabel>Currency</InputLabel>
+                        <Select
+                          value={newTemplate.currency}
+                          onChange={(e) =>
+                            setNewTemplate({ ...newTemplate, currency: e.target.value })
+                          }
+                          label="Currency"
+                          sx={{ borderRadius: 2 }}
+                        >
+                          <MenuItem value="" disabled>Select Currency</MenuItem>
+                          {currencies.map((currency) => (
+                            <MenuItem key={currency} value={currency}>
+                              {currency}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
+                    
+                    <Box sx={{ mt: 3 }}>
+                      <TextField
+                        fullWidth
+                        label="Offer URL Template"
+                        value={newTemplate.offerUrl}
                         onChange={(e) =>
-                          setNewTemplate({ ...newTemplate, currency: e.target.value })
+                          setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
                         }
-                        label="Currency"
-                      >
-                        <MenuItem value="" disabled>Select Currency</MenuItem>
-                        {currencies.map((currency) => (
-                          <MenuItem key={currency} value={currency}>
-                            {currency}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                        helperText="Template for generating tracking links (optional)"
+                        InputProps={{
+                          sx: { borderRadius: 2 }
+                        }}
+                      />
+                    </Box>
                     
-                    <TextField
-                      fullWidth
-                      label="Offer URL Template"
-                      value={newTemplate.offerUrl}
-                      onChange={(e) =>
-                        setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
-                      }
-                      sx={{ mt: 2 }}
-                      helperText="Template for generating tracking links (optional)"
-                    />
-                    
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={6}>
-                          <Typography variant="body2">Status</Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Select
-                            value={newTemplate.is_active}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, is_active: e.target.value })}
-                            fullWidth
-                          >
-                            <MenuItem value={true}>Active</MenuItem>
-                            <MenuItem value={false}>Inactive</MenuItem>
-                          </Select>
-                        </Grid>
-                      </Grid>
-                    </FormControl>
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Status
+                      </Typography>
+                      <Paper sx={{ p: 2, borderRadius: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={newTemplate.is_active}
+                              onChange={(e) => setNewTemplate({ ...newTemplate, is_active: e.target.checked })}
+                              color="primary"
+                            />
+                          }
+                          label={
+                            <Typography sx={{ fontWeight: newTemplate.is_active ? 600 : 400 }}>
+                              {newTemplate.is_active ? "Active" : "Inactive"}
+                            </Typography>
+                          }
+                        />
+                      </Paper>
+                    </Box>
                   </CardContent>
-                </Card>
+                </StyledCard>
 
                 {/* Postback Parameters - Enhanced for RedTrack */}
-                <Card sx={{ mb: 2 }}>
+                <StyledCard sx={{ mb: 3 }}>
                   <CardContent>
-                    <Typography variant="subtitle1">Postback Parameters</Typography>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
+                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                      Postback Parameters
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
-                          label="CLICKID"
+                          label="CLICKID Parameter"
                           value={newTemplate.clickid}
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, clickid: e.target.value })
                           }
                           helperText="Parameter name for tracking clicks (default: click_id)"
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
-                          label="PAYOUT"
+                          label="PAYOUT Parameter"
                           value={newTemplate.sum}
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, sum: e.target.value })
                           }
                           helperText="Parameter name for payout value (default: payout)"
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
                     </Grid>
                   </CardContent>
-                </Card>
+                </StyledCard>
 
                 {/* Additional Parameters */}
-                <Card>
+                <StyledCard>
                   <CardContent>
-                  <Typography variant="subtitle1">Additional Parameters</Typography>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={3}>
+                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                      Additional Parameters
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={4}>
                         <TextField
                           fullWidth
                           label="Parameter"
@@ -943,9 +1409,12 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, parameter: e.target.value })
                           }
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={3}>
+                      <Grid item xs={12} md={4}>
                         <TextField
                           fullWidth
                           label="Macro / Token"
@@ -953,19 +1422,25 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, token: e.target.value })
                           }
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={3}>
+                      <Grid item xs={12} md={4}>
                         <TextField
                           fullWidth
-                          label="Name / Description"
+                          label="Description"
                           value={newTemplate.description}
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, description: e.target.value })
                           }
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={12}>
                         <FormControl fullWidth>
                           <InputLabel>Role</InputLabel>
                           <Select
@@ -974,6 +1449,7 @@ const OfferSourcePage = () => {
                               setNewTemplate({ ...newTemplate, role: e.target.value })
                             }
                             label="Role"
+                            sx={{ borderRadius: 2 }}
                           >
                             <MenuItem value="" disabled>Select Role</MenuItem>
                             {roles.map((role) => (
@@ -986,217 +1462,302 @@ const OfferSourcePage = () => {
                       </Grid>
                     </Grid>
                   </CardContent>
-                </Card>
-              </>
-            )}
+                </StyledCard>
+              </TabPanel>
 
-            {/* Tab 2: Postback URL Editor - Enhanced for RedTrack */}
-            {tabValue === 1 && (
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Postback URL Configuration
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Create a postback URL template with tracking parameters. Traffic sources will use this URL to notify your system about conversions.
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <TextField
-                      fullWidth
-                      label="Postback URL"
-                      value={newTemplate.postbackUrl}
-                      onChange={(e) => setNewTemplate({ ...newTemplate, postbackUrl: e.target.value })}
-                      multiline
-                      rows={3}
-                      sx={{ mr: 1 }}
-                    />
-                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                      <IconButton onClick={handleCopyPostback} title="Copy URL">
-                        <ContentCopyIcon />
-                      </IconButton>
-                      <IconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
-                        <HelpOutlineIcon />
-                      </IconButton>
+              {/* Tab 2: Postback URL Editor - Enhanced for RedTrack */}
+              <TabPanel value={tabValue} index={1}>
+                <StyledCard>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      Postback URL Configuration
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Create a postback URL template with tracking parameters. Traffic sources will use this URL to notify your system about conversions.
+                    </Typography>
+                    
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 2, 
+                        mb: 3, 
+                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        borderRadius: 2
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                        <TextField
+                          fullWidth
+                          label="Postback URL"
+                          value={newTemplate.postbackUrl}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, postbackUrl: e.target.value })}
+                          multiline
+                          rows={3}
+                          sx={{ mr: 1 }}
+                          InputProps={{
+                            sx: { 
+                              borderRadius: 2,
+                              fontFamily: 'monospace',
+                              fontSize: '0.9rem'
+                            }
+                          }}
+                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <AnimatedIconButton onClick={handleCopyPostback} title="Copy URL">
+                            <ContentCopyIcon />
+                          </AnimatedIconButton>
+                          <AnimatedIconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
+                            <HelpOutlineIcon />
+                          </AnimatedIconButton>
+                        </Box>
+                      </Box>
+                    </Paper>
+                    
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                      Available Parameters
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                      {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
+                        <Chip
+                          key={key}
+                          label={value}
+                          onClick={() => handleInsertMacro(value)}
+                          sx={{ 
+                            borderRadius: 2,
+                            fontFamily: 'monospace',
+                            fontWeight: 500,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            '&:hover': {
+                              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                            }
+                          }}
+                          clickable
+                        />
+                      ))}
                     </Box>
-                  </Box>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Available Parameters:
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    {Object.entries(POSTBACK_MACROS).map(([key, value]) => (
-                      <Button 
-                        key={key}
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleInsertMacro(value)}
-                        sx={{ textTransform: 'none' }}
+                    
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                      Example Preview
+                    </Typography>
+                    
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        p: 2, 
+                        bgcolor: alpha(theme.palette.info.main, 0.05), 
+                        borderRadius: 2,
+                        mb: 3
+                      }}
+                    >
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontFamily: 'monospace',
+                          wordBreak: 'break-all',
+                          color: theme.palette.text.secondary
+                        }}
                       >
-                        {value}
-                      </Button>
-                    ))}
-                  </Box>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Example preview:
-                  </Typography>
-                  
-                  <TextField
-                    fullWidth
-                    disabled
-                    value={parsePostbackUrl(newTemplate.postbackUrl, {
-                      click_id: 'abc123',
-                      payout: '10.00',
-                      status: 'approved'
-                    })}
-                  />
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    This URL will be used to receive conversion data from your traffic sources. The system will track
-                    clicks using the {'{click_id}'} parameter, payout values using the {'{payout}'} parameter, and
-                    conversion status with the {'{status}'} parameter.
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
+                        {parsePostbackUrl(newTemplate.postbackUrl, {
+                          click_id: 'abc123',
+                          payout: '10.00',
+                          status: 'approved'
+                        }) || 'No URL template configured'}
+                      </Typography>
+                    </Paper>
+                    
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        p: 2, 
+                        bgcolor: alpha(theme.palette.warning.main, 0.05), 
+                        borderRadius: 2,
+                        borderLeft: `4px solid ${theme.palette.warning.main}`
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Note:</strong> This URL will be used to receive conversion data from your traffic sources. The system will track
+                        clicks using the {'{click_id}'} parameter, payout values using the {'{payout}'} parameter, and
+                        conversion status with the {'{status}'} parameter.
+                      </Typography>
+                    </Paper>
+                  </CardContent>
+                </StyledCard>
+              </TabPanel>
 
-            <Divider sx={{ my: 3 }} />
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button onClick={() => setOpenTemplateModal(false)} sx={{ mr: 2 }}>
-                Cancel
-              </Button>
-              <Button variant="contained" color="primary" onClick={handleSaveTemplate}>
-                {editMode ? "Save Changes" : "Save Template"}
-              </Button>
+              <Divider sx={{ my: 3 }} />
+              <Box sx={{ display: "flex", justifyContent: "flex-end", px: 3, pb: 3 }}>
+                <Button 
+                  variant="outlined"
+                  onClick={() => setOpenTemplateModal(false)} 
+                  sx={{ mr: 2, borderRadius: 2, px: 3 }}
+                >
+                  Cancel
+                </Button>
+                <GradientButton 
+                  onClick={handleSaveTemplate}
+                  endIcon={editMode ? <EditIcon /> : <AddIcon />}
+                  sx={{ px: 3 }}
+                >
+                  {editMode ? "Save Changes" : "Create Source"}
+                </GradientButton>
+              </Box>
             </Box>
-          </Box>
+          </ModalContainer>
         </Modal>
         
         {/* Enhanced Postback Testing Dialog */}
         <Modal 
           open={postbackTestDialogOpen} 
           onClose={handleClosePostbackTest}
+          closeAfterTransition
         >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "800px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflow: "auto",
-              bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
-            }}
-          >
-            <Typography variant="h6" gutterBottom>
-              Test Postback URL
+          <ModalContainer sx={{ width: '800px' }}>
+            <Box sx={{ bgcolor: theme.palette.warning.main, color: 'white', p: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <VisibilityIcon sx={{ mr: 1.5 }} /> Test Postback URL
+              </Typography>
               {selectedSource && (
-                <Typography variant="subtitle2" color="text.secondary">
+                <Typography variant="body1" sx={{ mt: 1, opacity: 0.9 }}>
                   {selectedSource.source_name} ({selectedSource.source_type})
                 </Typography>
               )}
-            </Typography>
+            </Box>
             
             {selectedSource && (
-              <>
-                <Typography variant="subtitle2" gutterBottom>
+              <Box sx={{ p: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
                   Postback URL Template:
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={selectedSource.postback || 'No postback URL configured'}
-                  InputProps={{ readOnly: true }}
-                  sx={{ mb: 3 }}
-                />
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    mb: 3, 
+                    bgcolor: alpha(theme.palette.warning.main, 0.05),
+                    borderRadius: 2
+                  }}
+                >
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontFamily: 'monospace',
+                      wordBreak: 'break-all'
+                    }}
+                  >
+                    {selectedSource.postback || 'No postback URL configured'}
+                  </Typography>
+                </Paper>
                 
-                <Typography variant="subtitle2" gutterBottom>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                   Test Parameters:
                 </Typography>
                 
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Click ID"
-                      name="click_id"
-                      value={testPostbackData.click_id}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Payout"
-                      name="payout"
-                      value={testPostbackData.payout}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Status</InputLabel>
-                      <Select
-                        name="status"
-                        value={testPostbackData.status}
-                        onChange={handleTestDataChange}
-                        label="Status"
-                      >
-                        <MenuItem value="approved">Approved</MenuItem>
-                        <MenuItem value="pending">Pending</MenuItem>
-                        <MenuItem value="rejected">Rejected</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Revenue"
-                      name="revenue"
-                      value={testPostbackData.revenue}
-                      onChange={handleTestDataChange}
-                    />
-                  </Grid>
-                </Grid>
+                <StyledCard sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Click ID"
+                          name="click_id"
+                          value={testPostbackData.click_id}
+                          onChange={handleTestDataChange}
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Payout"
+                          name="payout"
+                          value={testPostbackData.payout}
+                          onChange={handleTestDataChange}
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth>
+                          <InputLabel>Status</InputLabel>
+                          <Select
+                            name="status"
+                            value={testPostbackData.status}
+                            onChange={handleTestDataChange}
+                            label="Status"
+                            sx={{ borderRadius: 2 }}
+                          >
+                            <MenuItem value="approved">Approved</MenuItem>
+                            <MenuItem value="pending">Pending</MenuItem>
+                            <MenuItem value="rejected">Rejected</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Revenue"
+                          name="revenue"
+                          value={testPostbackData.revenue}
+                          onChange={handleTestDataChange}
+                          InputProps={{
+                            sx: { borderRadius: 2 }
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </StyledCard>
                 
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                   <Button
                     variant="outlined"
                     onClick={handleGenerateTestUrl}
                     disabled={!selectedSource.postback}
+                    sx={{ borderRadius: 2, px: 3 }}
+                    startIcon={<CodeIcon />}
                   >
                     Generate Test URL
                   </Button>
-                  <Button
-                    variant="contained"
-                    color="primary"
+                  <GradientButton
                     onClick={handleTestPostback}
                     disabled={!selectedSource.postback || isTesting}
+                    colorStart="#f5af19"
+                    colorEnd="#f12711"
+                    endIcon={<SendIcon />}
+                    sx={{ px: 3 }}
                   >
                     {isTesting ? 'Testing...' : 'Send Test Postback'}
-                  </Button>
+                  </GradientButton>
                 </Box>
                 
                 {processedUrl && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Generated URL:
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      value={processedUrl}
-                      multiline
-                      rows={2}
-                      InputProps={{
-                        readOnly: true,
-                        endAdornment: (
-                          <IconButton
+                  <StyledCard sx={{ mb: 3 }}>
+                    <CardContent>
+                      <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                        Generated URL:
+                      </Typography>
+                      <Box sx={{ position: 'relative' }}>
+                        <TextField
+                          fullWidth
+                          value={processedUrl}
+                          multiline
+                          rows={2}
+                          InputProps={{
+                            readOnly: true,
+                            sx: { 
+                              borderRadius: 2,
+                              fontFamily: 'monospace',
+                              fontSize: '0.85rem',
+                              pr: 5
+                            }
+                          }}
+                        />
+                        <Box sx={{ position: 'absolute', right: 8, top: 8 }}>
+                          <AnimatedIconButton
                             onClick={() => {
                               navigator.clipboard.writeText(processedUrl);
                               setSnackbar({
@@ -1205,52 +1766,83 @@ const OfferSourcePage = () => {
                                 severity: 'success'
                               });
                             }}
+                            title="Copy URL"
                           >
                             <ContentCopyIcon />
-                          </IconButton>
-                        )
-                      }}
-                    />
-                  </Box>
+                          </AnimatedIconButton>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </StyledCard>
                 )}
                 
                 {testResult && (
                   <Paper 
+                    elevation={0}
                     sx={{ 
-                      p: 2, 
-                      bgcolor: testResult.success ? '#e8f5e9' : '#ffebee',
-                      borderRadius: 1
+                      p: 3, 
+                      bgcolor: testResult.success ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                      borderRadius: 2,
+                      borderLeft: `4px solid ${testResult.success ? theme.palette.success.main : theme.palette.error.main}`,
+                      mb: 3
                     }}
                   >
-                    <Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center' }}>
+                      {testResult.success ? 
+                        <><CheckCircleIcon sx={{ mr: 1, color: theme.palette.success.main }} /> Test Successful</> : 
+                        <><CancelIcon sx={{ mr: 1, color: theme.palette.error.main }} /> Test Failed</>
+                      }
+                    </Typography>
+                    
+                    <Typography variant="body2">
                       {testResult.message}
                     </Typography>
                     
                     {testResult.success && testResult.data && (
-                      <Box mt={2}>
-                        <Typography variant="subtitle2">Response Data:</Typography>
-                        <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                          {JSON.stringify(testResult.data, null, 2)}
-                        </pre>
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1 }}>Response Data:</Typography>
+                        <Paper 
+                          elevation={0}
+                          sx={{ 
+                            p: 2, 
+                            bgcolor: 'background.paper', 
+                            borderRadius: 2
+                          }}
+                        >
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontFamily: 'monospace',
+                              whiteSpace: 'pre-wrap'
+                            }}
+                          >
+                            {JSON.stringify(testResult.data, null, 2)}
+                          </Typography>
+                        </Paper>
                       </Box>
                     )}
                   </Paper>
                 )}
-              </>
+                
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Button 
+                    variant="outlined"
+                    onClick={handleClosePostbackTest}
+                    sx={{ borderRadius: 2, px: 3 }}
+                  >
+                    Close
+                  </Button>
+                </Box>
+              </Box>
             )}
-            
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
-              <Button onClick={handleClosePostbackTest}>
-                Close
-              </Button>
-            </Box>
-          </Box>
+          </ModalContainer>
         </Modal>
         
         {/* Delete Confirmation Dialog */}
         <Modal
           open={deleteConfirmOpen}
           onClose={() => setDeleteConfirmOpen(false)}
+          closeAfterTransition
         >
           <Box
             sx={{
@@ -1260,31 +1852,39 @@ const OfferSourcePage = () => {
               transform: "translate(-50%, -50%)",
               width: "400px",
               bgcolor: "background.paper",
-              boxShadow: 24,
-              p: 4,
-              borderRadius: 2,
+              boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
+              borderRadius: 4,
+              overflow: 'hidden',
             }}
           >
-            <Typography variant="h6" gutterBottom>
-              Confirm Deletion
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3 }}>
-              Are you sure you want to delete this traffic source? This action cannot be undone.
-            </Typography>
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button 
-                onClick={() => setDeleteConfirmOpen(false)} 
-                sx={{ mr: 2 }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                color="error" 
-                onClick={handleConfirmDelete}
-              >
-                Delete
-              </Button>
+            <Box sx={{ bgcolor: theme.palette.error.main, color: 'white', p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <DeleteIcon sx={{ mr: 1.5 }} /> Confirm Deletion
+              </Typography>
+            </Box>
+            
+            <Box sx={{ p: 3 }}>
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                Are you sure you want to delete this traffic source? This action cannot be undone.
+              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <Button 
+                  variant="outlined"
+                  onClick={() => setDeleteConfirmOpen(false)} 
+                  sx={{ mr: 2, borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="error" 
+                  onClick={handleConfirmDelete}
+                  startIcon={<DeleteIcon />}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Delete
+                </Button>
+              </Box>
             </Box>
           </Box>
         </Modal>
@@ -1299,12 +1899,17 @@ const OfferSourcePage = () => {
           <Alert 
             onClose={handleCloseSnackbar} 
             severity={snackbar.severity}
-            sx={{ width: '100%' }}
+            sx={{ 
+              width: '100%',
+              borderRadius: 2,
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            }}
+            variant="filled"
           >
             {snackbar.message}
           </Alert>
         </Snackbar>
-      </Box>
+      </Container>
     </Layout>
   );
 };
