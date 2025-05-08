@@ -40,9 +40,6 @@ const facebookTokenStore = {};
 
 // Facebook OAuth Callback - Exchange code for access token
 router.get('/auth/facebook/callback', async (req, res) => {
-    console.log("📥 Entered /auth/facebook/callback");
-    console.log("Query Params:", req.query);
-
     const { code } = req.query;
 
     if (!code) {
@@ -105,6 +102,11 @@ router.get('/auth/facebook/callback', async (req, res) => {
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error.message);
 
+        // Log the full error response from Facebook
+        if (error.response) {
+            console.error("Facebook Error Response:", error.response.data);
+        }
+
         // Send error back to parent window
         res.send(`
             <script>
@@ -122,6 +124,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         `);
     }
 });
+
 
 // Google OAuth Callback - Updated with the same improved window closing logic
 // Google OAuth Callback - Pure JavaScript approach
