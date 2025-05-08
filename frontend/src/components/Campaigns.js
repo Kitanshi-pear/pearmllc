@@ -758,11 +758,6 @@ export default function CampaignsPage() {
       }
     },
     { 
-      field: "costType", 
-      headerName: "Cost Type", 
-      width: 100
-    },
-    { 
       field: "costValue", 
       headerName: "Cost", 
       width: 80,
@@ -832,45 +827,6 @@ export default function CampaignsPage() {
         }
       },
       valueFormatter: (params) => `$${Number(params?.value || 0).toFixed(2)}`
-    },
-    {
-      field: "offer_id",
-      headerName: "Offer",
-      width: 120,
-      renderCell: (params) => {
-        if (!params.row) return null;
-        
-        let offerName = '';
-        
-        // Try to find offer name from the offers list
-        if (params.row.offer_id) {
-          const offerItem = offersList.find(
-            offer => String(offer.Serial_No) === String(params.row.offer_id)
-          );
-          
-          if (offerItem?.Offer_name) {
-            offerName = offerItem.Offer_name;
-          } 
-          // Try nested Offer relationship (uppercase)
-          else if (params.row.Offer?.name) {
-            offerName = params.row.Offer.name;
-          } 
-          // Try nested offer relationship (lowercase)
-          else if (params.row.offer?.name) {
-            offerName = params.row.offer.name;
-          }
-          // Fall back to ID if name not found
-          else {
-            offerName = `ID: ${params.row.offer_id}`;
-          }
-        }
-        
-        return (
-          <Tooltip title={`Offer ID: ${params.row.offer_id || 'N/A'}`}>
-            <div>{offerName}</div>
-          </Tooltip>
-        );
-      }
     },
     {
       field: "actions",
