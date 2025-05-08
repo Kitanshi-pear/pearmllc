@@ -317,48 +317,77 @@ const TrafficChannels = () => {
     status: "Active"
   });
 
-  // Force refresh connection status function
+  // Improved function to refresh connection status more reliably
   const forceRefreshConnectionStatus = async () => {
     try {
+      console.log("Forcing refresh of connection status...");
       const sessionToken = localStorage.getItem('sessionToken');
       
-      if (sessionToken) {
-        // Make API call to check authentication status
-        const response = await axios.get(`${API_URL}/auth/status`, {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`
+      if (!sessionToken) {
+        console.log("No session token found, cannot refresh connection status");
+        return;
+      }
+      
+      // Make API call to check authentication status
+      const response = await axios.get(`${API_URL}/auth/status`, {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`
+        }
+      });
+      
+      console.log("Auth status API response:", response.data);
+      
+      // Update auth status based on API response
+      if (response.data) {
+        const newAuthStatus = {
+          facebook: response.data.facebook?.connected || false,
+          google: response.data.google?.connected || false,
+          tiktok: response.data.tiktok?.connected || false
+        };
+        
+        console.log("Setting new auth status:", newAuthStatus);
+        setAuthStatus(newAuthStatus);
+        
+        // Update connection status for all channels
+        const updatedChannelConnectionStatus = { ...channelConnectionStatus };
+        let needsUpdate = false;
+        
+        // Update all channels based on their platform type
+        rows.forEach(channel => {
+          const platform = channel.aliasChannel?.toLowerCase();
+          if (platform && (platform === 'facebook' || platform === 'google' || platform === 'tiktok')) {
+            const shouldBeConnected = newAuthStatus[platform] || 
+              (platform === 'facebook' && channel.apiAccessToken) || 
+              (platform === 'google' && channel.googleAdsAccountId);
+            
+            if (updatedChannelConnectionStatus[channel.id] !== shouldBeConnected) {
+              updatedChannelConnectionStatus[channel.id] = shouldBeConnected;
+              needsUpdate = true;
+            }
           }
         });
         
-        // Update auth status based on API response
-        if (response.data) {
-          const newAuthStatus = {
-            facebook: response.data.facebook?.connected || false,
-            google: response.data.google?.connected || false,
-            tiktok: response.data.tiktok?.connected || false
-          };
-          
-          setAuthStatus(newAuthStatus);
-          
-          // Update connection status for the current channel if in edit mode
-          if (selectedRow && selectedRow.id) {
-            const platform = selectedRow.aliasChannel.toLowerCase();
-            const isConnected = 
-              platform === 'facebook' ? newAuthStatus.facebook : 
-              platform === 'google' ? newAuthStatus.google : 
-              platform === 'tiktok' ? newAuthStatus.tiktok : false;
+        // Only update state if there are changes
+        if (needsUpdate) {
+          console.log("Updating channel connection statuses:", updatedChannelConnectionStatus);
+          setChannelConnectionStatus(updatedChannelConnectionStatus);
+        }
+        
+        // Update the current channel being edited (if any)
+        if (selectedRow && selectedRow.id) {
+          const platform = selectedRow.aliasChannel?.toLowerCase();
+          if (platform && (platform === 'facebook' || platform === 'google' || platform === 'tiktok')) {
+            const isConnected = newAuthStatus[platform] || false;
             
-            // Update channel connection status
-            setChannelConnectionStatus(prev => ({
-              ...prev,
-              [selectedRow.id]: isConnected
-            }));
+            console.log(`Current selected channel (${selectedRow.channelName}) connection status:`, isConnected);
             
-            // Update form data connection status
-            setFormData(prev => ({
-              ...prev,
-              isConnected: isConnected
-            }));
+            // Update form data if needed
+            if (formData.isConnected !== isConnected) {
+              setFormData(prev => ({
+                ...prev,
+                isConnected: isConnected
+              }));
+            }
           }
         }
       }
@@ -367,114 +396,94 @@ const TrafficChannels = () => {
     }
   };
 
-  // Fetch data from API on component mount
-  useEffect(() => {
-    const fetchChannels = async () => {
-      setLoading((prev) => ({ ...prev, table: true }));
-      
-      try {
-        // Fetch data from the API
-        const response = await axios.get(API_URL);
-        
-        // Process the data
-        if (response.data && Array.isArray(response.data)) {
-          setRows(response.data);
-          
-          // Set up connection statuses based on data
-          const newConnectionStatus = {};
-          response.data.forEach(row => {
-            // Determine connection status based on API data
-            newConnectionStatus[row.id] = row.isConnected || 
-                                        (row.apiAccessToken && row.aliasChannel === 'Facebook') || 
-                                        (row.googleAdsAccountId && row.aliasChannel === 'Google');
-          });
-          
-          setChannelConnectionStatus(newConnectionStatus);
-        } else {
-          // If API returns unexpected format, set empty array
-          setRows([]);
-          setSnackbar({
-            open: true,
-            message: "Could not load channels: Unexpected data format",
-            severity: "error"
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching channels:", error);
-        setRows([]);
-        setSnackbar({
-          open: true,
-          message: `Could not load channels: ${error.message}`,
-          severity: "error"
-        });
-      } finally {
-        setLoading((prev) => ({ ...prev, table: false }));
-      }
-    };
+  // Improved function to save connection status
+  const saveConnectionStatus = async (platform, isConnected) => {
+    if (!selectedRow) {
+      console.warn("Cannot save connection status: No channel selected");
+      return;
+    }
     
-    fetchChannels();
-  }, [dateRange.startDate, dateRange.endDate]);
-  
-  // Check auth status from API
-  useEffect(() => {
-    const checkApiAuthStatus = async () => {
-      try {
-        const sessionToken = localStorage.getItem('sessionToken');
-        
-        if (sessionToken) {
-          // Make API call to check authentication status
-          const response = await axios.get(`${API_URL}/auth/status`, {
-            headers: {
-              Authorization: `Bearer ${sessionToken}`
-            }
-          });
-          
-          // Update auth status based on API response
-          if (response.data) {
-            setAuthStatus({
-              facebook: response.data.facebook?.connected || false,
-              google: response.data.google?.connected || false,
-              tiktok: response.data.tiktok?.connected || false
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error checking auth status:", error);
-      }
-    };
-    
-    checkApiAuthStatus();
-  }, []);
-
-  // Effect to update connection status when auth status changes
-  useEffect(() => {
-    if (selectedRow && openSecondModal) {
-      // If we're in edit mode and the modal is open, update connection status
-      const platform = selectedRow.aliasChannel;
-      let isConnected = false;
+    try {
+      console.log(`Saving connection status for ${platform}: ${isConnected ? 'Connected' : 'Disconnected'}`);
       
-      if (platform === 'Facebook') isConnected = authStatus.facebook;
-      else if (platform === 'Google') isConnected = authStatus.google;
-      else if (platform === 'TikTok') isConnected = authStatus.tiktok;
+      // Show loading indicator
+      setLoading(prev => ({ ...prev, save: true }));
       
-      // Update the connection status in the form
+      // Create an update payload with the current form data and updated connection status
+      const updateData = {
+        ...formData,
+        isConnected: isConnected
+      };
+      
+      // Log the payload for debugging
+      console.log("Updating channel with data:", updateData);
+      
+      // Call API to update channel connection status
+      const response = await axios.put(`${API_URL}/${selectedRow.id}`, updateData);
+      
+      console.log("API response:", response.data);
+      
+      // Update rows in state
+      setRows(prevRows => 
+        prevRows.map(row => 
+          row.id === selectedRow.id ? response.data : row
+        )
+      );
+      
+      // Update connection status tracking specifically
+      setChannelConnectionStatus(prev => ({
+        ...prev,
+        [selectedRow.id]: isConnected
+      }));
+      
+      // Also update form data's isConnected property
       setFormData(prev => ({
         ...prev,
         isConnected: isConnected
       }));
       
-      // Also update the connection status tracking
-      if (selectedRow.id) {
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: `${platform} connection status saved successfully`,
+        severity: "success"
+      });
+      
+      // Force refresh the connection status display
+      forceRefreshConnectionStatus();
+    } catch (error) {
+      console.error(`Error saving connection status for ${platform}:`, error);
+      
+      // Show error message but keep modal open
+      setSnackbar({
+        open: true,
+        message: `Failed to save connection status: ${error.message || 'Unknown error'}`,
+        severity: "error"
+      });
+      
+      // If API call fails, revert the local state to prevent misleading UI
+      if (selectedRow && selectedRow.id) {
+        const platformLower = platform.toLowerCase();
+        const actualStatus = authStatus[platformLower] || false;
+        
         setChannelConnectionStatus(prev => ({
           ...prev,
-          [selectedRow.id]: isConnected
+          [selectedRow.id]: actualStatus
+        }));
+        
+        setFormData(prev => ({
+          ...prev,
+          isConnected: actualStatus
         }));
       }
+    } finally {
+      // Always clear loading state
+      setLoading(prev => ({ ...prev, save: false }));
     }
-  }, [authStatus, selectedRow, openSecondModal]);
+  };
 
-  // Improved handleAuth function with reliable popup closing
-const handleAuth = async (platform) => {
+  // Improved handleAuth function
+  const handleAuth = async (platform) => {
     const platformLower = platform.toLowerCase();
     
     // Set loading state
@@ -657,6 +666,125 @@ const handleAuth = async (platform) => {
     }, 300); // Check more frequently
   };
 
+  // Fetch data from API on component mount
+  useEffect(() => {
+    const fetchChannels = async () => {
+      setLoading((prev) => ({ ...prev, table: true }));
+      
+      try {
+        // Fetch data from the API
+        const response = await axios.get(API_URL);
+        
+        // Process the data
+        if (response.data && Array.isArray(response.data)) {
+          setRows(response.data);
+          
+          // Set up connection statuses based on data
+          const newConnectionStatus = {};
+          response.data.forEach(row => {
+            // Determine connection status based on API data
+            newConnectionStatus[row.id] = row.isConnected || 
+                                        (row.apiAccessToken && row.aliasChannel === 'Facebook') || 
+                                        (row.googleAdsAccountId && row.aliasChannel === 'Google');
+          });
+          
+          setChannelConnectionStatus(newConnectionStatus);
+        } else {
+          // If API returns unexpected format, set empty array
+          setRows([]);
+          setSnackbar({
+            open: true,
+            message: "Could not load channels: Unexpected data format",
+            severity: "error"
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching channels:", error);
+        setRows([]);
+        setSnackbar({
+          open: true,
+          message: `Could not load channels: ${error.message}`,
+          severity: "error"
+        });
+      } finally {
+        setLoading((prev) => ({ ...prev, table: false }));
+      }
+    };
+    
+    fetchChannels();
+  }, [dateRange.startDate, dateRange.endDate]);
+  
+  // Check auth status from API
+  useEffect(() => {
+    const checkApiAuthStatus = async () => {
+      try {
+        const sessionToken = localStorage.getItem('sessionToken');
+        
+        if (sessionToken) {
+          // Make API call to check authentication status
+          const response = await axios.get(`${API_URL}/auth/status`, {
+            headers: {
+              Authorization: `Bearer ${sessionToken}`
+            }
+          });
+          
+          // Update auth status based on API response
+          if (response.data) {
+            setAuthStatus({
+              facebook: response.data.facebook?.connected || false,
+              google: response.data.google?.connected || false,
+              tiktok: response.data.tiktok?.connected || false
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth status:", error);
+      }
+    };
+    
+    checkApiAuthStatus();
+  }, []);
+
+  // Effect to update connection status when auth status changes
+  useEffect(() => {
+    if (selectedRow && openSecondModal) {
+      // If we're in edit mode and the modal is open, update connection status
+      const platform = selectedRow.aliasChannel;
+      let isConnected = false;
+      
+      if (platform === 'Facebook') isConnected = authStatus.facebook;
+      else if (platform === 'Google') isConnected = authStatus.google;
+      else if (platform === 'TikTok') isConnected = authStatus.tiktok;
+      
+      // Update the connection status in the form
+      setFormData(prev => ({
+        ...prev,
+        isConnected: isConnected
+      }));
+      
+      // Also update the connection status tracking
+      if (selectedRow.id) {
+        setChannelConnectionStatus(prev => ({
+          ...prev,
+          [selectedRow.id]: isConnected
+        }));
+      }
+    }
+  }, [authStatus, selectedRow, openSecondModal]);
+
+  // Filter rows based on search text
+  const filteredRows = rows.filter((row) =>
+    Object.values(row || {}).some((value) =>
+      value?.toString().toLowerCase().includes(filterText.toLowerCase())
+    )
+  );
+
+  // Helper to determine if platform is connectable
+  const isPlatformConnectable = (platformName) => {
+    if (!platformName) return false;
+    const platformLower = platformName.toLowerCase();
+    return ["facebook", "google", "tiktok"].includes(platformLower);
+  };
 
   // Form change handler for basic fields
   const handleFormChange = (e) => {
