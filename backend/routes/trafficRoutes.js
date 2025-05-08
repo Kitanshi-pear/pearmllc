@@ -126,74 +126,63 @@ router.get('/auth/facebook/callback', async (req, res) => {
 });
 
 
-// Google OAuth Callback - Updated with the same improved window closing logic
-// Google OAuth Callback - Pure JavaScript approach
+router.get('/auth/google', (req, res) => {
+    console.log("✅ Redirecting to Google OAuth...");
+    
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${GOOGLE_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT_URI)}` +
+        `&response_type=code` + // response_type=code for Authorization Code Flow
+        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/adwords email profile')}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+    
+    console.log("🔹 Full Google Auth URL:", googleAuthUrl);
+    res.redirect(googleAuthUrl);
+});
+
+// Google OAuth Callback - Exchange code for access token
 router.get('/auth/google/callback', async (req, res) => {
-    // Set content type to JavaScript
-    res.setHeader('Content-Type', 'application/javascript');
-    
     const { code, error } = req.query;
-    
+
     if (error) {
         console.error("❌ OAuth error:", error);
         return res.send(`
-            // Error handler for OAuth error
-            (function() {
+            <script>
                 if (window.opener && !window.opener.closed) {
-                    try {
-                        // Notify parent window of error
-                        window.opener.postMessage({
-                            type: 'auth_error',
-                            platform: 'Google',
-                            message: '${error.replace(/'/g, "\\'")}'
-                        }, '*');
-                        
-                        // Wait briefly then close
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    } catch (e) {
-                        console.error("Error communicating with parent:", e);
-                        window.close();
-                    }
+                    window.opener.postMessage({
+                        type: 'auth_error',
+                        platform: 'Google',
+                        message: '${error.replace(/'/g, "\\'")}'
+                    }, '*');
+                    setTimeout(() => window.close(), 500);
                 } else {
                     window.close();
                 }
-            })();
+            </script>
         `);
     }
-    
+
     if (!code) {
         console.error("❌ No authorization code received.");
         return res.send(`
-            // Error handler for missing code
-            (function() {
+            <script>
                 if (window.opener && !window.opener.closed) {
-                    try {
-                        // Notify parent window of error
-                        window.opener.postMessage({
-                            type: 'auth_error',
-                            platform: 'Google',
-                            message: 'No authorization code provided'
-                        }, '*');
-                        
-                        // Wait briefly then close
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    } catch (e) {
-                        console.error("Error communicating with parent:", e);
-                        window.close();
-                    }
+                    window.opener.postMessage({
+                        type: 'auth_error',
+                        platform: 'Google',
+                        message: 'No authorization code provided'
+                    }, '*');
+                    setTimeout(() => window.close(), 500);
                 } else {
                     window.close();
                 }
-            })();
+            </script>
         `);
     }
 
     try {
-        console.log("🔹 Exchanging code for tokens...");
+        console.log("🔹 Exchanging code for Google tokens...");
         
         // Exchange code for access token
         const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
@@ -229,37 +218,20 @@ router.get('/auth/google/callback', async (req, res) => {
 
         // Return pure JavaScript to handle successful authentication
         res.send(`
-            // Success handler for Google authentication
-            (function() {
+            <script>
                 if (window.opener && !window.opener.closed) {
-                    try {
-                        console.log("Authentication successful, communicating with parent window...");
-                        
-                        // Store session token directly in parent's localStorage
-                        window.opener.localStorage.setItem('sessionToken', '${sessionToken}');
-                        
-                        // Notify parent window of success using postMessage as backup
-                        window.opener.postMessage({
-                            type: 'auth_success',
-                            platform: 'Google',
-                            session: '${sessionToken}'
-                        }, '*');
-                        
-                        // Refresh the parent window to update UI
-                        window.opener.location.reload();
-                        
-                        // Close this popup window after a short delay
-                        setTimeout(function() {
-                            window.close();
-                        }, 1000);
-                    } catch (e) {
-                        console.error("Error communicating with parent:", e);
-                        window.close();
-                    }
+                    window.opener.localStorage.setItem('sessionToken', '${sessionToken}');
+                    window.opener.postMessage({
+                        type: 'auth_success',
+                        platform: 'Google',
+                        session: '${sessionToken}'
+                    }, '*');
+                    window.opener.location.reload();
+                    setTimeout(function() { window.close(); }, 1000);
                 } else {
                     window.close();
                 }
-            })();
+            </script>
         `);
     } catch (error) {
         console.error("❌ Google OAuth Error:", error.response?.data || error);
@@ -267,48 +239,20 @@ router.get('/auth/google/callback', async (req, res) => {
         
         // Return JavaScript to handle error
         res.send(`
-            // Error handler for Google authentication
-            (function() {
+            <script>
                 if (window.opener && !window.opener.closed) {
-                    try {
-                        // Notify parent window of error
-                        window.opener.postMessage({
-                            type: 'auth_error',
-                            platform: 'Google',
-                            message: '${errorMessage.replace(/'/g, "\\'")}'
-                        }, '*');
-                        
-                        // Wait briefly then close
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    } catch (e) {
-                        console.error("Error communicating with parent:", e);
-                        window.close();
-                    }
+                    window.opener.postMessage({
+                        type: 'auth_error',
+                        platform: 'Google',
+                        message: '${errorMessage.replace(/'/g, "\\'")}'
+                    }, '*');
+                    setTimeout(() => window.close(), 500);
                 } else {
                     window.close();
                 }
-            })();
+            </script>
         `);
     }
-});
-
-// Google OAuth Login Redirect
-router.get('/auth/google', (req, res) => {
-    console.log("✅ Redirecting to Google OAuth...");
-    console.log("📍 Using redirect URI:", GOOGLE_REDIRECT_URI);
-    
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${GOOGLE_CLIENT_ID}` +
-        `&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT_URI)}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/adwords email profile')}` +
-        `&access_type=offline` +
-        `&prompt=consent`;
-    
-    console.log("🔹 Full Google Auth URL:", googleAuthUrl);
-    res.redirect(googleAuthUrl);
 });
 
 
