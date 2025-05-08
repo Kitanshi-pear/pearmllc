@@ -30,6 +30,7 @@ router.get('/auth/facebook', (req, res) => {
     const fbAuthUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${FB_REDIRECT_URI}&scope=public_profile,email,ads_read&config_id=${CONFIG_ID}&response_type=code`;
     console.log("🔹 Full FB Auth URL:", fbAuthUrl);
     res.redirect(fbAuthUrl);
+    console.log("Response type:", code);
 });
 
 // Facebook OAuth Callback - Updated with reliable window closing
@@ -37,6 +38,7 @@ router.get('/auth/facebook', (req, res) => {
 router.get('/auth/facebook/callback', async (req, res) => {
     // Set content type to JavaScript
     res.setHeader('Content-Type', 'application/javascript');
+    
     
     const { code } = req.query;
     if (!code) {
