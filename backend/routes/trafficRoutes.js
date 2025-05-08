@@ -31,180 +31,706 @@ router.get('/auth/facebook', (req, res) => {
     res.redirect(fbAuthUrl);
 });
 
-// Facebook OAuth Callback - Modified to support popup window
+// Facebook OAuth Callback - Modified for reliable popup closing
 router.get('/auth/facebook/callback', async (req, res) => {
     const { code } = req.query;
     if (!code) {
-      // Return HTML with more reliable window closing mechanism
-      return res.send(`
-        <html>
-          <head>
-            <title>Authentication Failed</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-              button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="error">Authentication Failed</h3>
-            <p>No authorization code provided.</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                window.opener.postMessage({
-                  type: 'auth_error',
-                  platform: 'Facebook',
-                  message: 'No authorization code provided'
-                }, window.location.origin);
-                window.close();
-                // Additional techniques to ensure window closes
-                window.location.href = "about:blank";
-                window.open('', '_self');
-                window.self.close();
-              }
-              
-              // Send message to opener window
-              window.opener.postMessage({
-                type: 'auth_error',
-                platform: 'Facebook',
-                message: 'No authorization code provided'
-              }, window.location.origin);
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 2000);
-            </script>
-          </body>
-        </html>
-      `);
+        // Return HTML with more reliable window closing mechanism
+        return res.send(`
+            <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #d32f2f; }
+                        button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="error">Authentication Failed</h3>
+                    <p>No authorization code provided.</p>
+                    <p>This window will close automatically in a few seconds.</p>
+                    <button onclick="closeWindow()">Close Now</button>
+                    
+                    <script>
+                        function closeWindow() {
+                            // First send the message (IMPORTANT)
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_error',
+                                    platform: 'Facebook',
+                                    message: 'No authorization code provided'
+                                }, window.location.origin);
+                                console.log("Error message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
     }
-  
+
     try {
-      console.log("🔹 Received Facebook Auth Code:", code);
-      const tokenResponse = await axios.get(`https://graph.facebook.com/v22.0/oauth/access_token`, {
-        params: {
-          client_id: FB_CLIENT_ID,
-          client_secret: FB_CLIENT_SECRET,
-          redirect_uri: FB_REDIRECT_URI,
-          code,
-          config_id: CONFIG_ID
-        }
-      });
-  
-      console.log("✅ Facebook Access Token Response:", tokenResponse.data);
-      
-      // Get user info
-      const userResponse = await axios.get('https://graph.facebook.com/me', {
-        params: {
-          access_token: tokenResponse.data.access_token,
-          fields: 'id,name,email'
-        }
-      });
-  
-      // Store token
-      const userId = userResponse.data.id;
-      facebookTokenStore[userId] = {
-        access_token: tokenResponse.data.access_token,
-        expires_at: tokenResponse.data.expires_in ? Date.now() + (tokenResponse.data.expires_in * 1000) : null,
-        email: userResponse.data.email,
-        name: userResponse.data.name
-      };
-  
-      // Create session token
-      const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
-  
-      // Return HTML with enhanced post message for success and improved window closing
-      res.send(`
-        <html>
-          <head>
-            <title>Authentication Successful</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .success { color: #2e7d32; }
-              button { padding: 10px 20px; background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="success">Authentication Successful!</h3>
-            <p>Your Facebook account has been connected.</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                // First send the message
-                window.opener.postMessage({
-                  type: 'auth_success',
-                  platform: 'Facebook',
-                  session: '${sessionToken}'
-                }, window.location.origin);
-                
-                // Then try multiple close methods
-                window.close();
-                // Additional attempts
-                setTimeout(function() {
-                  window.location.href = "about:blank";
-                  window.open('', '_self');
-                  window.self.close();
-                }, 300);
-              }
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 1500);
-            </script>
-          </body>
-        </html>
-      `);
+        console.log("🔹 Received Facebook Auth Code:", code);
+        const tokenResponse = await axios.get(`https://graph.facebook.com/v22.0/oauth/access_token`, {
+            params: {
+                client_id: FB_CLIENT_ID,
+                client_secret: FB_CLIENT_SECRET,
+                redirect_uri: FB_REDIRECT_URI,
+                code,
+                config_id: CONFIG_ID
+            }
+        });
+
+        console.log("✅ Facebook Access Token Response:", tokenResponse.data);
+        
+        // Get user info
+        const userResponse = await axios.get('https://graph.facebook.com/me', {
+            params: {
+                access_token: tokenResponse.data.access_token,
+                fields: 'id,name,email'
+            }
+        });
+
+        // Store token
+        const userId = userResponse.data.id;
+        facebookTokenStore[userId] = {
+            access_token: tokenResponse.data.access_token,
+            expires_at: tokenResponse.data.expires_in ? Date.now() + (tokenResponse.data.expires_in * 1000) : null,
+            email: userResponse.data.email,
+            name: userResponse.data.name
+        };
+
+        // Create session token
+        const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
+
+        // Return HTML with enhanced post message for success and improved window closing
+        res.send(`
+            <html>
+                <head>
+                    <title>Authentication Successful</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .success { color: #2e7d32; }
+                        button { padding: 10px 20px; background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                        .loading-spinner { 
+                            display: inline-block; 
+                            width: 24px; 
+                            height: 24px; 
+                            border: 3px solid rgba(0,0,0,0.1); 
+                            border-radius: 50%; 
+                            border-top-color: #2e7d32; 
+                            animation: spin 1s ease infinite; 
+                        }
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="success">Authentication Successful!</h3>
+                    <p>Your Facebook account has been connected.</p>
+                    <p>This window will close automatically.</p>
+                    <div class="loading-spinner"></div>
+                    <button onclick="closeWindow()" style="margin-top: 20px;">Close Now</button>
+                    
+                    <script>
+                        // Message has been sent, display to user and close window
+                        function closeWindow() {
+                            console.log("Close window function called");
+                            
+                            // CRITICAL: First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_success',
+                                    platform: 'Facebook',
+                                    session: '${sessionToken}'
+                                }, window.location.origin);
+                                console.log("Success message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
     } catch (error) {
-      console.error("❌ Facebook OAuth Error:", error.response?.data || error);
-      // Return HTML with post message for error with improved window closing
-      res.send(`
-        <html>
-          <head>
-            <title>Authentication Failed</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-              button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="error">Authentication Failed</h3>
-            <p>${error.message}</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                window.opener.postMessage({
-                  type: 'auth_error',
-                  platform: 'Facebook',
-                  message: '${error.message.replace(/'/g, "\\'")}'
-                }, window.location.origin);
-                window.close();
-                // Additional techniques to ensure window closes
-                window.location.href = "about:blank";
-                window.open('', '_self');
-                window.self.close();
-              }
-              
-              // Send message to opener window
-              window.opener.postMessage({
-                type: 'auth_error',
-                platform: 'Facebook',
-                message: '${error.message.replace(/'/g, "\\'")}'
-              }, window.location.origin);
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 2000);
-            </script>
-          </body>
-        </html>
-      `);
+        console.error("❌ Facebook OAuth Error:", error.response?.data || error);
+        // Return HTML with post message for error with improved window closing
+        res.send(`
+            <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #d32f2f; }
+                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="error">Authentication Failed</h3>
+                    <p>${error.message}</p>
+                    <p>This window will close automatically in a few seconds.</p>
+                    <button onclick="closeWindow()">Close Now</button>
+                    
+                    <script>
+                        function closeWindow() {
+                            // First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_error',
+                                    platform: 'Facebook',
+                                    message: '${error.message.replace(/'/g, "\\'")}'
+                                }, window.location.origin);
+                                console.log("Error message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
     }
-  });
+});
+
+// Google OAuth Callback - Improved with the same enhancements
+router.get('/auth/google/callback', async (req, res) => {
+    console.log("🔹 Google OAuth Callback Triggered");
+    const { code, error } = req.query;
+    
+    if (error) {
+        console.error("❌ OAuth error:", error);
+        return res.send(`
+            <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #d32f2f; }
+                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="error">Authentication Failed</h3>
+                    <p>${error}</p>
+                    <p>This window will close automatically in a few seconds.</p>
+                    <button onclick="closeWindow()">Close Now</button>
+                    
+                    <script>
+                        function closeWindow() {
+                            // First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_error',
+                                    platform: 'Google',
+                                    message: '${error.replace(/'/g, "\\'")}'
+                                }, window.location.origin);
+                                console.log("Error message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+    }
+    
+    if (!code) {
+        console.error("❌ No authorization code received.");
+        return res.send(`
+            <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #d32f2f; }
+                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="error">Authentication Failed</h3>
+                    <p>No authorization code provided.</p>
+                    <p>This window will close automatically in a few seconds.</p>
+                    <button onclick="closeWindow()">Close Now</button>
+                    
+                    <script>
+                        function closeWindow() {
+                            // First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_error',
+                                    platform: 'Google',
+                                    message: 'No authorization code provided'
+                                }, window.location.origin);
+                                console.log("Error message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+    }
+
+    try {
+        console.log("🔹 Exchanging code for tokens...");
+        
+        // Exchange code for access token
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
+            redirect_uri: GOOGLE_REDIRECT_URI,
+            grant_type: 'authorization_code',
+            code
+        });
+
+        console.log("✅ Google Access Token Response:", {
+            access_token: tokenResponse.data.access_token ? '***' : null,
+            refresh_token: tokenResponse.data.refresh_token ? '***' : null,
+            expires_in: tokenResponse.data.expires_in,
+            token_type: tokenResponse.data.token_type
+        });
+
+        // Store the tokens
+        const { access_token, refresh_token, expires_in } = tokenResponse.data;
+        
+        // Get user info
+        const userInfo = await axios.get(
+            'https://www.googleapis.com/oauth2/v2/userinfo',
+            { headers: { Authorization: `Bearer ${access_token}` } }
+        );
+        
+        console.log("✅ Google User Info:", {
+            id: userInfo.data.id,
+            email: userInfo.data.email,
+            name: userInfo.data.name
+        });
+        
+        const userId = userInfo.data.id;
+        
+        // Store tokens with expiration
+        googleTokenStore[userId] = {
+            access_token,
+            refresh_token,
+            expires_at: Date.now() + (expires_in * 1000),
+            email: userInfo.data.email,
+            name: userInfo.data.name
+        };
+
+        // Create a session token
+        const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
+
+        // Return HTML with enhanced post message for success and improved window closing
+        res.send(`
+            <html>
+                <head>
+                    <title>Authentication Successful</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .success { color: #2e7d32; }
+                        button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                        .loading-spinner { 
+                            display: inline-block; 
+                            width: 24px; 
+                            height: 24px; 
+                            border: 3px solid rgba(0,0,0,0.1); 
+                            border-radius: 50%; 
+                            border-top-color: #4285F4; 
+                            animation: spin 1s ease infinite; 
+                        }
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="success">Authentication Successful!</h3>
+                    <p>Your Google account has been connected.</p>
+                    <p>This window will close automatically.</p>
+                    <div class="loading-spinner"></div>
+                    <button onclick="closeWindow()" style="margin-top: 20px;">Close Now</button>
+                    
+                    <script>
+                        // Message has been sent, display to user and close window
+                        function closeWindow() {
+                            console.log("Close window function called");
+                            
+                            // CRITICAL: First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_success',
+                                    platform: 'Google',
+                                    session: '${sessionToken}'
+                                }, window.location.origin);
+                                console.log("Success message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error("❌ Google OAuth Error:", error.response?.data || error);
+        const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
+        res.send(`
+            <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #d32f2f; }
+                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                    </style>
+                </head>
+                <body>
+                    <h3 class="error">Authentication Failed</h3>
+                    <p>${errorMessage}</p>
+                    <p>This window will close automatically in a few seconds.</p>
+                    <button onclick="closeWindow()">Close Now</button>
+                    
+                    <script>
+                        function closeWindow() {
+                            // First send the message
+                            try {
+                                window.opener.postMessage({
+                                    type: 'auth_error',
+                                    platform: 'Google',
+                                    message: '${errorMessage.replace(/'/g, "\\'")}'
+                                }, window.location.origin);
+                                console.log("Error message sent to parent window");
+                            } catch (e) {
+                                console.error("Failed to send message:", e);
+                            }
+                            
+                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            setTimeout(function() {
+                                try {
+                                    window.close();
+                                    console.log("Window.close called");
+                                } catch (e) {
+                                    console.error("Failed to close window:", e);
+                                }
+                                
+                                // Force page unload
+                                try {
+                                    window.location.href = "about:blank";
+                                    console.log("Redirected to about:blank");
+                                } catch (e) {
+                                    console.error("Failed to redirect:", e);
+                                }
+                                
+                                try {
+                                    window.open('', '_self');
+                                    window.self.close();
+                                    console.log("Self-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to self-close:", e);
+                                }
+                                
+                                try {
+                                    window.top.close();
+                                    console.log("Top-close attempted");
+                                } catch (e) {
+                                    console.error("Failed to top-close:", e);
+                                }
+                                
+                                // Fallback - resize to almost nothing
+                                try {
+                                    window.resizeTo(0, 0);
+                                    console.log("Window resized to 0x0");
+                                } catch (e) {
+                                    console.error("Failed to resize window:", e);
+                                }
+                            }, 100);
+                        }
+                        
+                        // Auto-close after short delay
+                        setTimeout(closeWindow, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+    }
+});
 
 // Google OAuth Login Redirect
 router.get('/auth/google', (req, res) => {
@@ -223,243 +749,7 @@ router.get('/auth/google', (req, res) => {
     res.redirect(googleAuthUrl);
 });
 
-// Google OAuth Callback - Modified to support popup window
-  router.get('/auth/google/callback', async (req, res) => {
-    console.log("🔹 Google OAuth Callback Triggered");
-    const { code, error } = req.query;
-    
-    if (error) {
-      console.error("❌ OAuth error:", error);
-      return res.send(`
-        <html>
-          <head>
-            <title>Authentication Failed</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-              button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="error">Authentication Failed</h3>
-            <p>${error}</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                window.opener.postMessage({
-                  type: 'auth_error',
-                  platform: 'Google',
-                  message: '${error.replace(/'/g, "\\'")}'
-                }, window.location.origin);
-                window.close();
-                // Additional techniques to ensure window closes
-                window.location.href = "about:blank";
-                window.open('', '_self');
-                window.self.close();
-              }
-              
-              // Send message to opener window
-              window.opener.postMessage({
-                type: 'auth_error',
-                platform: 'Google',
-                message: '${error.replace(/'/g, "\\'")}'
-              }, window.location.origin);
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 2000);
-            </script>
-          </body>
-        </html>
-      `);
-    }
-    
-    if (!code) {
-      console.error("❌ No authorization code received.");
-      return res.send(`
-        <html>
-          <head>
-            <title>Authentication Failed</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-              button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="error">Authentication Failed</h3>
-            <p>No authorization code provided.</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                window.opener.postMessage({
-                  type: 'auth_error',
-                  platform: 'Google',
-                  message: 'No authorization code provided'
-                }, window.location.origin);
-                window.close();
-                // Additional techniques to ensure window closes
-                window.location.href = "about:blank";
-                window.open('', '_self');
-                window.self.close();
-              }
-              
-              // Send message to opener window
-              window.opener.postMessage({
-                type: 'auth_error',
-                platform: 'Google',
-                message: 'No authorization code provided'
-              }, window.location.origin);
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 2000);
-            </script>
-          </body>
-        </html>
-      `);
-    }
-  
-    try {
-      console.log("🔹 Exchanging code for tokens...");
-      
-      // Exchange code for access token
-      const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: GOOGLE_REDIRECT_URI,
-        grant_type: 'authorization_code',
-        code
-      });
-  
-      console.log("✅ Google Access Token Response:", {
-        access_token: tokenResponse.data.access_token ? '***' : null,
-        refresh_token: tokenResponse.data.refresh_token ? '***' : null,
-        expires_in: tokenResponse.data.expires_in,
-        token_type: tokenResponse.data.token_type
-      });
-  
-      // Store the tokens
-      const { access_token, refresh_token, expires_in } = tokenResponse.data;
-      
-      // Get user info
-      const userInfo = await axios.get(
-        'https://www.googleapis.com/oauth2/v2/userinfo',
-        { headers: { Authorization: `Bearer ${access_token}` } }
-      );
-      
-      console.log("✅ Google User Info:", {
-        id: userInfo.data.id,
-        email: userInfo.data.email,
-        name: userInfo.data.name
-      });
-      
-      const userId = userInfo.data.id;
-      
-      // Store tokens with expiration
-      googleTokenStore[userId] = {
-        access_token,
-        refresh_token,
-        expires_at: Date.now() + (expires_in * 1000),
-        email: userInfo.data.email,
-        name: userInfo.data.name
-      };
-  
-      // Create a session token
-      const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
-  
-      // Return HTML with enhanced post message for success and improved window closing
-      res.send(`
-        <html>
-          <head>
-            <title>Authentication Successful</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .success { color: #2e7d32; }
-              button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="success">Authentication Successful!</h3>
-            <p>Your Google account has been connected.</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                // First send the message
-                window.opener.postMessage({
-                  type: 'auth_success',
-                  platform: 'Google',
-                  session: '${sessionToken}'
-                }, window.location.origin);
-                
-                // Then try multiple close methods
-                window.close();
-                // Additional attempts
-                setTimeout(function() {
-                  window.location.href = "about:blank";
-                  window.open('', '_self');
-                  window.self.close();
-                }, 300);
-              }
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 1500);
-            </script>
-          </body>
-        </html>
-      `);
-    } catch (error) {
-      console.error("❌ Google OAuth Error:", error.response?.data || error);
-      const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
-      res.send(`
-        <html>
-          <head>
-            <title>Authentication Failed</title>
-            <style>
-              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-              .error { color: #d32f2f; }
-              button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-          </head>
-          <body>
-            <h3 class="error">Authentication Failed</h3>
-            <p>${errorMessage}</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="closeWindow()">Close Now</button>
-            
-            <script>
-              function closeWindow() {
-                window.opener.postMessage({
-                  type: 'auth_error',
-                  platform: 'Google',
-                  message: '${errorMessage.replace(/'/g, "\\'")}'
-                }, window.location.origin);
-                window.close();
-                // Additional techniques to ensure window closes
-                window.location.href = "about:blank";
-                window.open('', '_self');
-                window.self.close();
-              }
-              
-              // Send message to opener window
-              window.opener.postMessage({
-                type: 'auth_error',
-                platform: 'Google',
-                message: '${errorMessage.replace(/'/g, "\\'")}'
-              }, window.location.origin);
-              
-              // Auto-close after short delay
-              setTimeout(closeWindow, 2000);
-            </script>
-          </body>
-        </html>
-      `);
-    }
-  });
+
 // Check OAuth connection status
 router.get('/auth/status', async (req, res) => {
     try {
