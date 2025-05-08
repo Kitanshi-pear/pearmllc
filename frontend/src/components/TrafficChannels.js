@@ -366,7 +366,7 @@ const TrafficChannels = () => {
       }
       
       // Make API call to check authentication status
-      const response = await axios.get(`${API_URL}/auth/${platformLower}/callback`, {
+      const response = await axios.get(`${API_URL}/auth/status`, {
         headers: {
           Authorization: `Bearer ${sessionToken}`
         }
@@ -755,7 +755,7 @@ const TrafficChannels = () => {
         
         if (sessionToken) {
           // Make API call to check authentication status
-          const response = await axios.get(`{API_URL}/auth/${platformLower}/callback`, {
+          const response = await axios.get(`${API_URL}/auth/status`, {
             headers: {
               Authorization: `Bearer ${sessionToken}`
             }
