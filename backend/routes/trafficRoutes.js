@@ -12,7 +12,7 @@ const { Op } = require('sequelize'); // Make sure to import Op for Sequelize ope
 const FB_CLIENT_ID = process.env.FB_CLIENT_ID || '1002084978515659';
 const FB_CLIENT_SECRET = process.env.FB_CLIENT_SECRET || 'your_fb_client_secret';
 const FB_REDIRECT_URI = process.env.FB_REDIRECT_URI;
-const CONFIG_ID = process.env.FB_CONFIG_ID || '958823683130260';
+
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
