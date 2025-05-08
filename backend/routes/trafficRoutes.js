@@ -20,24 +20,31 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
 // Store tokens in memory (replace with database storage in production)
 let googleTokenStore = {};
-let facebookTokenStore = {};
+
 
 // ----- OAuth Endpoints -----
 
 // Facebook OAuth Login Redirect
+// Redirect to Facebook OAuth
 router.get('/auth/facebook', (req, res) => {
     console.log("✅ Redirecting to Facebook OAuth...");
-    const fbAuthUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${FB_REDIRECT_URI}&scope=public_profile,email,ads_read&config_id=${CONFIG_ID}&response_type=code`;
+
+    const fbAuthUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=public_profile,email,ads_read&response_type=code`;
+
     console.log("🔹 Full FB Auth URL:", fbAuthUrl);
     res.redirect(fbAuthUrl);
-    console.log("Response type:", "code");
 });
 
-// Facebook OAuth Callback - Updated with reliable window closing
-// Facebook OAuth Callback - Pure JavaScript approach
+const facebookTokenStore = {};
+
+
 // Facebook OAuth Callback - Exchange code for access token
 router.get('/auth/facebook/callback', async (req, res) => {
+    console.log("📥 Entered /auth/facebook/callback");
+    console.log("Query Params:", req.query);
+
     const { code } = req.query;
+
     if (!code) {
         return res.status(400).json({ error: "No authorization code provided" });
     }
@@ -51,14 +58,13 @@ router.get('/auth/facebook/callback', async (req, res) => {
                 client_id: FB_CLIENT_ID,
                 client_secret: FB_CLIENT_SECRET,
                 redirect_uri: FB_REDIRECT_URI,
-                code,
-                config_id: CONFIG_ID
+                code
             }
         });
 
         console.log("✅ Facebook Access Token Response:", tokenResponse.data);
-        
-        // Get user info with the access token
+
+        // Fetch user profile info
         const userResponse = await axios.get('https://graph.facebook.com/me', {
             params: {
                 access_token: tokenResponse.data.access_token,
@@ -66,8 +72,9 @@ router.get('/auth/facebook/callback', async (req, res) => {
             }
         });
 
-        // Store token and user info in memory (can replace with DB storage)
         const userId = userResponse.data.id;
+
+        // Store token info (or replace with DB write)
         facebookTokenStore[userId] = {
             access_token: tokenResponse.data.access_token,
             expires_at: Date.now() + (tokenResponse.data.expires_in * 1000),
@@ -75,10 +82,9 @@ router.get('/auth/facebook/callback', async (req, res) => {
             name: userResponse.data.name
         };
 
-        // Create a session token
         const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
 
-        // Respond with JavaScript to store session token in parent window's localStorage
+        // Respond with script to save token and close popup
         res.send(`
             <script>
                 if (window.opener && !window.opener.closed) {
@@ -89,16 +95,17 @@ router.get('/auth/facebook/callback', async (req, res) => {
                         session: '${sessionToken}'
                     }, '*');
                     window.opener.location.reload();
-                    setTimeout(function() { window.close(); }, 1000);
+                    setTimeout(() => window.close(), 1000);
                 } else {
                     window.close();
                 }
             </script>
         `);
-    } catch (error) {
-        console.error("❌ Facebook OAuth Error:", error.response?.data || error);
 
-        // Return JavaScript for error handling
+    } catch (error) {
+        console.error("❌ Facebook OAuth Error:", error.response?.data || error.message);
+
+        // Send error back to parent window
         res.send(`
             <script>
                 if (window.opener && !window.opener.closed) {
@@ -107,7 +114,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
                         platform: 'Facebook',
                         message: '${(error.message || "Authentication failed").replace(/'/g, "\\'")}'
                     }, '*');
-                    setTimeout(function() { window.close(); }, 500);
+                    setTimeout(() => window.close(), 500);
                 } else {
                     window.close();
                 }
@@ -115,7 +122,6 @@ router.get('/auth/facebook/callback', async (req, res) => {
         `);
     }
 });
-
 
 // Google OAuth Callback - Updated with the same improved window closing logic
 // Google OAuth Callback - Pure JavaScript approach
