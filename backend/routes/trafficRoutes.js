@@ -31,7 +31,7 @@ router.get('/auth/facebook', (req, res) => {
     res.redirect(fbAuthUrl);
 });
 
-// Facebook OAuth Callback - Modified for reliable popup closing
+// Facebook OAuth Callback - Updated with reliable window closing
 router.get('/auth/facebook/callback', async (req, res) => {
     const { code } = req.query;
     if (!code) {
@@ -44,73 +44,87 @@ router.get('/auth/facebook/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .error { color: #d32f2f; }
-                        button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
                     </style>
                 </head>
                 <body>
                     <h3 class="error">Authentication Failed</h3>
                     <p>No authorization code provided.</p>
-                    <p>This window will close automatically in a few seconds.</p>
-                    <button onclick="closeWindow()">Close Now</button>
                     
                     <script>
-                        function closeWindow() {
-                            // First send the message (IMPORTANT)
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_error',
-                                    platform: 'Facebook',
-                                    message: 'No authorization code provided'
-                                }, window.location.origin);
-                                console.log("Error message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                        (function() {
+                            var messageAcknowledged = false;
+                            
+                            // Function to send error message
+                            function sendErrorMessage() {
+                                if (messageAcknowledged) return;
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_error',
+                                            platform: 'Facebook',
+                                            message: 'No authorization code provided'
+                                        }, '*');
+                                        messageAcknowledged = true;
+                                        console.log("Error message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Send message immediately
+                            sendErrorMessage();
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Attempting to close window...");
+                                
+                                // Wait to ensure message is sent before closing
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    // Try alternative closing methods with delays
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 100);
+                                }, 1000);
+                            }
+                            
+                            // Auto-close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 1500);
+                        })();
                     </script>
                 </body>
             </html>
@@ -160,7 +174,6 @@ router.get('/auth/facebook/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .success { color: #2e7d32; }
-                        button { padding: 10px 20px; background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; }
                         .loading-spinner { 
                             display: inline-block; 
                             width: 24px; 
@@ -180,76 +193,97 @@ router.get('/auth/facebook/callback', async (req, res) => {
                     <p>Your Facebook account has been connected.</p>
                     <p>This window will close automatically.</p>
                     <div class="loading-spinner"></div>
-                    <button onclick="closeWindow()" style="margin-top: 20px;">Close Now</button>
                     
                     <script>
-                        // Message has been sent, display to user and close window
-                        function closeWindow() {
-                            console.log("Close window function called");
+                        (function() {
+                            var messageAcknowledged = false;
+                            var messageAttempts = 0;
+                            var maxAttempts = 5;
                             
-                            // CRITICAL: First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_success',
-                                    platform: 'Facebook',
-                                    session: '${sessionToken}'
-                                }, window.location.origin);
-                                console.log("Success message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                            // Function to send success message with retry logic
+                            function sendSuccessMessage() {
+                                if (messageAcknowledged || messageAttempts >= maxAttempts) return;
+                                
+                                messageAttempts++;
+                                console.log("Sending message attempt " + messageAttempts);
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_success',
+                                            platform: 'Facebook',
+                                            session: '${sessionToken}'
+                                        }, '*');
+                                        console.log("Success message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
+                                
+                                // Retry if no acknowledgment
+                                if (!messageAcknowledged && messageAttempts < maxAttempts) {
+                                    setTimeout(sendSuccessMessage, 300);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 800);
+                            }
+                            
+                            // Start sending message immediately
+                            sendSuccessMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>
         `);
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error);
-        // Return HTML with post message for error with improved window closing
+        // Return HTML with error handling and similar closing logic
         res.send(`
             <html>
                 <head>
@@ -258,73 +292,85 @@ router.get('/auth/facebook/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .error { color: #d32f2f; }
-                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
                     </style>
                 </head>
                 <body>
                     <h3 class="error">Authentication Failed</h3>
                     <p>${error.message}</p>
-                    <p>This window will close automatically in a few seconds.</p>
-                    <button onclick="closeWindow()">Close Now</button>
                     
                     <script>
-                        function closeWindow() {
-                            // First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_error',
-                                    platform: 'Facebook',
-                                    message: '${error.message.replace(/'/g, "\\'")}'
-                                }, window.location.origin);
-                                console.log("Error message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                        (function() {
+                            var messageAcknowledged = false;
+                            
+                            // Function to send error message
+                            function sendErrorMessage() {
+                                if (messageAcknowledged) return;
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_error',
+                                            platform: 'Facebook',
+                                            message: '${error.message.replace(/'/g, "\\'")}'
+                                        }, '*');
+                                        console.log("Error message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 1000);
+                            }
+                            
+                            // Send message immediately
+                            sendErrorMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>
@@ -332,7 +378,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 });
 
-// Google OAuth Callback - Improved with the same enhancements
+// Google OAuth Callback - Updated with the same improved window closing logic
 router.get('/auth/google/callback', async (req, res) => {
     console.log("🔹 Google OAuth Callback Triggered");
     const { code, error } = req.query;
@@ -347,73 +393,85 @@ router.get('/auth/google/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .error { color: #d32f2f; }
-                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
                     </style>
                 </head>
                 <body>
                     <h3 class="error">Authentication Failed</h3>
                     <p>${error}</p>
-                    <p>This window will close automatically in a few seconds.</p>
-                    <button onclick="closeWindow()">Close Now</button>
                     
                     <script>
-                        function closeWindow() {
-                            // First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_error',
-                                    platform: 'Google',
-                                    message: '${error.replace(/'/g, "\\'")}'
-                                }, window.location.origin);
-                                console.log("Error message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                        (function() {
+                            var messageAcknowledged = false;
+                            
+                            // Function to send error message
+                            function sendErrorMessage() {
+                                if (messageAcknowledged) return;
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_error',
+                                            platform: 'Google',
+                                            message: '${error.replace(/'/g, "\\'")}'
+                                        }, '*');
+                                        console.log("Error message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 1000);
+                            }
+                            
+                            // Send message immediately
+                            sendErrorMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>
@@ -430,73 +488,85 @@ router.get('/auth/google/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .error { color: #d32f2f; }
-                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
                     </style>
                 </head>
                 <body>
                     <h3 class="error">Authentication Failed</h3>
                     <p>No authorization code provided.</p>
-                    <p>This window will close automatically in a few seconds.</p>
-                    <button onclick="closeWindow()">Close Now</button>
                     
                     <script>
-                        function closeWindow() {
-                            // First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_error',
-                                    platform: 'Google',
-                                    message: 'No authorization code provided'
-                                }, window.location.origin);
-                                console.log("Error message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                        (function() {
+                            var messageAcknowledged = false;
+                            
+                            // Function to send error message
+                            function sendErrorMessage() {
+                                if (messageAcknowledged) return;
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_error',
+                                            platform: 'Google',
+                                            message: 'No authorization code provided'
+                                        }, '*');
+                                        console.log("Error message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 1000);
+                            }
+                            
+                            // Send message immediately
+                            sendErrorMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>
@@ -560,7 +630,6 @@ router.get('/auth/google/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .success { color: #2e7d32; }
-                        button { padding: 10px 20px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; }
                         .loading-spinner { 
                             display: inline-block; 
                             width: 24px; 
@@ -580,69 +649,90 @@ router.get('/auth/google/callback', async (req, res) => {
                     <p>Your Google account has been connected.</p>
                     <p>This window will close automatically.</p>
                     <div class="loading-spinner"></div>
-                    <button onclick="closeWindow()" style="margin-top: 20px;">Close Now</button>
                     
                     <script>
-                        // Message has been sent, display to user and close window
-                        function closeWindow() {
-                            console.log("Close window function called");
+                        (function() {
+                            var messageAcknowledged = false;
+                            var messageAttempts = 0;
+                            var maxAttempts = 5;
                             
-                            // CRITICAL: First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_success',
-                                    platform: 'Google',
-                                    session: '${sessionToken}'
-                                }, window.location.origin);
-                                console.log("Success message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                            // Function to send success message with retry logic
+                            function sendSuccessMessage() {
+                                if (messageAcknowledged || messageAttempts >= maxAttempts) return;
+                                
+                                messageAttempts++;
+                                console.log("Sending message attempt " + messageAttempts);
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_success',
+                                            platform: 'Google',
+                                            session: '${sessionToken}'
+                                        }, '*');
+                                        console.log("Success message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
+                                
+                                // Retry if no acknowledgment
+                                if (!messageAcknowledged && messageAttempts < maxAttempts) {
+                                    setTimeout(sendSuccessMessage, 300);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 800);
+                            }
+                            
+                            // Start sending message immediately
+                            sendSuccessMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>
@@ -650,6 +740,8 @@ router.get('/auth/google/callback', async (req, res) => {
     } catch (error) {
         console.error("❌ Google OAuth Error:", error.response?.data || error);
         const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
+        
+        // Send similar error page with the improved window closing logic
         res.send(`
             <html>
                 <head>
@@ -658,73 +750,85 @@ router.get('/auth/google/callback', async (req, res) => {
                     <style>
                         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                         .error { color: #d32f2f; }
-                        button { padding: 10px 20px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; }
                     </style>
                 </head>
                 <body>
                     <h3 class="error">Authentication Failed</h3>
                     <p>${errorMessage}</p>
-                    <p>This window will close automatically in a few seconds.</p>
-                    <button onclick="closeWindow()">Close Now</button>
                     
                     <script>
-                        function closeWindow() {
-                            // First send the message
-                            try {
-                                window.opener.postMessage({
-                                    type: 'auth_error',
-                                    platform: 'Google',
-                                    message: '${errorMessage.replace(/'/g, "\\'")}'
-                                }, window.location.origin);
-                                console.log("Error message sent to parent window");
-                            } catch (e) {
-                                console.error("Failed to send message:", e);
+                        (function() {
+                            var messageAcknowledged = false;
+                            
+                            // Function to send error message
+                            function sendErrorMessage() {
+                                if (messageAcknowledged) return;
+                                
+                                try {
+                                    if (window.opener) {
+                                        window.opener.postMessage({
+                                            type: 'auth_error',
+                                            platform: 'Google',
+                                            message: '${errorMessage.replace(/'/g, "\\'")}'
+                                        }, '*');
+                                        console.log("Error message sent to parent window");
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to send message:", e);
+                                }
                             }
                             
-                            // Then try multiple close methods - AGGRESSIVE APPROACH
+                            // Listen for acknowledgment from parent window
+                            window.addEventListener('message', function(event) {
+                                if (event.data && event.data.type === 'message_received') {
+                                    messageAcknowledged = true;
+                                    console.log("Message acknowledgment received");
+                                    closeWindow();
+                                }
+                            });
+                            
+                            // Function to close window with multiple strategies
+                            function closeWindow() {
+                                console.log("Closing window...");
+                                
+                                setTimeout(function() {
+                                    try {
+                                        window.close();
+                                        console.log("Standard window.close called");
+                                    } catch (e) {
+                                        console.error("Standard close failed:", e);
+                                    }
+                                    
+                                    setTimeout(function() {
+                                        try {
+                                            window.open('', '_self').close();
+                                            console.log("Self-close attempted");
+                                        } catch (e) {
+                                            console.error("Self-close failed:", e);
+                                        }
+                                        
+                                        setTimeout(function() {
+                                            try {
+                                                window.location.href = "about:blank";
+                                                console.log("Redirected to blank page");
+                                            } catch (e) {
+                                                console.error("Redirect failed:", e);
+                                            }
+                                        }, 100);
+                                    }, 200);
+                                }, 1000);
+                            }
+                            
+                            // Send message immediately
+                            sendErrorMessage();
+                            
+                            // Force close after delay even if no acknowledgment
                             setTimeout(function() {
-                                try {
-                                    window.close();
-                                    console.log("Window.close called");
-                                } catch (e) {
-                                    console.error("Failed to close window:", e);
+                                if (!messageAcknowledged) {
+                                    closeWindow();
                                 }
-                                
-                                // Force page unload
-                                try {
-                                    window.location.href = "about:blank";
-                                    console.log("Redirected to about:blank");
-                                } catch (e) {
-                                    console.error("Failed to redirect:", e);
-                                }
-                                
-                                try {
-                                    window.open('', '_self');
-                                    window.self.close();
-                                    console.log("Self-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to self-close:", e);
-                                }
-                                
-                                try {
-                                    window.top.close();
-                                    console.log("Top-close attempted");
-                                } catch (e) {
-                                    console.error("Failed to top-close:", e);
-                                }
-                                
-                                // Fallback - resize to almost nothing
-                                try {
-                                    window.resizeTo(0, 0);
-                                    console.log("Window resized to 0x0");
-                                } catch (e) {
-                                    console.error("Failed to resize window:", e);
-                                }
-                            }, 100);
-                        }
-                        
-                        // Auto-close after short delay
-                        setTimeout(closeWindow, 500);
+                            }, 3000);
+                        })();
                     </script>
                 </body>
             </html>

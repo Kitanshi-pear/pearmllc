@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -237,6 +237,11 @@ const TrafficChannels = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Refs for improved auth handling
+  const authListenerRef = useRef(null);
+  const popupRef = useRef(null);
+  const authTimerRef = useRef(null);
+
   // State management
   const [authStatus, setAuthStatus] = useState({
     facebook: false,
@@ -317,7 +322,39 @@ const TrafficChannels = () => {
     status: "Active"
   });
 
-  // Improved function to refresh connection status more reliably
+  // Cleanup function for auth resources
+  const cleanupAuthResources = () => {
+    // Clear any previous auth listener
+    if (authListenerRef.current) {
+      window.removeEventListener('message', authListenerRef.current);
+      authListenerRef.current = null;
+    }
+    
+    // Clear any running timers
+    if (authTimerRef.current) {
+      clearInterval(authTimerRef.current);
+      authTimerRef.current = null;
+    }
+    
+    // Close any open popup
+    if (popupRef.current && !popupRef.current.closed) {
+      try {
+        popupRef.current.close();
+      } catch (e) {
+        console.error("Error closing existing popup:", e);
+      }
+      popupRef.current = null;
+    }
+  };
+  
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupAuthResources();
+    };
+  }, []);
+
+  // Improved forceRefreshConnectionStatus function
   const forceRefreshConnectionStatus = async () => {
     try {
       console.log("Forcing refresh of connection status...");
@@ -415,7 +452,13 @@ const TrafficChannels = () => {
         isConnected: isConnected
       };
       
-      // Log the payload for debugging
+      // Add additional API-specific fields based on platform
+      if (platform.toLowerCase() === 'facebook' && authStatus.facebook) {
+        // Can add Facebook-specific fields here if needed
+      } else if (platform.toLowerCase() === 'google' && authStatus.google) {
+        // Can add Google-specific fields here if needed
+      }
+      
       console.log("Updating channel with data:", updateData);
       
       // Call API to update channel connection status
@@ -433,13 +476,13 @@ const TrafficChannels = () => {
       // Update connection status tracking specifically
       setChannelConnectionStatus(prev => ({
         ...prev,
-        [selectedRow.id]: isConnected
+        [selectedRow.id]: response.data.isConnected || isConnected
       }));
       
       // Also update form data's isConnected property
       setFormData(prev => ({
         ...prev,
-        isConnected: isConnected
+        isConnected: response.data.isConnected || isConnected
       }));
       
       // Show success message
@@ -482,9 +525,12 @@ const TrafficChannels = () => {
     }
   };
 
-  // Improved handleAuth function
+  // Completely rewritten handleAuth function with improved flow
   const handleAuth = async (platform) => {
     const platformLower = platform.toLowerCase();
+    
+    // Clean up any existing auth resources first
+    cleanupAuthResources();
     
     // Set loading state
     setLoading(prev => ({ ...prev, [platformLower]: true }));
@@ -495,56 +541,33 @@ const TrafficChannels = () => {
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
     
-    // Store the popup reference globally so the message event has access to it
-    window.currentAuthPopup = null;
-    
-    // Open popup window
-    const popup = window.open(
-      `${API_URL}/auth/${platformLower}`,
-      `${platformLower}Auth`,
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-    );
-    
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      // Popup was blocked or closed immediately
-      setSnackbar({
-        open: true,
-        message: `Unable to open ${platform} login. Please allow popups for this site.`,
-        severity: 'error'
-      });
-      setLoading(prev => ({ ...prev, [platformLower]: false }));
-      return;
-    }
-    
-    // Store reference globally
-    window.currentAuthPopup = popup;
-    
-    // Keep focus on the popup to ensure a better user experience
-    popup.focus();
-    
-    // Add listener for messages from popup
-    const authMessageListener = async (event) => {
-      // Verify origin for security
-      if (event.origin !== window.location.origin) return;
+    // Create message listener first (before opening popup)
+    const authMessageHandler = (event) => {
+      // Log all incoming messages for debugging
+      console.log("Message received:", event.data);
       
-      console.log("Received message from popup:", event.data);
-      
-      // Process auth result from the message
+      // Process auth result messages
       if (event.data && (event.data.type === 'auth_success' || event.data.type === 'auth_error')) {
+        console.log(`Auth ${event.data.type} message received from popup`);
+        
+        // Send acknowledgment back to popup
+        try {
+          if (popupRef.current && !popupRef.current.closed) {
+            popupRef.current.postMessage({ 
+              type: 'message_received' 
+            }, '*');
+            console.log("Acknowledgment sent to popup");
+          }
+        } catch (ackError) {
+          console.error("Error sending acknowledgment:", ackError);
+        }
+        
+        // Extract message data
         const isSuccess = event.data.type === 'auth_success';
         const { platform, session, message } = event.data;
         
-        // IMPORTANT: Force close the popup immediately
-        if (window.currentAuthPopup) {
-          try {
-            console.log("Attempting to close popup window...");
-            window.currentAuthPopup.close();
-          } catch (e) {
-            console.error("Error closing popup:", e);
-          }
-        }
-        
-        if (isSuccess) {
+        // Handle success case
+        if (isSuccess && session) {
           console.log(`Successfully authenticated with ${platform}`);
           
           // Store session token
@@ -560,53 +583,20 @@ const TrafficChannels = () => {
             return newStatus;
           });
           
-          // Force refresh connection status first to ensure UI is up to date
-          await forceRefreshConnectionStatus();
-          
-          // Update connection status if in edit mode
+          // Update UI immediately for better feedback
           if (selectedRow && selectedRow.id) {
-            // First update the UI immediately to give feedback
-            setChannelConnectionStatus(prev => {
-              const updated = {
-                ...prev,
-                [selectedRow.id]: true
-              };
-              console.log("Updated channelConnectionStatus immediately:", updated);
-              return updated;
-            });
+            setChannelConnectionStatus(prev => ({
+              ...prev,
+              [selectedRow.id]: true
+            }));
             
-            // Also update form data connection status
-            setFormData(prev => {
-              const updated = {
-                ...prev,
-                isConnected: true
-              };
-              console.log("Updated formData.isConnected to:", updated.isConnected);
-              return updated;
-            });
+            setFormData(prev => ({
+              ...prev,
+              isConnected: true
+            }));
             
-            // Then save to API (this is async and will happen in background)
-            await saveConnectionStatus(platformLower, true);
-            
-            // After API call completes, refresh the list of channels to ensure everything is in sync
-            try {
-              const response = await axios.get(API_URL);
-              if (response.data && Array.isArray(response.data)) {
-                setRows(response.data);
-                
-                // Update connection statuses from fresh data
-                const newConnectionStatus = {};
-                response.data.forEach(row => {
-                  newConnectionStatus[row.id] = row.isConnected || 
-                    (row.apiAccessToken && row.aliasChannel === 'Facebook') || 
-                    (row.googleAdsAccountId && row.aliasChannel === 'Google');
-                });
-                
-                setChannelConnectionStatus(newConnectionStatus);
-              }
-            } catch (error) {
-              console.error("Error refreshing channels after auth:", error);
-            }
+            // Save to API in background
+            saveConnectionStatus(platform, true);
           }
           
           // Show success message
@@ -615,11 +605,14 @@ const TrafficChannels = () => {
             message: `${platform} account connected successfully`,
             severity: 'success'
           });
-        } else {
-          // Show error message
+        } 
+        // Handle error case
+        else {
+          console.error(`Authentication failed with ${platform}:`, message);
+          
           setSnackbar({
             open: true,
-            message: `Failed to connect to ${platform}: ${message || 'Authentication failed'}`,
+            message: `Failed to connect ${platform}: ${message || 'Authentication failed'}`,
             severity: 'error'
           });
         }
@@ -627,43 +620,83 @@ const TrafficChannels = () => {
         // Reset loading state
         setLoading(prev => ({ ...prev, [platformLower]: false }));
         
-        // Remove event listener
-        window.removeEventListener('message', authMessageListener);
+        // Clean up resources
+        cleanupAuthResources();
         
-        // Clear the global reference
-        window.currentAuthPopup = null;
-      }
-    };
-    
-    // Add event listener for messages from popup
-    window.addEventListener('message', authMessageListener);
-    
-    // Monitor the popup state with a shorter interval for more responsiveness
-    const checkPopupInterval = setInterval(() => {
-      if (!popup || popup.closed) {
-        clearInterval(checkPopupInterval);
-        window.removeEventListener('message', authMessageListener);
-        
-        // Refresh connection status one more time to be sure
+        // Force refresh connection status after a short delay
         setTimeout(() => {
           forceRefreshConnectionStatus();
         }, 500);
+      }
+    };
+    
+    // Store listener reference for cleanup
+    authListenerRef.current = authMessageHandler;
+    
+    // Add event listener before opening popup
+    window.addEventListener('message', authMessageHandler);
+    
+    // Open popup window
+    const popup = window.open(
+      `${API_URL}/auth/${platformLower}`,
+      `${platformLower}Auth`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+    );
+    
+    // Store popup reference
+    popupRef.current = popup;
+    
+    // Handle popup blocker case
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      cleanupAuthResources();
+      
+      setSnackbar({
+        open: true,
+        message: `Unable to open ${platform} login. Please allow popups for this site.`,
+        severity: 'error'
+      });
+      
+      setLoading(prev => ({ ...prev, [platformLower]: false }));
+      return;
+    }
+    
+    // Focus popup for better user experience
+    popup.focus();
+    
+    // Set up monitoring for popup closing without sending a message
+    authTimerRef.current = setInterval(() => {
+      if (!popup || popup.closed) {
+        // Clear the interval immediately
+        clearInterval(authTimerRef.current);
+        authTimerRef.current = null;
         
-        // Reset loading state if no message was received
-        if (loading[platformLower]) {
-          setLoading(prev => ({ ...prev, [platformLower]: false }));
+        // Clean up event listener if popup was closed without sending a message
+        if (authListenerRef.current) {
+          window.removeEventListener('message', authListenerRef.current);
+          authListenerRef.current = null;
           
-          setSnackbar({
-            open: true,
-            message: `${platform} authentication was cancelled`,
-            severity: 'warning'
-          });
+          // Reset loading state if still loading
+          if (loading[platformLower]) {
+            console.log(`${platform} authentication window closed without completing`);
+            
+            setLoading(prev => ({ ...prev, [platformLower]: false }));
+            
+            // Check if auth status changed anyway (edge case)
+            setTimeout(() => {
+              forceRefreshConnectionStatus();
+            }, 500);
+            
+            setSnackbar({
+              open: true,
+              message: `${platform} authentication was cancelled`,
+              severity: 'warning'
+            });
+          }
         }
         
-        // Clear the global reference
-        window.currentAuthPopup = null;
+        popupRef.current = null;
       }
-    }, 300); // Check more frequently
+    }, 500);
   };
 
   // Fetch data from API on component mount
