@@ -10,7 +10,7 @@ const { Op } = require('sequelize'); // Make sure to import Op for Sequelize ope
 
 // Environment variables for OAuth
 const FB_CLIENT_ID = process.env.FB_CLIENT_ID || '1002084978515659';
-const FB_CLIENT_SECRET = process.env.FB_CLIENT_SECRET || 'your_fb_client_secret';
+const FB_CLIENT_SECRET = process.env.FB_CLIENT_SECRET || 'd9ac796fa81d4e35dd973661529819ec';
 const FB_REDIRECT_URI = process.env.FB_REDIRECT_URI;
 
 
