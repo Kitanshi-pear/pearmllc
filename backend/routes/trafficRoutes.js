@@ -32,102 +32,38 @@ router.get('/auth/facebook', (req, res) => {
 });
 
 // Facebook OAuth Callback - Updated with reliable window closing
+// Facebook OAuth Callback - Pure JavaScript approach
 router.get('/auth/facebook/callback', async (req, res) => {
+    // Set content type to JavaScript
+    res.setHeader('Content-Type', 'application/javascript');
+    
     const { code } = req.query;
     if (!code) {
-        // Return HTML with more reliable window closing mechanism
+        // Return JavaScript that handles error
         return res.send(`
-            <html>
-                <head>
-                    <title>Authentication Failed</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="error">Authentication Failed</h3>
-                    <p>No authorization code provided.</p>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            
-                            // Function to send error message
-                            function sendErrorMessage() {
-                                if (messageAcknowledged) return;
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_error',
-                                            platform: 'Facebook',
-                                            message: 'No authorization code provided'
-                                        }, '*');
-                                        messageAcknowledged = true;
-                                        console.log("Error message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Send message immediately
-                            sendErrorMessage();
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Attempting to close window...");
-                                
-                                // Wait to ensure message is sent before closing
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    // Try alternative closing methods with delays
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 100);
-                                }, 1000);
-                            }
-                            
-                            // Auto-close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 1500);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Error handler for missing code
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Notify parent window of error
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Facebook',
+                            message: 'No authorization code provided'
+                        }, '*');
+                        
+                        // Wait briefly then close
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     }
 
@@ -165,411 +101,135 @@ router.get('/auth/facebook/callback', async (req, res) => {
         // Create session token
         const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
 
-        // Return HTML with enhanced post message for success and improved window closing
+        // Return pure JavaScript to handle successful authentication
         res.send(`
-            <html>
-                <head>
-                    <title>Authentication Successful</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .success { color: #2e7d32; }
-                        .loading-spinner { 
-                            display: inline-block; 
-                            width: 24px; 
-                            height: 24px; 
-                            border: 3px solid rgba(0,0,0,0.1); 
-                            border-radius: 50%; 
-                            border-top-color: #2e7d32; 
-                            animation: spin 1s ease infinite; 
-                        }
-                        @keyframes spin {
-                            to { transform: rotate(360deg); }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="success">Authentication Successful!</h3>
-                    <p>Your Facebook account has been connected.</p>
-                    <p>This window will close automatically.</p>
-                    <div class="loading-spinner"></div>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            var messageAttempts = 0;
-                            var maxAttempts = 5;
-                            
-                            // Function to send success message with retry logic
-                            function sendSuccessMessage() {
-                                if (messageAcknowledged || messageAttempts >= maxAttempts) return;
-                                
-                                messageAttempts++;
-                                console.log("Sending message attempt " + messageAttempts);
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_success',
-                                            platform: 'Facebook',
-                                            session: '${sessionToken}'
-                                        }, '*');
-                                        console.log("Success message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                                
-                                // Retry if no acknowledgment
-                                if (!messageAcknowledged && messageAttempts < maxAttempts) {
-                                    setTimeout(sendSuccessMessage, 300);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 800);
-                            }
-                            
-                            // Start sending message immediately
-                            sendSuccessMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Success handler for Facebook authentication
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        console.log("Authentication successful, communicating with parent window...");
+                        
+                        // Store session token directly in parent's localStorage
+                        window.opener.localStorage.setItem('sessionToken', '${sessionToken}');
+                        
+                        // Notify parent window of success using postMessage as backup
+                        window.opener.postMessage({
+                            type: 'auth_success',
+                            platform: 'Facebook',
+                            session: '${sessionToken}'
+                        }, '*');
+                        
+                        // Refresh the parent window to update UI
+                        window.opener.location.reload();
+                        
+                        // Close this popup window after a short delay
+                        setTimeout(function() {
+                            window.close();
+                        }, 1000);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     } catch (error) {
         console.error("❌ Facebook OAuth Error:", error.response?.data || error);
-        // Return HTML with error handling and similar closing logic
+        
+        // Return JavaScript to handle error
         res.send(`
-            <html>
-                <head>
-                    <title>Authentication Failed</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="error">Authentication Failed</h3>
-                    <p>${error.message}</p>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            
-                            // Function to send error message
-                            function sendErrorMessage() {
-                                if (messageAcknowledged) return;
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_error',
-                                            platform: 'Facebook',
-                                            message: '${error.message.replace(/'/g, "\\'")}'
-                                        }, '*');
-                                        console.log("Error message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 1000);
-                            }
-                            
-                            // Send message immediately
-                            sendErrorMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Error handler for Facebook authentication
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Notify parent window of error
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Facebook',
+                            message: '${(error.message || "Authentication failed").replace(/'/g, "\\'")}'
+                        }, '*');
+                        
+                        // Wait briefly then close
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     }
 });
 
 // Google OAuth Callback - Updated with the same improved window closing logic
+// Google OAuth Callback - Pure JavaScript approach
 router.get('/auth/google/callback', async (req, res) => {
-    console.log("🔹 Google OAuth Callback Triggered");
+    // Set content type to JavaScript
+    res.setHeader('Content-Type', 'application/javascript');
+    
     const { code, error } = req.query;
     
     if (error) {
         console.error("❌ OAuth error:", error);
         return res.send(`
-            <html>
-                <head>
-                    <title>Authentication Failed</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="error">Authentication Failed</h3>
-                    <p>${error}</p>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            
-                            // Function to send error message
-                            function sendErrorMessage() {
-                                if (messageAcknowledged) return;
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_error',
-                                            platform: 'Google',
-                                            message: '${error.replace(/'/g, "\\'")}'
-                                        }, '*');
-                                        console.log("Error message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 1000);
-                            }
-                            
-                            // Send message immediately
-                            sendErrorMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Error handler for OAuth error
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Notify parent window of error
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: '${error.replace(/'/g, "\\'")}'
+                        }, '*');
+                        
+                        // Wait briefly then close
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     }
     
     if (!code) {
         console.error("❌ No authorization code received.");
         return res.send(`
-            <html>
-                <head>
-                    <title>Authentication Failed</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="error">Authentication Failed</h3>
-                    <p>No authorization code provided.</p>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            
-                            // Function to send error message
-                            function sendErrorMessage() {
-                                if (messageAcknowledged) return;
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_error',
-                                            platform: 'Google',
-                                            message: 'No authorization code provided'
-                                        }, '*');
-                                        console.log("Error message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 1000);
-                            }
-                            
-                            // Send message immediately
-                            sendErrorMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Error handler for missing code
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Notify parent window of error
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: 'No authorization code provided'
+                        }, '*');
+                        
+                        // Wait briefly then close
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     }
 
@@ -585,13 +245,6 @@ router.get('/auth/google/callback', async (req, res) => {
             code
         });
 
-        console.log("✅ Google Access Token Response:", {
-            access_token: tokenResponse.data.access_token ? '***' : null,
-            refresh_token: tokenResponse.data.refresh_token ? '***' : null,
-            expires_in: tokenResponse.data.expires_in,
-            token_type: tokenResponse.data.token_type
-        });
-
         // Store the tokens
         const { access_token, refresh_token, expires_in } = tokenResponse.data;
         
@@ -600,12 +253,6 @@ router.get('/auth/google/callback', async (req, res) => {
             'https://www.googleapis.com/oauth2/v2/userinfo',
             { headers: { Authorization: `Bearer ${access_token}` } }
         );
-        
-        console.log("✅ Google User Info:", {
-            id: userInfo.data.id,
-            email: userInfo.data.email,
-            name: userInfo.data.name
-        });
         
         const userId = userInfo.data.id;
         
@@ -621,220 +268,73 @@ router.get('/auth/google/callback', async (req, res) => {
         // Create a session token
         const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
 
-        // Return HTML with enhanced post message for success and improved window closing
+        // Return pure JavaScript to handle successful authentication
         res.send(`
-            <html>
-                <head>
-                    <title>Authentication Successful</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .success { color: #2e7d32; }
-                        .loading-spinner { 
-                            display: inline-block; 
-                            width: 24px; 
-                            height: 24px; 
-                            border: 3px solid rgba(0,0,0,0.1); 
-                            border-radius: 50%; 
-                            border-top-color: #4285F4; 
-                            animation: spin 1s ease infinite; 
-                        }
-                        @keyframes spin {
-                            to { transform: rotate(360deg); }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="success">Authentication Successful!</h3>
-                    <p>Your Google account has been connected.</p>
-                    <p>This window will close automatically.</p>
-                    <div class="loading-spinner"></div>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            var messageAttempts = 0;
-                            var maxAttempts = 5;
-                            
-                            // Function to send success message with retry logic
-                            function sendSuccessMessage() {
-                                if (messageAcknowledged || messageAttempts >= maxAttempts) return;
-                                
-                                messageAttempts++;
-                                console.log("Sending message attempt " + messageAttempts);
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_success',
-                                            platform: 'Google',
-                                            session: '${sessionToken}'
-                                        }, '*');
-                                        console.log("Success message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                                
-                                // Retry if no acknowledgment
-                                if (!messageAcknowledged && messageAttempts < maxAttempts) {
-                                    setTimeout(sendSuccessMessage, 300);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 800);
-                            }
-                            
-                            // Start sending message immediately
-                            sendSuccessMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Success handler for Google authentication
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        console.log("Authentication successful, communicating with parent window...");
+                        
+                        // Store session token directly in parent's localStorage
+                        window.opener.localStorage.setItem('sessionToken', '${sessionToken}');
+                        
+                        // Notify parent window of success using postMessage as backup
+                        window.opener.postMessage({
+                            type: 'auth_success',
+                            platform: 'Google',
+                            session: '${sessionToken}'
+                        }, '*');
+                        
+                        // Refresh the parent window to update UI
+                        window.opener.location.reload();
+                        
+                        // Close this popup window after a short delay
+                        setTimeout(function() {
+                            window.close();
+                        }, 1000);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     } catch (error) {
         console.error("❌ Google OAuth Error:", error.response?.data || error);
         const errorMessage = error.response?.data?.error_description || error.message || 'Authentication failed';
         
-        // Send similar error page with the improved window closing logic
+        // Return JavaScript to handle error
         res.send(`
-            <html>
-                <head>
-                    <title>Authentication Failed</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h3 class="error">Authentication Failed</h3>
-                    <p>${errorMessage}</p>
-                    
-                    <script>
-                        (function() {
-                            var messageAcknowledged = false;
-                            
-                            // Function to send error message
-                            function sendErrorMessage() {
-                                if (messageAcknowledged) return;
-                                
-                                try {
-                                    if (window.opener) {
-                                        window.opener.postMessage({
-                                            type: 'auth_error',
-                                            platform: 'Google',
-                                            message: '${errorMessage.replace(/'/g, "\\'")}'
-                                        }, '*');
-                                        console.log("Error message sent to parent window");
-                                    }
-                                } catch (e) {
-                                    console.error("Failed to send message:", e);
-                                }
-                            }
-                            
-                            // Listen for acknowledgment from parent window
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'message_received') {
-                                    messageAcknowledged = true;
-                                    console.log("Message acknowledgment received");
-                                    closeWindow();
-                                }
-                            });
-                            
-                            // Function to close window with multiple strategies
-                            function closeWindow() {
-                                console.log("Closing window...");
-                                
-                                setTimeout(function() {
-                                    try {
-                                        window.close();
-                                        console.log("Standard window.close called");
-                                    } catch (e) {
-                                        console.error("Standard close failed:", e);
-                                    }
-                                    
-                                    setTimeout(function() {
-                                        try {
-                                            window.open('', '_self').close();
-                                            console.log("Self-close attempted");
-                                        } catch (e) {
-                                            console.error("Self-close failed:", e);
-                                        }
-                                        
-                                        setTimeout(function() {
-                                            try {
-                                                window.location.href = "about:blank";
-                                                console.log("Redirected to blank page");
-                                            } catch (e) {
-                                                console.error("Redirect failed:", e);
-                                            }
-                                        }, 100);
-                                    }, 200);
-                                }, 1000);
-                            }
-                            
-                            // Send message immediately
-                            sendErrorMessage();
-                            
-                            // Force close after delay even if no acknowledgment
-                            setTimeout(function() {
-                                if (!messageAcknowledged) {
-                                    closeWindow();
-                                }
-                            }, 3000);
-                        })();
-                    </script>
-                </body>
-            </html>
+            // Error handler for Google authentication
+            (function() {
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Notify parent window of error
+                        window.opener.postMessage({
+                            type: 'auth_error',
+                            platform: 'Google',
+                            message: '${errorMessage.replace(/'/g, "\\'")}'
+                        }, '*');
+                        
+                        // Wait briefly then close
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    } catch (e) {
+                        console.error("Error communicating with parent:", e);
+                        window.close();
+                    }
+                } else {
+                    window.close();
+                }
+            })();
         `);
     }
 });
+
 
 // Google OAuth Login Redirect
 router.get('/auth/google', (req, res) => {
