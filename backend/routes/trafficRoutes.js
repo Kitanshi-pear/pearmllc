@@ -30,7 +30,7 @@ router.get('/auth/facebook', (req, res) => {
     const fbAuthUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${FB_CLIENT_ID}&redirect_uri=${FB_REDIRECT_URI}&scope=public_profile,email,ads_read&config_id=${CONFIG_ID}&response_type=code`;
     console.log("🔹 Full FB Auth URL:", fbAuthUrl);
     res.redirect(fbAuthUrl);
-    console.log("Response type:", code);
+    console.log("Response type:", url.searchParams.get("response_type"));
 });
 
 // Facebook OAuth Callback - Updated with reliable window closing
