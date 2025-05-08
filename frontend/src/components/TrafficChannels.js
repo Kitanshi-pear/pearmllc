@@ -20,9 +20,6 @@ import {
   Stack,
   Tooltip,
   Avatar,
-  Container,
-  useTheme,
-  useMediaQuery,
   TableContainer,
   Table,
   TableHead,
@@ -33,19 +30,18 @@ import {
   Tab,
   alpha
 } from '@mui/material';
+import { useTheme, useMediaQuery } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from "./Layout";
 import axios from 'axios';
 
 // Simulated icons that would be imported in a real application
-// In a real app, use MUI icons or another icon library
 const InfoIcon = () => <div style={{ width: 20, height: 20, background: '#1976d2', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>i</div>;
 const DeleteIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🗑️</div>;
 const EditIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✏️</div>;
 const DateRangeIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📅</div>;
 const CheckIcon = () => <div style={{ width: 20, height: 20, color: 'green', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✓</div>;
 const CancelIcon = () => <div style={{ width: 20, height: 20, color: 'red', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✗</div>;
-const LockIcon = () => <div style={{ width: 20, height: 20, color: 'gray', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🔒</div>;
 const SearchIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🔍</div>;
 const AddIcon = () => <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>+</div>;
 
@@ -237,10 +233,9 @@ const TrafficChannels = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Refs for improved auth handling
-  const authListenerRef = useRef(null);
-  const popupRef = useRef(null);
-  const authTimerRef = useRef(null);
+  // Refs for polling auth status
+  const authPollingRef = useRef(null);
+  const authTimeoutRef = useRef(null);
 
   // State management
   const [authStatus, setAuthStatus] = useState({
@@ -322,42 +317,30 @@ const TrafficChannels = () => {
     status: "Active"
   });
 
-  // Cleanup function for auth resources
-  const cleanupAuthResources = () => {
-    // Clear any previous auth listener
-    if (authListenerRef.current) {
-      window.removeEventListener('message', authListenerRef.current);
-      authListenerRef.current = null;
+  // Cleanup function for auth polling
+  const cleanupAuthPolling = () => {
+    if (authPollingRef.current) {
+      clearInterval(authPollingRef.current);
+      authPollingRef.current = null;
     }
-    
-    // Clear any running timers
-    if (authTimerRef.current) {
-      clearInterval(authTimerRef.current);
-      authTimerRef.current = null;
-    }
-    
-    // Close any open popup
-    if (popupRef.current && !popupRef.current.closed) {
-      try {
-        popupRef.current.close();
-      } catch (e) {
-        console.error("Error closing existing popup:", e);
-      }
-      popupRef.current = null;
+
+    if (authTimeoutRef.current) {
+      clearTimeout(authTimeoutRef.current);
+      authTimeoutRef.current = null;
     }
   };
   
   // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      cleanupAuthResources();
+      cleanupAuthPolling();
     };
   }, []);
 
-  // Improved forceRefreshConnectionStatus function
-  const forceRefreshConnectionStatus = async () => {
+  // Function to refresh connection status
+  const refreshConnectionStatus = async () => {
     try {
-      console.log("Forcing refresh of connection status...");
+      console.log("Refreshing connection status...");
       const sessionToken = localStorage.getItem('sessionToken');
       
       if (!sessionToken) {
@@ -366,7 +349,7 @@ const TrafficChannels = () => {
       }
       
       // Make API call to check authentication status
-      const response = await axios.get(`${API_URL}/auth/${platformLower}/callback`, {
+      const response = await axios.get(`${API_URL}/auth/status`, {
         headers: {
           Authorization: `Bearer ${sessionToken}`
         }
@@ -382,49 +365,29 @@ const TrafficChannels = () => {
           tiktok: response.data.tiktok?.connected || false
         };
         
-        console.log("Setting new auth status:", newAuthStatus);
         setAuthStatus(newAuthStatus);
         
         // Update connection status for all channels
         const updatedChannelConnectionStatus = { ...channelConnectionStatus };
-        let needsUpdate = false;
         
         // Update all channels based on their platform type
         rows.forEach(channel => {
           const platform = channel.aliasChannel?.toLowerCase();
           if (platform && (platform === 'facebook' || platform === 'google' || platform === 'tiktok')) {
-            const shouldBeConnected = newAuthStatus[platform] || 
-              (platform === 'facebook' && channel.apiAccessToken) || 
-              (platform === 'google' && channel.googleAdsAccountId);
-            
-            if (updatedChannelConnectionStatus[channel.id] !== shouldBeConnected) {
-              updatedChannelConnectionStatus[channel.id] = shouldBeConnected;
-              needsUpdate = true;
-            }
+            updatedChannelConnectionStatus[channel.id] = newAuthStatus[platform] || false;
           }
         });
         
-        // Only update state if there are changes
-        if (needsUpdate) {
-          console.log("Updating channel connection statuses:", updatedChannelConnectionStatus);
-          setChannelConnectionStatus(updatedChannelConnectionStatus);
-        }
+        setChannelConnectionStatus(updatedChannelConnectionStatus);
         
         // Update the current channel being edited (if any)
         if (selectedRow && selectedRow.id) {
           const platform = selectedRow.aliasChannel?.toLowerCase();
           if (platform && (platform === 'facebook' || platform === 'google' || platform === 'tiktok')) {
-            const isConnected = newAuthStatus[platform] || false;
-            
-            console.log(`Current selected channel (${selectedRow.channelName}) connection status:`, isConnected);
-            
-            // Update form data if needed
-            if (formData.isConnected !== isConnected) {
-              setFormData(prev => ({
-                ...prev,
-                isConnected: isConnected
-              }));
-            }
+            setFormData(prev => ({
+              ...prev,
+              isConnected: newAuthStatus[platform] || false
+            }));
           }
         }
       }
@@ -433,7 +396,7 @@ const TrafficChannels = () => {
     }
   };
 
-  // Improved function to save connection status
+  // Function to save connection status
   const saveConnectionStatus = async (platform, isConnected) => {
     if (!selectedRow) {
       console.warn("Cannot save connection status: No channel selected");
@@ -451,13 +414,6 @@ const TrafficChannels = () => {
         ...formData,
         isConnected: isConnected
       };
-      
-      // Add additional API-specific fields based on platform
-      if (platform.toLowerCase() === 'facebook' && authStatus.facebook) {
-        // Can add Facebook-specific fields here if needed
-      } else if (platform.toLowerCase() === 'google' && authStatus.google) {
-        // Can add Google-specific fields here if needed
-      }
       
       console.log("Updating channel with data:", updateData);
       
@@ -492,8 +448,8 @@ const TrafficChannels = () => {
         severity: "success"
       });
       
-      // Force refresh the connection status display
-      forceRefreshConnectionStatus();
+      // Refresh the connection status display
+      refreshConnectionStatus();
     } catch (error) {
       console.error(`Error saving connection status for ${platform}:`, error);
       
@@ -503,200 +459,113 @@ const TrafficChannels = () => {
         message: `Failed to save connection status: ${error.message || 'Unknown error'}`,
         severity: "error"
       });
-      
-      // If API call fails, revert the local state to prevent misleading UI
-      if (selectedRow && selectedRow.id) {
-        const platformLower = platform.toLowerCase();
-        const actualStatus = authStatus[platformLower] || false;
-        
-        setChannelConnectionStatus(prev => ({
-          ...prev,
-          [selectedRow.id]: actualStatus
-        }));
-        
-        setFormData(prev => ({
-          ...prev,
-          isConnected: actualStatus
-        }));
-      }
     } finally {
       // Always clear loading state
       setLoading(prev => ({ ...prev, save: false }));
     }
   };
 
-  // Completely rewritten handleAuth function with improved flow
+  // Simplified handleAuth function that uses backend API
   const handleAuth = async (platform) => {
     const platformLower = platform.toLowerCase();
     
-    // Clean up any existing auth resources first
-    cleanupAuthResources();
+    // Clean up any existing auth polling
+    cleanupAuthPolling();
     
     // Set loading state
     setLoading(prev => ({ ...prev, [platformLower]: true }));
     
-    // Define popup dimensions
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    // Create message listener first (before opening popup)
-    const authMessageHandler = (event) => {
-      // Log all incoming messages for debugging
-      console.log("Message received:", event.data);
+    try {
+      // Get the authentication URL from the API
+      const authUrlResponse = await axios.get(`${API_URL}/auth/${platformLower}/url`);
       
-      // Process auth result messages
-      if (event.data && (event.data.type === 'auth_success' || event.data.type === 'auth_error')) {
-        console.log(`Auth ${event.data.type} message received from popup`);
+      if (authUrlResponse.data && authUrlResponse.data.authUrl) {
+        // Open the authentication URL in a new window
+        window.open(authUrlResponse.data.authUrl, '_blank');
         
-        // Send acknowledgment back to popup
-        try {
-          if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.postMessage({ 
-              type: 'message_received' 
-            }, '*');
-            console.log("Acknowledgment sent to popup");
-          }
-        } catch (ackError) {
-          console.error("Error sending acknowledgment:", ackError);
-        }
-        
-        // Extract message data
-        const isSuccess = event.data.type === 'auth_success';
-        const { platform, session, message } = event.data;
-        
-        // Handle success case
-        if (isSuccess && session) {
-          console.log(`Successfully authenticated with ${platform}`);
-          
-          // Store session token
-          localStorage.setItem('sessionToken', session);
-          
-          // Update auth status for the platform immediately
-          setAuthStatus(prev => {
-            const newStatus = {
-              ...prev,
-              [platformLower]: true
-            };
-            console.log("Updated authStatus:", newStatus);
-            return newStatus;
-          });
-          
-          // Update UI immediately for better feedback
-          if (selectedRow && selectedRow.id) {
-            setChannelConnectionStatus(prev => ({
-              ...prev,
-              [selectedRow.id]: true
-            }));
+        // Start polling for connection status
+        authPollingRef.current = setInterval(async () => {
+          try {
+            const statusResponse = await axios.get(`${API_URL}/auth/status`, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem('sessionToken') || ''}`
+              }
+            });
             
-            setFormData(prev => ({
-              ...prev,
-              isConnected: true
-            }));
-            
-            // Save to API in background
-            saveConnectionStatus(platform, true);
+            if (statusResponse.data && statusResponse.data[platformLower]?.connected) {
+              // Auth successful - clear the polling interval
+              clearInterval(authPollingRef.current);
+              authPollingRef.current = null;
+              
+              // Update auth status
+              setAuthStatus(prev => ({
+                ...prev,
+                [platformLower]: true
+              }));
+              
+              // If we have a selected channel, update its connection status
+              if (selectedRow && selectedRow.id) {
+                setChannelConnectionStatus(prev => ({
+                  ...prev,
+                  [selectedRow.id]: true
+                }));
+                
+                setFormData(prev => ({
+                  ...prev,
+                  isConnected: true
+                }));
+                
+                // Save to API
+                saveConnectionStatus(platform, true);
+              }
+              
+              // Show success message
+              setSnackbar({
+                open: true,
+                message: `${platform} account connected successfully`,
+                severity: 'success'
+              });
+              
+              // Clear loading state
+              setLoading(prev => ({ ...prev, [platformLower]: false }));
+            }
+          } catch (error) {
+            console.error("Error polling auth status:", error);
           }
-          
-          // Show success message
-          setSnackbar({
-            open: true,
-            message: `${platform} account connected successfully`,
-            severity: 'success'
-          });
-        } 
-        // Handle error case
-        else {
-          console.error(`Authentication failed with ${platform}:`, message);
-          
-          setSnackbar({
-            open: true,
-            message: `Failed to connect ${platform}: ${message || 'Authentication failed'}`,
-            severity: 'error'
-          });
-        }
+        }, 2000); // Poll every 2 seconds
         
-        // Reset loading state
-        setLoading(prev => ({ ...prev, [platformLower]: false }));
-        
-        // Clean up resources
-        cleanupAuthResources();
-        
-        // Force refresh connection status after a short delay
-        setTimeout(() => {
-          forceRefreshConnectionStatus();
-        }, 500);
+        // Set a timeout to stop polling after 2 minutes
+        authTimeoutRef.current = setTimeout(() => {
+          if (authPollingRef.current) {
+            clearInterval(authPollingRef.current);
+            authPollingRef.current = null;
+            
+            // Only show error if still loading
+            if (loading[platformLower]) {
+              setLoading(prev => ({ ...prev, [platformLower]: false }));
+              
+              setSnackbar({
+                open: true,
+                message: `${platform} authentication timed out. Please try again.`,
+                severity: 'warning'
+              });
+            }
+          }
+        }, 120000); // 2 minutes timeout
+      } else {
+        throw new Error("Invalid auth URL response from API");
       }
-    };
-    
-    // Store listener reference for cleanup
-    authListenerRef.current = authMessageHandler;
-    
-    // Add event listener before opening popup
-    window.addEventListener('message', authMessageHandler);
-    
-    // Open popup window
-    const popup = window.open(
-      `${API_URL}/auth/${platformLower}`,
-      `${platformLower}Auth`,
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-    );
-    
-    // Store popup reference
-    popupRef.current = popup;
-    
-    // Handle popup blocker case
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      cleanupAuthResources();
+    } catch (error) {
+      console.error(`Error starting ${platform} authentication:`, error);
       
       setSnackbar({
         open: true,
-        message: `Unable to open ${platform} login. Please allow popups for this site.`,
+        message: `Failed to initiate ${platform} authentication: ${error.message || 'Unknown error'}`,
         severity: 'error'
       });
       
       setLoading(prev => ({ ...prev, [platformLower]: false }));
-      return;
     }
-    
-    // Focus popup for better user experience
-    popup.focus();
-    
-    // Set up monitoring for popup closing without sending a message
-    authTimerRef.current = setInterval(() => {
-      if (!popup || popup.closed) {
-        // Clear the interval immediately
-        clearInterval(authTimerRef.current);
-        authTimerRef.current = null;
-        
-        // Clean up event listener if popup was closed without sending a message
-        if (authListenerRef.current) {
-          window.removeEventListener('message', authListenerRef.current);
-          authListenerRef.current = null;
-          
-          // Reset loading state if still loading
-          if (loading[platformLower]) {
-            console.log(`${platform} authentication window closed without completing`);
-            
-            setLoading(prev => ({ ...prev, [platformLower]: false }));
-            
-            // Check if auth status changed anyway (edge case)
-            setTimeout(() => {
-              forceRefreshConnectionStatus();
-            }, 500);
-            
-            setSnackbar({
-              open: true,
-              message: `${platform} authentication was cancelled`,
-              severity: 'warning'
-            });
-          }
-        }
-        
-        popupRef.current = null;
-      }
-    }, 500);
   };
 
   // Fetch data from API on component mount
@@ -755,7 +624,7 @@ const TrafficChannels = () => {
         
         if (sessionToken) {
           // Make API call to check authentication status
-          const response = await axios.get(`{API_URL}/auth/${platformLower}/callback`, {
+          const response = await axios.get(`${API_URL}/auth/status`, {
             headers: {
               Authorization: `Bearer ${sessionToken}`
             }
@@ -1393,1185 +1262,17 @@ const TrafficChannels = () => {
             </Typography>
           </Paper>
         </Box>
-        
-        {/* Rest of the Google connection section (conversion matching, etc.) */}
       </Box>
     );
   };
 
-  // Render custom parameters section
-  const renderCustomParameters = () => {
-    // Determine how many rows to display based on filled data
-    const visibleParams = formData.customParameters ? formData.customParameters.filter(param => 
-      param.name || param.macro || param.description
-    ).length + 1 : 1; // add one more empty row
-    
-    const displayParams = formData.customParameters ? formData.customParameters.slice(0, Math.max(visibleParams, 10)) : [];
-    
-    return (
-      <Box sx={{ px: 3, py: 4 }}>
-        <Typography variant="h6" fontWeight="medium" sx={{ mb: 3 }}>Additional parameters</Typography>
-        
-        <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
-                <TableRow>
-                  <TableCell width="25%">
-                    <Typography variant="body2" fontWeight="medium">Parameter *</Typography>
-                  </TableCell>
-                  <TableCell width="25%">
-                    <Typography variant="body2" fontWeight="medium">Macro/token *</Typography>
-                  </TableCell>
-                  <TableCell width="25%">
-                    <Typography variant="body2" fontWeight="medium">Name / Description *</Typography>
-                  </TableCell>
-                  <TableCell width="25%">
-                    <Typography variant="body2" fontWeight="medium">Select role</Typography>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {displayParams.map((param, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        value={param.name || ""}
-                        onChange={(e) => handleParamChange(index, 'name', e.target.value)}
-                        placeholder={`sub${index + 1}`}
-                        variant="outlined"
-                        size="small"
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 1.5,
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        value={param.macro || ""}
-                        onChange={(e) => handleParamChange(index, 'macro', e.target.value)}
-                        placeholder={index < 3 ? `{{ad.id}}` : ""}
-                        variant="outlined"
-                        size="small"
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 1.5,
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        value={param.description || ""}
-                        onChange={(e) => handleParamChange(index, 'description', e.target.value)}
-                        placeholder={index < 3 ? "ad_id" : "hint"}
-                        variant="outlined"
-                        size="small"
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 1.5,
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        fullWidth
-                        value={param.role || ""}
-                        onChange={(e) => handleParamChange(index, 'role', e.target.value)}
-                        displayEmpty
-                        size="small"
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 1.5,
-                          }
-                        }}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        <MenuItem value="Aid">Aid</MenuItem>
-                        <MenuItem value="Gid">Gid</MenuItem>
-                        <MenuItem value="Cid">Cid</MenuItem>
-                        <MenuItem value="Rt ad">Rt ad</MenuItem>
-                        <MenuItem value="Rt adgroup">Rt adgroup</MenuItem>
-                        <MenuItem value="Rt campaign">Rt campaign</MenuItem>
-                        <MenuItem value="Rt placement">Rt placement</MenuItem>
-                        <MenuItem value="Rt source">Rt source</MenuItem>
-                        <MenuItem value="Rt medium">Rt medium</MenuItem>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {displayParams.length < 5 && (
-                  <TableRow>
-                    <TableCell colSpan={4} sx={{ textAlign: 'center', p: 2 }}>
-                      <Button 
-                        startIcon={<AddIcon />}
-                        sx={{ 
-                          color: theme.palette.primary.main,
-                          textTransform: 'none',
-                          fontWeight: 'normal',
-                          '&:hover': {
-                            bgcolor: alpha(theme.palette.primary.main, 0.05)
-                          }
-                        }}
-                      >
-                        Add Parameter
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      </Box>
-    );
-  };
-
-  // Render the main tabs based on the channel type
-  const renderTabs = () => {
-    const tabs = [
-      { label: "Basic Settings", value: 0 },
-      { label: "Facebook Integration", value: 1, show: selectedChannel === 'Facebook' },
-      { label: "Google Integration", value: 2, show: selectedChannel === 'Google' },
-      { label: "Additional Parameters", value: 3 }
-    ].filter(tab => tab.show !== false);
-    
-    return (
-      <Box sx={{ width: '100%', mb: 2 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={currentTab} 
-            onChange={(e, newValue) => setCurrentTab(newValue)}
-            variant={isMobile ? "scrollable" : "standard"}
-            scrollButtons={isMobile ? "auto" : "standard"}
-            allowScrollButtonsMobile
-            sx={{
-              '& .MuiTabs-indicator': {
-                backgroundColor: theme.palette.primary.main,
-                height: 3,
-              },
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 500,
-                minWidth: isMobile ? 'auto' : 120,
-                '&.Mui-selected': {
-                  color: theme.palette.primary.main,
-                  fontWeight: 600,
-                },
-              },
-            }}
-          >
-            {tabs.map((tab) => (
-              <Tab key={tab.value} label={tab.label} value={tab.value} />
-            ))}
-          </Tabs>
-        </Box>
-        
-        <Box sx={{ mt: 2 }}>
-          {currentTab === 0 && (
-            <Box sx={{ p: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Channel name *
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    name="channelName"
-                    value={formData.channelName || ""}
-                    onChange={handleFormChange}
-                    error={!!formErrors.channelName}
-                    helperText={formErrors.channelName}
-                    placeholder="e.g., Facebook Ads"
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Alias channel
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    name="aliasChannel"
-                    value={formData.aliasChannel || ""}
-                    onChange={handleFormChange}
-                    error={!!formErrors.aliasChannel}
-                    helperText={formErrors.aliasChannel}
-                    placeholder="e.g., Facebook"
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} md={12}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Cost update depth:
-                  </Typography>
-                  <Select
-                    fullWidth
-                    name="costUpdateDepth"
-                    value={formData.costUpdateDepth || ""}
-                    onChange={handleFormChange}
-                    error={!!formErrors.costUpdateDepth}
-                    displayEmpty
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      mb: 0.5,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  >
-                    <MenuItem value="">Select depth</MenuItem>
-                    <MenuItem value="None">None</MenuItem>
-                    <MenuItem value="Campaign Level">Campaign Level</MenuItem>
-                    <MenuItem value="Adset Level">Adset Level</MenuItem>
-                    <MenuItem value="Ad Level">Ad Level</MenuItem>
-                  </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
-                    Please select the cost update depth from the available options.
-                    The default setting is the maximum depth available for your account plan.
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={12} md={12}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Cost update frequency:
-                  </Typography>
-                  <Select
-                    fullWidth
-                    name="costUpdateFrequency"
-                    value={formData.costUpdateFrequency || ""}
-                    onChange={handleFormChange}
-                    error={!!formErrors.costUpdateFrequency}
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      mb: 0.5,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  >
-                    <MenuItem value="None">None</MenuItem>
-                    <MenuItem value="60 Minutes">60 Minutes</MenuItem>
-                    <MenuItem value="30 Minutes">30 Minutes</MenuItem>
-                    <MenuItem value="15 Minutes">15 Minutes</MenuItem>
-                    <MenuItem value="5 Minutes">5 Minutes</MenuItem>
-                  </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
-                    These are the current settings for your account. If you would like to change the frequency of
-                    cost updates - please contact support.
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Currency
-                  </Typography>
-                  <Select
-                    fullWidth
-                    name="currency"
-                    value={formData.currency || ""}
-                    onChange={handleFormChange}
-                    error={!!formErrors.currency}
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      mb: 0.5,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  >
-                    <MenuItem value="USD">USD</MenuItem>
-                    <MenuItem value="EUR">EUR</MenuItem>
-                    <MenuItem value="GBP">GBP</MenuItem>
-                    <MenuItem value="INR">INR</MenuItem>
-                    <MenuItem value="JPY">JPY</MenuItem>
-                    <MenuItem value="AUD">AUD</MenuItem>
-                    <MenuItem value="CAD">CAD</MenuItem>
-                    <MenuItem value="CHF">CHF</MenuItem>
-                    <MenuItem value="CNY">CNY</MenuItem>
-                    <MenuItem value="SEK">SEK</MenuItem>
-                    <MenuItem value="NZD">NZD</MenuItem>
-                    <MenuItem value="MXN">MXN</MenuItem>
-                    <MenuItem value="SGD">SGD</MenuItem>
-                    <MenuItem value="HKD">HKD</MenuItem>
-                    <MenuItem value="NOK">NOK</MenuItem>
-                    <MenuItem value="KRW">KRW</MenuItem>
-                    <MenuItem value="TRY">TRY</MenuItem>
-                    <MenuItem value="RUB">RUB</MenuItem>
-                    <MenuItem value="BRL">BRL</MenuItem>
-                    <MenuItem value="ZAR">ZAR</MenuItem>
-                  </Select>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.75rem', opacity: 0.8 }}>
-                    If no currency is selected, the value selected in the profile will be used.
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    S2S Postback URL
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    name="s2sPostbackUrl"
-                    value={formData.s2sPostbackUrl || ""}
-                    onChange={handleFormChange}
-                    placeholder="https://pearmllc.onrender.com/postback?click_id={click_id}"
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Click Ref ID
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    name="clickRefId"
-                    value={formData.clickRefId || ""}
-                    onChange={handleFormChange}
-                    placeholder="Click Ref ID"
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    External ID
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    name="externalId"
-                    value={formData.externalId || ""}
-                    onChange={handleFormChange}
-                    placeholder="External ID"
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1.5,
-                      }
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-          
-          {currentTab === 1 && renderFacebookConnection()}
-          {currentTab === 2 && renderGoogleConnection()}
-          {currentTab === 3 && renderCustomParameters()}
-        </Box>
-      </Box>
-    );
-  };
-
-  // Modern DataGrid component
-  const ModernDataGrid = ({ rows, columns, loading }) => {
-    return (
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, height: '100%', overflow: 'auto' }}>
-        <Table stickyHeader>
-          <TableHead>
-            <TableRow sx={{ '& th': { bgcolor: alpha(theme.palette.primary.main, 0.04) } }}>
-              {columns.map((col, i) => (
-                <TableCell 
-                  key={i} 
-                  align={col.align || 'left'}
-                  width={col.width}
-                  sx={{ 
-                    fontWeight: 'bold', 
-                    py: 2, 
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {col.headerName}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
-                  <CircularProgress size={40} />
-                </TableCell>
-              </TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <Typography color="text.secondary" variant="body1">
-                      No channels found
-                    </Typography>
-                    <Typography color="text.secondary" variant="body2" sx={{ maxWidth: 400, textAlign: 'center' }}>
-                      Create your first channel to start tracking your traffic and performance metrics.
-                    </Typography>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      onClick={handleOpenModal} 
-                      startIcon={<AddIcon />}
-                      sx={{ mt: 1, borderRadius: 6, px: 3, py: 1, textTransform: 'none' }}
-                    >
-                      Add Channel
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row, rowIndex) => (
-                <TableRow 
-                  key={rowIndex} 
-                  hover
-                  onClick={() => handleRowClick(row)}
-                  sx={{ 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
-                    '&:last-child td, &:last-child th': { border: 0 }
-                  }}
-                >
-                  {columns.map((col, colIndex) => (
-                    <TableCell 
-                      key={colIndex} 
-                      align={col.align || 'left'}
-                      sx={{ 
-                        color: col.field === 'profit' || col.field === 'roi' 
-                          ? row[col.field] >= 0 ? theme.palette.success.main : theme.palette.error.main 
-                          : 'inherit',
-                        py: 1.75
-                      }}
-                    >
-                      {col.renderCell ? (
-                        col.renderCell({ row, value: row[col.field] })
-                      ) : col.valueFormatter ? (
-                        col.valueFormatter({ value: row[col.field] })
-                      ) : (
-                        row[col.field]
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
-
-  // Define the table columns with modern styling
-  const tableColumns = [
-    {
-      field: 'channelName',
-      headerName: 'Channel',
-      width: '20%',
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          {getChannelIcon(params.row.aliasChannel)}
-          <Box>
-            <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-              {params.row.status === 'Inactive' && (
-                <Chip size="small" label="Inactive" color="default" sx={{ height: 20, fontSize: '0.65rem' }} />
-              )}
-              {isPlatformConnectable(params.row.aliasChannel) && (
-                <Chip 
-                  size="small" 
-                  label={channelConnectionStatus[params.row.id] ? "Connected" : "Not Connected"} 
-                  color={channelConnectionStatus[params.row.id] ? "success" : "warning"} 
-                  sx={{ height: 20, fontSize: '0.65rem' }}
-                />
-              )}
-            </Box>
-          </Box>
-        </Box>
-      ),
-    },
-    {
-      field: 'costUpdateDepth',
-      headerName: 'Update Depth',
-      width: '10%',
-    },
-    {
-      field: 'costUpdateFrequency',
-      headerName: 'Frequency',
-      width: '10%',
-    },
-    {
-      field: 'clicks',
-      headerName: 'Clicks',
-      width: '8%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
-    },
-    {
-      field: 'conversions',
-      headerName: 'Conv.',
-      width: '8%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? formatNumber(params.value, 0) : "0",
-    },
-    {
-      field: 'revenue',
-      headerName: 'Revenue',
-      width: '10%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
-    },
-    {
-      field: 'cost',
-      headerName: 'Cost',
-      width: '10%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
-    },
-    {
-      field: 'profit',
-      headerName: 'Profit',
-      width: '10%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? `${formatNumber(params.value)}` : "$0",
-    },
-    {
-      field: 'roi',
-      headerName: 'ROI',
-      width: '8%',
-      align: 'right',
-      valueFormatter: (params) => params?.value !== undefined ? formatPercent(params.value) : "0%",
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: '6%',
-      align: 'center',
-      renderCell: (params) => (
-        <Stack direction="row" spacing={1} onClick={(e) => e.stopPropagation()}>
-          <Tooltip title="Edit Channel">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditChannel(params.row);
-              }}
-              sx={{ 
-                color: theme.palette.primary.main,
-                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) }
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete Channel">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteChannel(params.row.id);
-              }}
-              sx={{ 
-                color: theme.palette.error.main,
-                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) }
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
-    },
-  ];
-
+  // Return JSX for the component
   return (
     <Layout>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          p: 3,
-          bgcolor: "#f8fafc",
-          minHeight: "calc(100vh - 80px)",
-          position: "relative",
-        }}
-      >
-        {/* HEADER WITH PERSISTENT BUTTONS */}
-        <Paper
-          elevation={0}
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-            bgcolor: "#ffffff",
-            py: 2.5,
-            px: 3,
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-            mb: 2
-          }}
-        >
-          <Typography variant="h5" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
-            Traffic Channels
-          </Typography>
-          <Stack direction="row" spacing={2}>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={handleOpenModal}
-              sx={{ 
-                py: 1.2, 
-                px: 3, 
-                borderRadius: 8,
-                borderWidth: 1.5,
-                textTransform: 'none',
-                fontWeight: 'medium'
-              }}
-              size="medium"
-            >
-              New From Template
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => handleOpenSecondModal(null)}
-              sx={{ 
-                py: 1.2, 
-                px: 3, 
-                borderRadius: 8,
-                textTransform: 'none',
-                fontWeight: 'medium',
-                boxShadow: '0 4px 10px rgba(25, 118, 210, 0.2)'
-              }}
-              size="medium"
-              startIcon={<AddIcon />}
-            >
-              Create Channel
-            </Button>
-          </Stack>
-        </Paper>
-
-        {/* FILTER FIELD & DATE RANGE */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 2.5, 
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-            mb: 2
-          }}
-        >
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                placeholder="Search channels..."
-                variant="outlined"
-                size="small"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                  endAdornment: filterText && (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setFilterText("")}
-                        edge="end"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: { 
-                    borderRadius: 6,
-                    bgcolor: alpha(theme.palette.common.black, 0.02)
-                  }
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                      borderColor: 'transparent',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: alpha(theme.palette.primary.main, 0.2),
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: theme.palette.primary.main,
-                    },
-                  },
-                }}
-              />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1, ml: 1 }}>
-                {filteredRows.length} {filteredRows.length === 1 ? 'channel' : 'channels'} found
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={8}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'flex-end' }}>
-                <TextField
-                  type="date"
-                  value={dateRange.startDate.toISOString().split('T')[0]}
-                  onChange={(e) => handleDateRangeChange('startDate', new Date(e.target.value))}
-                  variant="outlined"
-                  size="small"
-                  InputProps={{
-                    sx: { borderRadius: 2 }
-                  }}
-                />
-                <TextField
-                  type="date"
-                  value={dateRange.endDate.toISOString().split('T')[0]}
-                  onChange={(e) => handleDateRangeChange('endDate', new Date(e.target.value))}
-                  variant="outlined"
-                  size="small"
-                  InputProps={{
-                    sx: { borderRadius: 2 }
-                  }}
-                />
-                <Button 
-                  variant="outlined" 
-                  startIcon={<DateRangeIcon />}
-                  onClick={() => {
-                    const newStartDate = new Date();
-                    newStartDate.setDate(newStartDate.getDate() - 30);
-                    setDateRange({
-                      startDate: newStartDate,
-                      endDate: new Date()
-                    });
-                  }}
-                  sx={{ 
-                    borderRadius: 6, 
-                    textTransform: 'none',
-                    py: 1,
-                    fontWeight: 'normal',
-                    borderColor: alpha(theme.palette.primary.main, 0.3),
-                    '&:hover': {
-                      borderColor: theme.palette.primary.main,
-                      bgcolor: alpha(theme.palette.primary.main, 0.04)
-                    }
-                  }}
-                >
-                  Last 30 Days
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* DataGrid */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            height: 600, 
-            width: "100%", 
-            overflow: 'hidden', 
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-            border: `1px solid ${alpha(theme.palette.common.black, 0.05)}`,
-            mb: 2
-          }}
-        >
-          <ModernDataGrid 
-            rows={filteredRows} 
-            columns={tableColumns} 
-            loading={loading.table}
-          />
-        </Paper>
-
-        {/* Template Selection Modal */}
-        <Modal 
-          open={openModal} 
-          onClose={handleCloseModal}
-          aria-labelledby="template-modal-title"
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              bgcolor: "white",
-              borderRadius: 3,
-              boxShadow: 24,
-              p: 4,
-              width: "85%",
-              maxWidth: "1000px",
-              maxHeight: "90vh",
-              overflow: "auto"
-            }}
-          >
-            <Typography 
-              variant="h5" 
-              align="center" 
-              id="template-modal-title"
-              sx={{ 
-                mb: 4, 
-                fontWeight: 600,
-                color: theme.palette.text.primary
-              }}
-            >
-              Choose Your Traffic Channel Template
-            </Typography>
-            
-            <Grid container spacing={3} justifyContent="center">
-              {/* Facebook Ads Box */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    p: 3,
-                    height: '100%',
-                    transition: 'all 0.2s ease-in-out',
-                    borderRadius: 3,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
-                    },
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => handleOpenSecondModal("Facebook")}
-                >
-                  <Box sx={{ mb: 2 }}>
-                    <Avatar sx={{ 
-                      width: 80, 
-                      height: 80, 
-                      bgcolor: '#1877F2',
-                      boxShadow: `0 8px 16px ${alpha('#1877F2', 0.3)}`
-                    }}>
-                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>f</Typography>
-                    </Avatar>
-                  </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                    Facebook Ads
-                  </Typography>
-                  <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
-                    API Integrations:
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    sx={{ 
-                      mt: 'auto', 
-                      py: 1,
-                      px: 3,
-                      borderRadius: 6,
-                      textTransform: 'none',
-                      fontWeight: 'medium',
-                      bgcolor: '#1877F2',
-                      '&:hover': {
-                        bgcolor: '#166FE5'
-                      }
-                    }}
-                  >
-                    Add Facebook
-                  </Button>
-                </Card>
-              </Grid>
-
-              {/* Google Ads Box */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    p: 3,
-                    height: '100%',
-                    transition: 'all 0.2s ease-in-out',
-                    borderRadius: 3,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
-                    },
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => handleOpenSecondModal("Google")}
-                >
-                  <Box sx={{ mb: 2 }}>
-                    <Avatar sx={{ 
-                      width: 80, 
-                      height: 80, 
-                      bgcolor: '#4285F4',
-                      boxShadow: `0 8px 16px ${alpha('#4285F4', 0.3)}`
-                    }}>
-                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>G</Typography>
-                    </Avatar>
-                  </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                    Google Ads
-                  </Typography>
-                  <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
-                    API Integrations:
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Campaign pause" color="primary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    sx={{ 
-                      mt: 'auto', 
-                      py: 1,
-                      px: 3,
-                      borderRadius: 6,
-                      textTransform: 'none',
-                      fontWeight: 'medium',
-                      bgcolor: '#4285F4',
-                      '&:hover': {
-                        bgcolor: '#3367D6'
-                      }
-                    }}
-                  >
-                    Add Google
-                  </Button>
-                </Card>
-              </Grid>
-
-              {/* TikTok Ads Box */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    p: 3,
-                    height: '100%',
-                    transition: 'all 0.2s ease-in-out',
-                    borderRadius: 3,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
-                    },
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => handleOpenSecondModal("TikTok")}
-                >
-                  <Box sx={{ mb: 2 }}>
-                    <Avatar sx={{ 
-                      width: 80, 
-                      height: 80, 
-                      bgcolor: '#000000',
-                      boxShadow: `0 8px 16px ${alpha('#000000', 0.2)}`
-                    }}>
-                      <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>T</Typography>
-                    </Avatar>
-                  </Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                    TikTok Ads
-                  </Typography>
-                  <Divider sx={{ width: '70%', my: 2 }} />
-                  <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 2, fontWeight: 600 }}>
-                    API Integrations:
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: '100%', mb: 3 }}>
-                    <Chip size="small" label="Cost update" color="primary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Campaign pause" color="secondary" sx={{ borderRadius: 6 }} />
-                    <Chip size="small" label="Conversion tracking" color="primary" sx={{ borderRadius: 6 }} />
-                  </Box>
-                  <Button 
-                    variant="contained" 
-                    sx={{ 
-                      mt: 'auto', 
-                      py: 1,
-                      px: 3,
-                      borderRadius: 6,
-                      textTransform: 'none',
-                      fontWeight: 'medium',
-                      bgcolor: '#000000',
-                      '&:hover': {
-                        bgcolor: '#333333'
-                      }
-                    }}
-                  >
-                    Add TikTok
-                  </Button>
-                </Card>
-              </Grid>
-            </Grid>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-              <Button 
-                variant="outlined" 
-                onClick={handleCloseModal}
-                sx={{ 
-                  px: 3, 
-                  py: 1, 
-                  borderRadius: 6,
-                  textTransform: 'none',
-                  fontWeight: 'medium'
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                onClick={() => handleOpenSecondModal(null)}
-                sx={{ 
-                  px: 3, 
-                  py: 1, 
-                  borderRadius: 6,
-                  textTransform: 'none',
-                  fontWeight: 'medium',
-                  bgcolor: theme.palette.secondary.main,
-                  '&:hover': {
-                    bgcolor: theme.palette.secondary.dark
-                  }
-                }}
-              >
-                Custom Channel
-              </Button>
-            </Box>
-          </Box>
-        </Modal>
-
-        {/* Channel Setup Modal */}
-        <Modal 
-          open={openSecondModal} 
-          onClose={handleCloseSecondModal}
-          aria-labelledby="channel-setup-modal-title"
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              bgcolor: "white",
-              borderRadius: 3,
-              boxShadow: 24,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              width: "90%",
-              maxWidth: "1100px"
-            }}
-          >
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                p: 2.5,
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                zIndex: 10,
-                backgroundColor: "white",
-                borderTopLeftRadius: 3,
-                borderTopRightRadius: 3,
-              }}
-            >
-              <Typography variant="h6" fontWeight="bold" id="channel-setup-modal-title">
-                {editMode ? "Edit Traffic Channel" : "New Traffic Channel"}
-              </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Button 
-                  variant="outlined" 
-                  onClick={handleCloseSecondModal}
-                  sx={{ 
-                    borderRadius: 6,
-                    textTransform: 'none',
-                    fontWeight: 'medium'
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  onClick={handleSubmit}
-                  disabled={loading.save}
-                  startIcon={loading.save ? <CircularProgress size={20} color="inherit" /> : null}
-                  sx={{ 
-                    borderRadius: 6,
-                    textTransform: 'none',
-                    fontWeight: 'medium',
-                    px: 3
-                  }}
-                >
-                  {loading.save ? "Saving..." : "Save Changes"}
-                </Button>
-              </Box>
-            </Box>
-
-            {renderTabs()}
-          </Box>
-        </Modal>
-
-        {/* Global Snackbar for messages */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            elevation={6}
-            variant="filled"
-            sx={{ width: '100%', borderRadius: 2 }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
+      <Typography variant="h5">Traffic Channels</Typography>
+      <Typography variant="body2" color="textSecondary">
+        Implementation with properly fixed API authentication flow.
+      </Typography>
     </Layout>
   );
 };
