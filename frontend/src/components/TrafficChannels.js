@@ -474,7 +474,7 @@ const TrafficChannels = () => {
   }, [authStatus, selectedRow, openSecondModal]);
 
   // Improved handleAuth function with reliable popup closing
-  const handleAuth = (platform) => {
+const handleAuth = async (platform) => {
     const platformLower = platform.toLowerCase();
     
     // Set loading state
@@ -514,14 +514,14 @@ const TrafficChannels = () => {
     popup.focus();
     
     // Add listener for messages from popup
-    const authMessageListener = (event) => {
+    const authMessageListener = async (event) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) return;
       
       console.log("Received message from popup:", event.data);
       
       // Process auth result from the message
-      if (event.data && (event.data.type === 'auth_success')) {
+      if (event.data && (event.data.type === 'auth_success' || event.data.type === 'auth_error')) {
         const isSuccess = event.data.type === 'auth_success';
         const { platform, session, message } = event.data;
         
@@ -536,33 +536,68 @@ const TrafficChannels = () => {
         }
         
         if (isSuccess) {
+          console.log(`Successfully authenticated with ${platform}`);
+          
           // Store session token
           localStorage.setItem('sessionToken', session);
           
-          // Force refresh connection status to ensure UI is updated
-          forceRefreshConnectionStatus();
+          // Update auth status for the platform immediately
+          setAuthStatus(prev => {
+            const newStatus = {
+              ...prev,
+              [platformLower]: true
+            };
+            console.log("Updated authStatus:", newStatus);
+            return newStatus;
+          });
           
-          // Update auth status for the platform
-          setAuthStatus(prev => ({
-            ...prev,
-            [platformLower]: true
-          }));
+          // Force refresh connection status first to ensure UI is up to date
+          await forceRefreshConnectionStatus();
           
           // Update connection status if in edit mode
           if (selectedRow && selectedRow.id) {
-            setChannelConnectionStatus(prev => ({
-              ...prev,
-              [selectedRow.id]: true
-            }));
+            // First update the UI immediately to give feedback
+            setChannelConnectionStatus(prev => {
+              const updated = {
+                ...prev,
+                [selectedRow.id]: true
+              };
+              console.log("Updated channelConnectionStatus immediately:", updated);
+              return updated;
+            });
             
-            // Update form data connection status
-            setFormData(prev => ({
-              ...prev,
-              isConnected: true
-            }));
+            // Also update form data connection status
+            setFormData(prev => {
+              const updated = {
+                ...prev,
+                isConnected: true
+              };
+              console.log("Updated formData.isConnected to:", updated.isConnected);
+              return updated;
+            });
             
-            // Save connection status to API
-            saveConnectionStatus(platformLower, true);
+            // Then save to API (this is async and will happen in background)
+            await saveConnectionStatus(platformLower, true);
+            
+            // After API call completes, refresh the list of channels to ensure everything is in sync
+            try {
+              const response = await axios.get(API_URL);
+              if (response.data && Array.isArray(response.data)) {
+                setRows(response.data);
+                
+                // Update connection statuses from fresh data
+                const newConnectionStatus = {};
+                response.data.forEach(row => {
+                  newConnectionStatus[row.id] = row.isConnected || 
+                    (row.apiAccessToken && row.aliasChannel === 'Facebook') || 
+                    (row.googleAdsAccountId && row.aliasChannel === 'Google');
+                });
+                
+                setChannelConnectionStatus(newConnectionStatus);
+              }
+            } catch (error) {
+              console.error("Error refreshing channels after auth:", error);
+            }
           }
           
           // Show success message
@@ -622,50 +657,6 @@ const TrafficChannels = () => {
     }, 300); // Check more frequently
   };
 
-  // Function to save connection status without closing modal
-  const saveConnectionStatus = async (platform, isConnected) => {
-    if (!selectedRow) return;
-    
-    try {
-      // Create an update payload
-      const updateData = {
-        ...formData,
-        isConnected: isConnected
-      };
-      
-      // Call API to update channel connection status
-      const response = await axios.put(`${API_URL}/${selectedRow.id}`, updateData);
-      
-      // Update local state with response data
-      setRows(prevRows => 
-        prevRows.map(row => 
-          row.id === selectedRow.id ? response.data : row
-        )
-      );
-    } catch (error) {
-      console.error(`Error saving connection status for ${platform}:`, error);
-      // Show error message but keep modal open
-      setSnackbar({
-        open: true,
-        message: `Failed to save connection status: ${error.message}`,
-        severity: "warning"
-      });
-    }
-  };
-
-  // Filter rows based on search text
-  const filteredRows = rows.filter((row) =>
-    Object.values(row || {}).some((value) =>
-      value?.toString().toLowerCase().includes(filterText.toLowerCase())
-    )
-  );
-
-  // Helper to determine if platform is connectable
-  const isPlatformConnectable = (platformName) => {
-    if (!platformName) return false;
-    const platformLower = platformName.toLowerCase();
-    return ["facebook", "google", "tiktok"].includes(platformLower);
-  };
 
   // Form change handler for basic fields
   const handleFormChange = (e) => {
