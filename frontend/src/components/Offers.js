@@ -29,67 +29,75 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import Layout from "./Layout";
 import axios from 'axios';
 
-// Modern styled components
+// Modern styled components with improved aesthetics
 const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: 16,
-  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
-  transition: 'transform 0.3s, box-shadow 0.3s',
+  borderRadius: 12,
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+  transition: 'transform 0.2s, box-shadow 0.2s',
   overflow: 'hidden',
   '&:hover': {
-    transform: 'translateY(-5px)',
-    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+    transform: 'translateY(-3px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
   },
 }));
 
 const GradientButton = styled(Button)(({ theme, colorStart = '#4776E6', colorEnd = '#8E54E9' }) => ({
   background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
-  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
-  transition: 'all 0.3s',
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+  transition: 'all 0.2s',
   color: 'white',
   fontWeight: 600,
+  borderRadius: 8,
+  padding: '8px 16px',
   '&:hover': {
-    boxShadow: '0 6px 15px rgba(0, 0, 0, 0.25)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
     transform: 'translateY(-2px)',
   },
   '&:active': {
     transform: 'translateY(1px)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.12)',
   },
 }));
 
 const AnimatedIconButton = styled(IconButton)(({ theme }) => ({
-  transition: 'transform 0.2s, background 0.2s',
+  transition: 'transform 0.15s, background 0.15s',
   '&:hover': {
-    transform: 'scale(1.1)',
-    background: alpha(theme.palette.primary.main, 0.1),
+    transform: 'scale(1.08)',
+    background: alpha(theme.palette.primary.main, 0.08),
   },
 }));
 
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   border: 'none',
-  borderRadius: 16,
+  borderRadius: 12,
+  '& .MuiDataGrid-root': {
+    border: 'none',
+  },
   '& .MuiDataGrid-columnHeader': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-    padding: '12px 16px',
+    backgroundColor: alpha(theme.palette.primary.main, 0.06),
+    padding: '16px',
     '&:first-of-type': {
-      borderTopLeftRadius: 16,
+      borderTopLeftRadius: 12,
     },
     '&:last-of-type': {
-      borderTopRightRadius: 16,
+      borderTopRightRadius: 12,
     },
   },
   '& .MuiDataGrid-columnHeaderTitle': {
     fontWeight: 600,
+    fontSize: '0.85rem',
+    color: theme.palette.text.secondary,
   },
   '& .MuiDataGrid-cell': {
     padding: '16px',
-    fontSize: '0.95rem',
+    fontSize: '0.9rem',
+    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
   },
   '& .MuiDataGrid-row': {
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.15s',
     '&:hover': {
-      backgroundColor: alpha(theme.palette.primary.main, 0.04),
+      backgroundColor: alpha(theme.palette.primary.main, 0.03),
     },
     '&.Mui-selected': {
       backgroundColor: alpha(theme.palette.primary.main, 0.08),
@@ -98,15 +106,16 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
       },
     },
   },
-  // Zebra striping for rows
+  // Subtle zebra striping for better readability
   [`& .${gridClasses.row}.even`]: {
-    backgroundColor: alpha(theme.palette.primary.main, 0.02),
+    backgroundColor: alpha(theme.palette.primary.main, 0.01),
   },
 }));
 
 const StatusChip = styled(Chip)(({ theme, status }) => ({
   fontWeight: 600,
-  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+  borderRadius: 6,
   ...(status === 'active' && {
     background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
     color: '#05603a',
@@ -120,12 +129,12 @@ const StatusChip = styled(Chip)(({ theme, status }) => ({
 const GradientBox = styled(Box)(({ theme, colorStart = '#a1c4fd', colorEnd = '#c2e9fb' }) => ({
   background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
   borderRadius: 16,
-  padding: theme.spacing(3),
+  padding: theme.spacing(4, 3),
   color: theme.palette.getContrastText(theme.palette.primary.light),
-  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
+  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
 }));
 
-// Custom styled modal container
+// Clean, modern modal container
 const ModalContainer = styled(Box)(({ theme }) => ({
   position: "absolute",
   top: "50%",
@@ -137,15 +146,20 @@ const ModalContainer = styled(Box)(({ theme }) => ({
   overflow: "auto",
   backgroundColor: theme.palette.background.paper,
   borderRadius: 16,
-  boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
+  boxShadow: '0 16px 32px rgba(0, 0, 0, 0.12)',
   padding: 0,
 }));
 
 // Custom styled tab
 const StyledTab = styled(Tab)(({ theme }) => ({
   fontWeight: 600,
+  fontSize: '0.9rem',
   textTransform: 'none',
   minWidth: 120,
+  transition: 'all 0.2s',
+  '&.Mui-selected': {
+    color: theme.palette.primary.main,
+  },
 }));
 
 const TabPanel = (props) => {
@@ -165,17 +179,23 @@ const TabPanel = (props) => {
   );
 };
 
-// Enhanced text field
+// Refined text field for better visual consistency
 const StyledTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: 8,
-    transition: 'box-shadow 0.3s',
+    transition: 'box-shadow 0.15s',
     '&:hover': {
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.06)',
     },
     '&.Mui-focused': {
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
     }
+  },
+  '& .MuiInputLabel-root': {
+    fontSize: '0.9rem',
+  },
+  '& .MuiOutlinedInput-input': {
+    padding: '14px 16px',
   }
 }));
 
@@ -183,13 +203,19 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 const StyledFormControl = styled(FormControl)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: 8,
-    transition: 'box-shadow 0.3s',
+    transition: 'box-shadow 0.15s',
     '&:hover': {
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.06)',
     },
     '&.Mui-focused': {
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
     }
+  },
+  '& .MuiInputLabel-root': {
+    fontSize: '0.9rem',
+  },
+  '& .MuiSelect-select': {
+    padding: '14px 16px',
   }
 }));
 
@@ -488,28 +514,28 @@ const OffersPage = () => {
         { 
             field: 'serial_no', 
             headerName: '#', 
-            width: 80,
+            width: 70,
             align: 'center',
             headerAlign: 'center'
         },
         { 
             field: 'offers_name', 
             headerName: 'Offer Name', 
-            width: 200,
+            width: 220,
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <Avatar 
                         sx={{ 
                             width: 32, 
                             height: 32, 
-                            mr: 1,
+                            mr: 1.5,
                             background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
                         }}
                     >
                         {params.value.charAt(0).toUpperCase()}
                     </Avatar>
                     <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
                             {params.value}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -522,14 +548,14 @@ const OffersPage = () => {
         { 
             field: 'offer_status', 
             headerName: 'Status', 
-            width: 120,
+            width: 110,
             renderCell: (params) => {
                 const isActive = params.value?.toLowerCase() === 'active';
                 return (
                     <StatusChip
                         label={params.value || 'Unknown'}
                         status={isActive ? 'active' : 'inactive'}
-                        icon={isActive ? <CheckCircleIcon /> : <CancelIcon />}
+                        icon={isActive ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
                         size="small"
                     />
                 );
@@ -538,7 +564,7 @@ const OffersPage = () => {
         { 
             field: 'source', 
             headerName: 'Source', 
-            width: 140,
+            width: 120,
             renderCell: (params) => (
                 <Chip
                     icon={getSourceIcon(params.value)}
@@ -546,7 +572,7 @@ const OffersPage = () => {
                     variant="outlined"
                     size="small"
                     sx={{ 
-                        borderRadius: 1,
+                        borderRadius: 6,
                         '& .MuiChip-icon': {
                             mr: 0.5
                         }
@@ -557,7 +583,7 @@ const OffersPage = () => {
         { 
             field: 'postbackUrl', 
             headerName: 'Postback', 
-            width: 120,
+            width: 100,
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     {params.value ? (
@@ -582,7 +608,7 @@ const OffersPage = () => {
         { 
             field: 'clicks', 
             headerName: 'Clicks', 
-            width: 100, 
+            width: 90, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -595,7 +621,7 @@ const OffersPage = () => {
         { 
             field: 'conversion', 
             headerName: 'Conv.', 
-            width: 100, 
+            width: 90, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -608,7 +634,7 @@ const OffersPage = () => {
         { 
             field: 'total_cpa', 
             headerName: 'CPA ($)', 
-            width: 120, 
+            width: 110, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -627,7 +653,7 @@ const OffersPage = () => {
         { 
             field: 'epc', 
             headerName: 'EPC ($)', 
-            width: 120, 
+            width: 110, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -646,7 +672,7 @@ const OffersPage = () => {
         { 
             field: 'total_revenue', 
             headerName: 'Revenue', 
-            width: 140, 
+            width: 120, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -662,7 +688,7 @@ const OffersPage = () => {
         { 
             field: 'profit', 
             headerName: 'Profit', 
-            width: 140, 
+            width: 120, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -688,7 +714,7 @@ const OffersPage = () => {
         { 
             field: 'total_roi', 
             headerName: 'ROI', 
-            width: 120, 
+            width: 110, 
             type: 'number',
             align: 'right',
             headerAlign: 'right',
@@ -702,7 +728,7 @@ const OffersPage = () => {
                         bgcolor: isPositive ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
                         px: 1,
                         py: 0.5,
-                        borderRadius: 1
+                        borderRadius: 6
                     }}>
                         <Typography sx={{ 
                             fontWeight: 600,
@@ -844,8 +870,8 @@ const OffersPage = () => {
     
     return (
         <Layout>
-            <Container maxWidth="xl">
-                <Box sx={{ pt: 4, pb: 8 }}>
+            <Container maxWidth="xl" sx={{ py: 4 }}>
+                <Box sx={{ mb: 6 }}>
                     {/* Dashboard Header with Stats */}
                     <GradientBox 
                         sx={{ mb: 4 }}
@@ -857,7 +883,7 @@ const OffersPage = () => {
                                 <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
                                     Offers Dashboard
                                 </Typography>
-                                <Typography variant="body1">
+                                <Typography variant="body1" sx={{ opacity: 0.9 }}>
                                     Monitor performance and manage your offers
                                 </Typography>
                             </Box>
@@ -871,8 +897,11 @@ const OffersPage = () => {
                                     sx={{ 
                                         bgcolor: 'rgba(255, 255, 255, 0.9)', 
                                         color: theme.palette.primary.main,
+                                        borderRadius: 8,
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
                                         '&:hover': {
                                             bgcolor: 'rgba(255, 255, 255, 1)',
+                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                                         }
                                     }}
                                 >
@@ -891,26 +920,29 @@ const OffersPage = () => {
 
                         {/* Stats Overview */}
                         <Grid container spacing={3} sx={{ mt: 3 }}>
+                            {/* Stat Cards */}
                             <Grid item xs={12} md={2.4}>
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                                        backdropFilter: 'blur(5px)', 
-                                        borderRadius: 2,
-                                        transition: 'transform 0.3s',
+                                        p: 2.5, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.92)', 
+                                        backdropFilter: 'blur(8px)', 
+                                        borderRadius: 3,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                                         '&:hover': {
-                                            transform: 'translateY(-5px)',
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
                                         }
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                                         Total Offers
                                     </Typography>
-                                    <Typography variant="h4" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, display: 'flex', alignItems: 'baseline' }}>
                                         {stats.totalOffers}
-                                        <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 500 }}>
                                             ({stats.activeOffers} active)
                                         </Typography>
                                     </Typography>
@@ -920,17 +952,19 @@ const OffersPage = () => {
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                                        backdropFilter: 'blur(5px)', 
-                                        borderRadius: 2,
-                                        transition: 'transform 0.3s',
+                                        p: 2.5, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.92)', 
+                                        backdropFilter: 'blur(8px)', 
+                                        borderRadius: 3,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                                         '&:hover': {
-                                            transform: 'translateY(-5px)',
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
                                         }
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                                         Total Clicks
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
@@ -942,17 +976,19 @@ const OffersPage = () => {
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                                        backdropFilter: 'blur(5px)', 
-                                        borderRadius: 2,
-                                        transition: 'transform 0.3s',
+                                        p: 2.5, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.92)', 
+                                        backdropFilter: 'blur(8px)', 
+                                        borderRadius: 3,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                                         '&:hover': {
-                                            transform: 'translateY(-5px)',
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
                                         }
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                                         Conversions
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
@@ -964,17 +1000,19 @@ const OffersPage = () => {
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                                        backdropFilter: 'blur(5px)', 
-                                        borderRadius: 2,
-                                        transition: 'transform 0.3s',
+                                        p: 2.5, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.92)', 
+                                        backdropFilter: 'blur(8px)', 
+                                        borderRadius: 3,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                                         '&:hover': {
-                                            transform: 'translateY(-5px)',
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
                                         }
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                                         Total Revenue
                                     </Typography>
                                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
@@ -989,17 +1027,19 @@ const OffersPage = () => {
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
-                                        p: 2, 
-                                        bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                                        backdropFilter: 'blur(5px)', 
-                                        borderRadius: 2,
-                                        transition: 'transform 0.3s',
+                                        p: 2.5, 
+                                        bgcolor: 'rgba(255, 255, 255, 0.92)', 
+                                        backdropFilter: 'blur(8px)', 
+                                        borderRadius: 3,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                                         '&:hover': {
-                                            transform: 'translateY(-5px)',
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.06)',
                                         }
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                                         Total Profit
                                     </Typography>
                                     <Typography 
@@ -1022,8 +1062,8 @@ const OffersPage = () => {
 
                     {/* Filter Controls */}
                     <StyledCard sx={{ mb: 4 }}>
-                        <CardContent>
-                            <Grid container spacing={2} alignItems="center">
+                        <CardContent sx={{ p: 3 }}>
+                            <Grid container spacing={3} alignItems="center">
                                 <Grid item xs={12} md={3}>
                                     <StyledTextField
                                         label="Date"
@@ -1035,7 +1075,7 @@ const OffersPage = () => {
                                         InputProps={{
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <CalendarTodayIcon color="primary" />
+                                                    <CalendarTodayIcon color="primary" fontSize="small" />
                                                 </InputAdornment>
                                             ),
                                         }}
@@ -1050,7 +1090,7 @@ const OffersPage = () => {
                                         InputProps={{
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <TitleIcon color="primary" />
+                                                    <TitleIcon color="primary" fontSize="small" />
                                                 </InputAdornment>
                                             ),
                                         }}
@@ -1065,7 +1105,7 @@ const OffersPage = () => {
                                             label="Source"
                                             startAdornment={
                                                 <InputAdornment position="start">
-                                                    <LinkIcon color="primary" />
+                                                    <LinkIcon color="primary" fontSize="small" />
                                                 </InputAdornment>
                                             }
                                         >
@@ -1085,7 +1125,6 @@ const OffersPage = () => {
                                     <Box sx={{ display: 'flex', gap: 2 }}>
                                         <GradientButton
                                             variant="contained"
-                                            color="primary"
                                             fullWidth
                                             startIcon={<FilterListIcon />}
                                             onClick={handleApplyFilters}
@@ -1096,7 +1135,7 @@ const OffersPage = () => {
                                             variant="outlined"
                                             color="secondary"
                                             onClick={handleFilterReset}
-                                            sx={{ borderRadius: 2 }}
+                                            sx={{ borderRadius: 8 }}
                                         >
                                             Reset
                                         </Button>
@@ -1108,7 +1147,7 @@ const OffersPage = () => {
 
                     {/* DataGrid Table */}
                     <StyledCard>
-                        <Box sx={{ position: 'relative', height: 650, p: 0 }}>
+                        <Box sx={{ position: 'relative', height: 650, width: '100%' }}>
                             {loading ? (
                                 <Box 
                                     sx={{
@@ -1180,7 +1219,8 @@ const OffersPage = () => {
                     PaperProps={{
                         sx: {
                             borderRadius: 3,
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)'
                         }
                     }}
                 >
@@ -1190,7 +1230,7 @@ const OffersPage = () => {
                         </Typography>
                     </Box>
                     
-                    <Box sx={{ p: 3 }}>
+                    <Box sx={{ px: 3, pt: 3 }}>
                         <Tabs 
                             value={tabValue} 
                             onChange={handleTabChange}
@@ -1269,7 +1309,7 @@ const OffersPage = () => {
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
-                                                        <LinkIcon color="primary" />
+                                                        <LinkIcon color="primary" fontSize="small" />
                                                     </InputAdornment>
                                                 ),
                                             }}
@@ -1300,7 +1340,7 @@ const OffersPage = () => {
                                                 onChange={handleChange}
                                                 startAdornment={
                                                     <InputAdornment position="start">
-                                                        <PublicIcon color="primary" />
+                                                        <PublicIcon color="primary" fontSize="small" />
                                                     </InputAdornment>
                                                 }
                                             >
@@ -1379,12 +1419,12 @@ const OffersPage = () => {
                                                 onClick={() => handleInsertMacro(value)}
                                                 sx={{ 
                                                     fontFamily: 'monospace',
-                                                    borderRadius: 1.5,
+                                                    borderRadius: 6,
                                                     fontWeight: 500,
-                                                    transition: 'all 0.2s',
+                                                    transition: 'all 0.15s',
                                                     '&:hover': {
                                                         backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
                                                     }
                                                 }}
                                                 clickable
@@ -1480,11 +1520,11 @@ const OffersPage = () => {
                         )}
                     </Box>
                     
-                    <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <DialogActions sx={{ p: 3, pt: 1 }}>
                         <Button 
                             variant="outlined" 
                             onClick={handleClose}
-                            sx={{ borderRadius: 2, px: 3 }}
+                            sx={{ borderRadius: 8, px: 3 }}
                         >
                             Cancel
                         </Button>
@@ -1507,7 +1547,8 @@ const OffersPage = () => {
                     PaperProps={{
                         sx: {
                             borderRadius: 3,
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)'
                         }
                     }}
                 >
@@ -1522,7 +1563,7 @@ const OffersPage = () => {
                         )}
                     </Box>
                     
-                    <DialogContent>
+                    <DialogContent sx={{ p: 3 }}>
                         {selectedOffer && (
                             <>
                                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
@@ -1553,8 +1594,8 @@ const OffersPage = () => {
                                 </Typography>
                                 
                                 <StyledCard sx={{ mb: 3 }}>
-                                    <CardContent>
-                                        <Grid container spacing={2}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Grid container spacing={2.5}>
                                             <Grid item xs={12} sm={6} md={4}>
                                                 <StyledTextField
                                                     fullWidth
@@ -1713,7 +1754,7 @@ const OffersPage = () => {
                                         onClick={handleGenerateTestUrl}
                                         disabled={!selectedOffer.postbackUrl}
                                         startIcon={<CodeIcon />}
-                                        sx={{ borderRadius: 2 }}
+                                        sx={{ borderRadius: 8 }}
                                     >
                                         Generate Test URL
                                     </Button>
@@ -1822,7 +1863,7 @@ const OffersPage = () => {
                     <DialogActions sx={{ p: 3, pt: 0 }}>
                         <Button 
                             onClick={handleClosePostbackTest}
-                            sx={{ borderRadius: 2, px: 3 }}
+                            sx={{ borderRadius: 8, px: 3 }}
                             variant="outlined"
                         >
                             Close
@@ -1843,7 +1884,7 @@ const OffersPage = () => {
                         variant="filled"
                         sx={{ 
                             width: '100%',
-                            borderRadius: 2,
+                            borderRadius: 8,
                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                         }}
                     >
