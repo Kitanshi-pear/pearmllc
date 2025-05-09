@@ -382,9 +382,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
   const landingTypes = [
     { value: 'LANDING', label: 'LANDING' },
-    { value: 'PRE-LANDING', label: 'PRE-LANDING' },
-    { value: 'LISTICLE LANDING', label: 'LISTICLE LANDING' },
-    { value: 'LISTICLE PRE-LANDING', label: 'LISTICLE PRE-LANDING' }
+    { value: 'PRE-LANDING', label: 'PRE-LANDING' }
   ];
 
   return (
@@ -470,7 +468,7 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
           <FormLabel component="label" htmlFor="url">
             <Box display="flex" alignItems="center">
               <LinkIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-              URL Parameters *
+              URL*
             </Box>
           </FormLabel>
           <TextField
