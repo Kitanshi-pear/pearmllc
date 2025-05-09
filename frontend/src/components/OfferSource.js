@@ -77,8 +77,12 @@ const dateFormatter = new DateFormatter();
 // Refined styled components
 const StyledCard = styled(Card)(({ theme }) => ({
   borderRadius: 8,
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+  transition: 'box-shadow 0.2s',
   overflow: 'hidden',
+  '&:hover': {
+    boxShadow: '0 3px 8px rgba(0, 0, 0, 0.09)',
+  },
 }));
 
 const ElegantButton = styled(Button)(({ theme }) => ({
