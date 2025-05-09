@@ -132,40 +132,6 @@ const Layout = ({ children }) => {
         flexDirection: "column"
       }}
     >
-      {/* User Profile Section */}
-      <Box
-        sx={{
-          py: 3,
-          px: 2,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          borderBottom: 1,
-          borderColor: "divider",
-          background: `linear-gradient(135deg, ${elegantTheme.primary.light}, ${elegantTheme.primary.main})`,
-          mb: 2
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 80,
-            height: 80,
-            mb: 2,
-            backgroundColor: elegantTheme.secondary.main,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            transition: "all 0.3s ease",
-            "&:hover": {
-              transform: "scale(1.05)",
-              boxShadow: "0 6px 16px rgba(0,0,0,0.2)"
-            }
-          }}
-        >
-          <AccountCircleIcon sx={{ fontSize: 50, color: "#ffffff" }} />
-        </Avatar>
-        <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#ffffff" }}>
-          {userEmail}
-        </Typography>
-      </Box>
 
       {/* Navigation Menu */}
       <List component="nav" sx={{ flexGrow: 1, px: 1 }}>
