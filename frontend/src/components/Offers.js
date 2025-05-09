@@ -568,7 +568,7 @@ const OffersPage = () => {
                 <CenteredCellContainer>
                     <Chip
                         icon={getSourceIcon(params.value)}
-                        label={params.value || 'Unknown'}
+                        label={params.value}
                         variant="outlined"
                         size="small"
                         sx={{ 

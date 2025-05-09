@@ -74,65 +74,43 @@ import DateFormatter, { DATE_FORMAT } from "./DateFormat";
 // Create date formatter instance
 const dateFormatter = new DateFormatter();
 
-// Modern styled components
+// Refined styled components
 const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: 16,
-  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
-  transition: 'transform 0.3s, box-shadow 0.3s',
+  borderRadius: 8,
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
   overflow: 'hidden',
-  '&:hover': {
-    transform: 'translateY(-5px)',
-    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
-  },
 }));
 
-const GradientButton = styled(Button)(({ theme, colorStart = '#4776E6', colorEnd = '#8E54E9' }) => ({
-  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
-  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
-  transition: 'all 0.3s',
-  color: 'white',
-  fontWeight: 600,
-  '&:hover': {
-    boxShadow: '0 6px 15px rgba(0, 0, 0, 0.25)',
-    transform: 'translateY(-2px)',
-  },
-  '&:active': {
-    transform: 'translateY(1px)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-  },
+const ElegantButton = styled(Button)(({ theme }) => ({
+  borderRadius: 4,
+  fontWeight: 500,
+  boxShadow: 'none',
+  textTransform: 'none',
+  padding: '8px 16px',
 }));
 
-const AnimatedIconButton = styled(IconButton)(({ theme }) => ({
-  transition: 'transform 0.2s, background 0.2s',
+const SimpleIconButton = styled(IconButton)(({ theme }) => ({
   '&:hover': {
-    transform: 'scale(1.1)',
-    background: alpha(theme.palette.primary.main, 0.1),
+    background: alpha(theme.palette.primary.main, 0.08),
   },
 }));
 
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   border: 'none',
-  borderRadius: 16,
   '& .MuiDataGrid-columnHeader': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+    backgroundColor: alpha(theme.palette.primary.main, 0.04),
     padding: '12px 16px',
-    '&:first-of-type': {
-      borderTopLeftRadius: 16,
-    },
-    '&:last-of-type': {
-      borderTopRightRadius: 16,
-    },
   },
   '& .MuiDataGrid-columnHeaderTitle': {
-    fontWeight: 600,
+    fontWeight: 500,
   },
   '& .MuiDataGrid-cell': {
-    padding: '16px',
-    fontSize: '0.95rem',
+    padding: '12px 16px',
+    justifyContent: 'center',
+    textAlign: 'center',
   },
   '& .MuiDataGrid-row': {
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
     '&:hover': {
       backgroundColor: alpha(theme.palette.primary.main, 0.04),
     },
@@ -146,24 +124,22 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
 }));
 
 const StatusChip = styled(Chip)(({ theme, status }) => ({
-  fontWeight: 600,
-  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)',
+  fontWeight: 500,
+  boxShadow: 'none',
   ...(status === 'active' && {
-    background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
-    color: '#05603a',
+    backgroundColor: alpha(theme.palette.success.main, 0.1),
+    color: theme.palette.success.main,
   }),
   ...(status === 'inactive' && {
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-    color: '#4b4b4b',
+    backgroundColor: alpha(theme.palette.text.secondary, 0.1),
+    color: theme.palette.text.secondary,
   }),
 }));
 
-const GradientBox = styled(Box)(({ theme, colorStart = '#a1c4fd', colorEnd = '#c2e9fb' }) => ({
-  background: `linear-gradient(135deg, ${colorStart} 0%, ${colorEnd} 100%)`,
-  borderRadius: 16,
+const SubtleBox = styled(Box)(({ theme }) => ({
+  backgroundColor: alpha(theme.palette.primary.main, 0.03),
+  borderRadius: 8,
   padding: theme.spacing(3),
-  color: theme.palette.getContrastText(theme.palette.primary.light),
-  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
 }));
 
 const TabPanel = (props) => {
@@ -311,7 +287,6 @@ const OfferSourcePage = () => {
     description: "",
     role: "",
     is_active: true,
-    // Conversion API settings removed from default state
   });
 
   // Handle date range change
@@ -605,7 +580,7 @@ const OfferSourcePage = () => {
     }
   };
 
-  // Modern source type renderer with custom icons
+  // Simple source type renderer with custom icons
   const renderSourceTypeIcon = (type) => {
     switch (type) {
       case 'Facebook':
@@ -613,58 +588,66 @@ const OfferSourcePage = () => {
       case 'Google':
         return <FontAwesomeIcon icon={faGoogle} style={{ color: '#4285F4' }} />;
       case 'TikTok':
-        return <Box component="span" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>TT</Box>;
+        return <Box component="span" sx={{ fontWeight: 'medium', fontSize: '0.875rem' }}>TT</Box>;
       default:
         return <LinkIcon fontSize="small" />;
     }
   };
 
-  // Enhanced columns with modern styling
+  // Enhanced columns with centered data
   const columns = [
-    { field: "serial_no", headerName: "#", width: 60, align: "center" },
+    { 
+      field: "serial_no", 
+      headerName: "#", 
+      width: 60, 
+      align: "center",
+      headerAlign: "center"
+    },
     {
       field: "source_name",
       headerName: "Source Name",
       width: 230,
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
-        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
           <Box 
             sx={{ 
               display: 'flex',
               alignItems: 'center',
               mr: 1,
-              width: 30,
-              height: 30,
+              width: 24,
+              height: 24,
               borderRadius: '50%',
               justifyContent: 'center',
-              background: alpha(theme.palette.primary.main, 0.1)
+              background: alpha(theme.palette.primary.main, 0.06)
             }}
           >
             {renderSourceTypeIcon(params.row.source_type)}
           </Box>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography sx={{ fontWeight: 600 }}>{params.value}</Typography>
+          <Box>
+            <Typography variant="body2">{params.value}</Typography>
             <Typography variant="caption" color="text.secondary">
               {params.row.source_type}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex' }}>
-            <AnimatedIconButton
+          <Box sx={{ display: 'flex', ml: 'auto' }}>
+            <SimpleIconButton
               size="small"
               onClick={() => handleEditClick(params.row)}
               title="Edit"
               sx={{ color: theme.palette.primary.main }}
             >
               <EditIcon fontSize="small" />
-            </AnimatedIconButton>
-            <AnimatedIconButton
+            </SimpleIconButton>
+            <SimpleIconButton
               size="small"
               onClick={() => handleDeleteClick(params.row)}
               title="Delete"
               sx={{ color: theme.palette.error.main }}
             >
               <DeleteIcon fontSize="small" />
-            </AnimatedIconButton>
+            </SimpleIconButton>
           </Box>
         </Box>
       ),
@@ -673,11 +656,13 @@ const OfferSourcePage = () => {
       field: "is_active",
       headerName: "Status",
       width: 120,
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
         <StatusChip
           label={params.value ? "Active" : "Inactive"}
           status={params.value ? "active" : "inactive"}
-          icon={params.value ? <CheckCircleIcon /> : <CancelIcon />}
+          icon={params.value ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
           size="small"
         />
       ),
@@ -686,25 +671,26 @@ const OfferSourcePage = () => {
       field: "postback", 
       headerName: "Postback URL", 
       width: 220,
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: "center" }}>
           <Tooltip title={params.value || "No postback URL"}>
             <Typography sx={{ 
               overflow: "hidden", 
               textOverflow: "ellipsis", 
               whiteSpace: "nowrap",
-              flexGrow: 1,
               maxWidth: 130,
               fontFamily: 'monospace',
-              fontSize: '0.85rem',
+              fontSize: '0.75rem',
               color: theme.palette.text.secondary
             }}>
               {params.value || "—"}
             </Typography>
           </Tooltip>
           {params.value && (
-            <Box sx={{ display: 'flex' }}>
-              <AnimatedIconButton 
+            <Box sx={{ display: 'flex', ml: 1 }}>
+              <SimpleIconButton 
                 size="small" 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -719,8 +705,8 @@ const OfferSourcePage = () => {
                 sx={{ color: theme.palette.info.main }}
               >
                 <ContentCopyIcon fontSize="small" />
-              </AnimatedIconButton>
-              <AnimatedIconButton 
+              </SimpleIconButton>
+              <SimpleIconButton 
                 size="small" 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -730,7 +716,7 @@ const OfferSourcePage = () => {
                 sx={{ color: theme.palette.warning.main }}
               >
                 <VisibilityIcon fontSize="small" />
-              </AnimatedIconButton>
+              </SimpleIconButton>
             </Box>
           )}
         </Box>
@@ -743,7 +729,7 @@ const OfferSourcePage = () => {
       align: "center",
       headerAlign: "center",
       renderCell: (params) => (
-        <Typography sx={{ fontWeight: 600 }}>
+        <Typography variant="body2">
           {params.value.toLocaleString()}
         </Typography>
       )
@@ -755,7 +741,7 @@ const OfferSourcePage = () => {
       align: "center",
       headerAlign: "center",
       renderCell: (params) => (
-        <Typography sx={{ fontWeight: 600 }}>
+        <Typography variant="body2">
           {params.value.toLocaleString()}
         </Typography>
       )
@@ -764,13 +750,12 @@ const OfferSourcePage = () => {
       field: "total_cpa", 
       headerName: "CPA ($)", 
       width: 110,
-      align: "right",
-      headerAlign: "right",
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => {
         const value = params.value || 0;
         return (
-          <Typography sx={{ 
-            fontWeight: 600,
+          <Typography variant="body2" sx={{ 
             color: value > 10 ? theme.palette.error.main : theme.palette.success.main 
           }}>
             ${value.toFixed(2)}
@@ -782,13 +767,12 @@ const OfferSourcePage = () => {
       field: "epc", 
       headerName: "EPC ($)", 
       width: 110,
-      align: "right",
-      headerAlign: "right",
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => {
         const value = params.value || 0;
         return (
-          <Typography sx={{ 
-            fontWeight: 600,
+          <Typography variant="body2" sx={{ 
             color: value > 0.5 ? theme.palette.success.main : theme.palette.text.primary 
           }}>
             ${value.toFixed(2)}
@@ -800,16 +784,14 @@ const OfferSourcePage = () => {
       field: "total_revenue", 
       headerName: "Revenue", 
       width: 120,
-      align: "right",
-      headerAlign: "right",
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => {
         const value = params.value || 0;
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography sx={{ fontWeight: 600, pr: 1 }}>
-              ${value.toFixed(2)}
-            </Typography>
-          </Box>
+          <Typography variant="body2">
+            ${value.toFixed(2)}
+          </Typography>
         );
       }
     },
@@ -817,19 +799,18 @@ const OfferSourcePage = () => {
       field: "profit", 
       headerName: "Profit", 
       width: 120,
-      align: "right",
-      headerAlign: "right",
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => {
         const value = params.value || 0;
         const isPositive = value >= 0;
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isPositive ? 
               <ArrowUpwardIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5 }} /> :
               <ArrowDownwardIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5 }} />
             }
-            <Typography sx={{ 
-              fontWeight: 600,
+            <Typography variant="body2" sx={{ 
               color: isPositive ? theme.palette.success.main : theme.palette.error.main
             }}>
               ${Math.abs(value).toFixed(2)}
@@ -842,27 +823,21 @@ const OfferSourcePage = () => {
       field: "total_roi", 
       headerName: "ROI", 
       width: 100,
-      align: "right",
-      headerAlign: "right",
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => {
         const value = params.value || 0;
         const isPositive = value >= 0;
         return (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
+          <Typography variant="body2" sx={{ 
+            color: isPositive ? theme.palette.success.main : theme.palette.error.main,
             bgcolor: isPositive ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
             px: 1,
             py: 0.5,
-            borderRadius: 1
+            borderRadius: 4
           }}>
-            <Typography sx={{ 
-              fontWeight: 600,
-              color: isPositive ? theme.palette.success.main : theme.palette.error.main
-            }}>
-              {value.toFixed(2)}%
-            </Typography>
-          </Box>
+            {value.toFixed(2)}%
+          </Typography>
         );
       }
     },
@@ -883,14 +858,14 @@ const OfferSourcePage = () => {
     maxHeight: "90vh",
     overflow: "auto",
     backgroundColor: theme.palette.background.paper,
-    borderRadius: 16,
-    boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
+    borderRadius: 8,
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
     padding: 0,
   }));
 
   // Custom styled tab
   const StyledTab = styled(Tab)(({ theme }) => ({
-    fontWeight: 600,
+    fontWeight: 500,
     textTransform: 'none',
     minWidth: 120,
   }));
@@ -900,41 +875,31 @@ const OfferSourcePage = () => {
       <Container maxWidth="xl">
         <Box sx={{ pt: 4, pb: 8 }}>
           {/* Dashboard Header with Stats */}
-          <GradientBox 
-            sx={{ mb: 4 }}
-            colorStart="#4facfe"
-            colorEnd="#00f2fe"
-          >
+          <StyledCard sx={{ mb: 4, p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
                   Offer Sources
                 </Typography>
-                <Typography variant="body1">
+                <Typography variant="body2" color="text.secondary">
                   Manage your traffic sources, postbacks and conversions
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button 
-                  variant="contained" 
-                  color="inherit"
+                  variant="outlined" 
                   startIcon={<RefreshIcon />}
                   onClick={fetchOfferSources}
                   disabled={loading}
-                  sx={{ 
-                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                    color: theme.palette.primary.main,
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 1)',
-                    }
-                  }}
+                  sx={{ textTransform: 'none' }}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
                 </Button>
-                <GradientButton
+                <Button
+                  variant="contained"
                   startIcon={<AddIcon />}
-                  colorStart="#FF416C"
-                  colorEnd="#FF4B2B"
+                  color="primary"
+                  sx={{ textTransform: 'none' }}
                   onClick={() => {
                     setOpenTemplateModal(true);
                     setEditMode(false);
@@ -957,7 +922,7 @@ const OfferSourcePage = () => {
                   }}
                 >
                   Add New Source
-                </GradientButton>
+                </Button>
               </Box>
             </Box>
 
@@ -968,31 +933,18 @@ const OfferSourcePage = () => {
                   elevation={0}
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(5px)', 
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     borderRadius: 2,
-                    transition: 'transform 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                    }
+                    textAlign: 'center'
                   }}
                 >
-                  <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                    <Badge 
-                      badgeContent={rows.length} 
-                      color="primary"
-                      sx={{ 
-                        '& .MuiBadge-badge': {
-                          fontSize: '0.9rem',
-                          height: '1.5rem',
-                          minWidth: '1.5rem',
-                        }
-                      }}
-                    >
-                      <Box sx={{ mr: 2 }}>Sources</Box>
-                    </Badge>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Sources
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="h6">
+                    {rows.length}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
                     {rows.filter(row => row.is_active).length} active
                   </Typography>
                 </Paper>
@@ -1002,20 +954,15 @@ const OfferSourcePage = () => {
                   elevation={0}
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(5px)', 
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     borderRadius: 2,
-                    transition: 'transform 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                    }
+                    textAlign: 'center'
                   }}
                 >
-                  <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                    <ShowChartIcon sx={{ mr: 1 }} /> 
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                     Conversions
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  <Typography variant="h6">
                     {rows.reduce((total, row) => total + (row.conversion || 0), 0).toLocaleString()}
                   </Typography>
                 </Paper>
@@ -1025,17 +972,15 @@ const OfferSourcePage = () => {
                   elevation={0}
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(5px)', 
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     borderRadius: 2,
-                    transition: 'transform 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                    }
+                    textAlign: 'center'
                   }}
                 >
-                  <Typography variant="h6" sx={{ mb: 1 }}>Revenue</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Revenue
+                  </Typography>
+                  <Typography variant="h6">
                     ${rows.reduce((total, row) => total + (row.total_revenue || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </Typography>
                 </Paper>
@@ -1045,20 +990,17 @@ const OfferSourcePage = () => {
                   elevation={0}
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(5px)', 
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     borderRadius: 2,
-                    transition: 'transform 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                    }
+                    textAlign: 'center'
                   }}
                 >
-                  <Typography variant="h6" sx={{ mb: 1 }}>Profit</Typography>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Profit
+                  </Typography>
                   <Typography 
-                    variant="h4" 
+                    variant="h6" 
                     sx={{ 
-                      fontWeight: 700,
                       color: rows.reduce((total, row) => total + (row.profit || 0), 0) >= 0 ? 
                         theme.palette.success.main : theme.palette.error.main
                     }}
@@ -1068,7 +1010,7 @@ const OfferSourcePage = () => {
                 </Paper>
               </Grid>
             </Grid>
-          </GradientBox>
+          </StyledCard>
 
           {/* Filter Controls */}
           <StyledCard sx={{ mb: 4 }}>
@@ -1092,19 +1034,22 @@ const OfferSourcePage = () => {
                   startIcon={<FilterListIcon />}
                   sx={{ 
                     borderRadius: 2,
-                    height: 56
+                    height: 48,
+                    textTransform: 'none'
                   }}
                 >
                   Filters
                 </Button>
                 
                 {/* Apply button */}
-                <GradientButton
+                <Button
+                  variant="contained"
+                  color="primary"
                   onClick={() => fetchOfferSources()}
-                  sx={{ height: 56 }}
+                  sx={{ height: 48, textTransform: 'none' }}
                 >
                   Apply
-                </GradientButton>
+                </Button>
               </Box>
             </CardContent>
           </StyledCard>
@@ -1125,7 +1070,6 @@ const OfferSourcePage = () => {
                     justifyContent: 'center',
                     bgcolor: 'rgba(255, 255, 255, 0.8)',
                     zIndex: 10,
-                    backdropFilter: 'blur(4px)',
                   }}
                 >
                   <CircularProgress />
@@ -1150,33 +1094,27 @@ const OfferSourcePage = () => {
                         p: 5
                       }}
                     >
-                      <img 
-                        src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
-                        alt="No sources" 
-                        style={{ width: 100, height: 100, marginBottom: 24, opacity: 0.5 }}
-                      />
+                      <LinkIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
                       <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
                         No Traffic Sources Found
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center', maxWidth: 400 }}>
                         Add your first traffic source to start tracking your campaigns and conversions
                       </Typography>
-                      <GradientButton
+                      <Button
+                        variant="contained"
+                        color="primary"
                         startIcon={<AddIcon />}
                         onClick={() => {
                           setOpenTemplateModal(true);
                           setEditMode(false);
                         }}
+                        sx={{ textTransform: 'none' }}
                       >
                         Add Your First Source
-                      </GradientButton>
+                      </Button>
                     </Box>
                   ),
-                }}
-                sx={{
-                  '& .MuiDataGrid-virtualScroller': {
-                    overflowX: 'hidden',
-                  }
                 }}
               />
             </Box>
@@ -1190,8 +1128,8 @@ const OfferSourcePage = () => {
           closeAfterTransition
         >
           <ModalContainer>
-            <Box sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            <Box sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3 }}>
+              <Typography variant="h6">
                 {editMode ? "Edit Offer Source" : "Add New Source"}
               </Typography>
               <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
@@ -1205,13 +1143,6 @@ const OfferSourcePage = () => {
                   value={tabValue} 
                   onChange={handleTabChange}
                   variant="fullWidth"
-                  TabIndicatorProps={{
-                    style: {
-                      height: 3,
-                      borderRadius: '3px',
-                      background: 'linear-gradient(to right, #4facfe 0%, #00f2fe 100%)',
-                    }
-                  }}
                 >
                   <StyledTab 
                     label="Basic Details" 
@@ -1230,7 +1161,7 @@ const OfferSourcePage = () => {
               <TabPanel value={tabValue} index={0}>
                 <StyledCard sx={{ mb: 3 }}>
                   <CardContent>
-                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 3 }}>
                       Source Information
                     </Typography>
                     <Grid container spacing={3}>
@@ -1247,9 +1178,6 @@ const OfferSourcePage = () => {
                               alias: value.toLowerCase().replace(/\s+/g, "-"),
                             });
                           }}
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -1258,9 +1186,6 @@ const OfferSourcePage = () => {
                           label="Alias"
                           value={newTemplate.alias}
                           disabled
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -1270,7 +1195,6 @@ const OfferSourcePage = () => {
                             value={newTemplate.sourceType}
                             onChange={handleSourceTypeChange}
                             label="Source Type"
-                            sx={{ borderRadius: 2 }}
                           >
                             <MenuItem value="" disabled>Select Source Type</MenuItem>
                             {source_types.map((type) => (
@@ -1304,7 +1228,6 @@ const OfferSourcePage = () => {
                             setNewTemplate({ ...newTemplate, currency: e.target.value })
                           }
                           label="Currency"
-                          sx={{ borderRadius: 2 }}
                         >
                           <MenuItem value="" disabled>Select Currency</MenuItem>
                           {currencies.map((currency) => (
@@ -1325,14 +1248,11 @@ const OfferSourcePage = () => {
                           setNewTemplate({ ...newTemplate, offerUrl: e.target.value })
                         }
                         helperText="Template for generating tracking links (optional)"
-                        InputProps={{
-                          sx: { borderRadius: 2 }
-                        }}
                       />
                     </Box>
                     
                     <Box sx={{ mt: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom>
+                      <Typography variant="subtitle2" gutterBottom>
                         Status
                       </Typography>
                       <Paper sx={{ p: 2, borderRadius: 2 }}>
@@ -1344,21 +1264,17 @@ const OfferSourcePage = () => {
                               color="primary"
                             />
                           }
-                          label={
-                            <Typography sx={{ fontWeight: newTemplate.is_active ? 600 : 400 }}>
-                              {newTemplate.is_active ? "Active" : "Inactive"}
-                            </Typography>
-                          }
+                          label={newTemplate.is_active ? "Active" : "Inactive"}
                         />
                       </Paper>
                     </Box>
                   </CardContent>
                 </StyledCard>
 
-                {/* Postback Parameters - Enhanced for RedTrack */}
+                {/* Postback Parameters */}
                 <StyledCard sx={{ mb: 3 }}>
                   <CardContent>
-                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 3 }}>
                       Postback Parameters
                     </Typography>
                     <Grid container spacing={3}>
@@ -1371,9 +1287,6 @@ const OfferSourcePage = () => {
                             setNewTemplate({ ...newTemplate, clickid: e.target.value })
                           }
                           helperText="Parameter name for tracking clicks (default: click_id)"
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -1385,9 +1298,6 @@ const OfferSourcePage = () => {
                             setNewTemplate({ ...newTemplate, sum: e.target.value })
                           }
                           helperText="Parameter name for payout value (default: payout)"
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                     </Grid>
@@ -1397,7 +1307,7 @@ const OfferSourcePage = () => {
                 {/* Additional Parameters */}
                 <StyledCard>
                   <CardContent>
-                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 3 }}>
                       Additional Parameters
                     </Typography>
                     <Grid container spacing={3}>
@@ -1409,9 +1319,6 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, parameter: e.target.value })
                           }
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1422,9 +1329,6 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, token: e.target.value })
                           }
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1435,9 +1339,6 @@ const OfferSourcePage = () => {
                           onChange={(e) =>
                             setNewTemplate({ ...newTemplate, description: e.target.value })
                           }
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12}>
@@ -1449,7 +1350,6 @@ const OfferSourcePage = () => {
                               setNewTemplate({ ...newTemplate, role: e.target.value })
                             }
                             label="Role"
-                            sx={{ borderRadius: 2 }}
                           >
                             <MenuItem value="" disabled>Select Role</MenuItem>
                             {roles.map((role) => (
@@ -1465,11 +1365,11 @@ const OfferSourcePage = () => {
                 </StyledCard>
               </TabPanel>
 
-              {/* Tab 2: Postback URL Editor - Enhanced for RedTrack */}
+              {/* Tab 2: Postback URL Editor */}
               <TabPanel value={tabValue} index={1}>
                 <StyledCard>
                   <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 2 }}>
                       Postback URL Configuration
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -1481,7 +1381,7 @@ const OfferSourcePage = () => {
                       sx={{ 
                         p: 2, 
                         mb: 3, 
-                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        bgcolor: alpha(theme.palette.primary.main, 0.04),
                         borderRadius: 2
                       }}
                     >
@@ -1496,24 +1396,23 @@ const OfferSourcePage = () => {
                           sx={{ mr: 1 }}
                           InputProps={{
                             sx: { 
-                              borderRadius: 2,
                               fontFamily: 'monospace',
-                              fontSize: '0.9rem'
+                              fontSize: '0.8rem'
                             }
                           }}
                         />
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                          <AnimatedIconButton onClick={handleCopyPostback} title="Copy URL">
+                          <SimpleIconButton onClick={handleCopyPostback} title="Copy URL">
                             <ContentCopyIcon />
-                          </AnimatedIconButton>
-                          <AnimatedIconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
+                          </SimpleIconButton>
+                          <SimpleIconButton onClick={handleGeneratePostbackTemplate} title="Generate Template">
                             <HelpOutlineIcon />
-                          </AnimatedIconButton>
+                          </SimpleIconButton>
                         </Box>
                       </Box>
                     </Paper>
                     
-                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>
                       Available Parameters
                     </Typography>
                     
@@ -1523,21 +1422,16 @@ const OfferSourcePage = () => {
                           key={key}
                           label={value}
                           onClick={() => handleInsertMacro(value)}
+                          size="small"
                           sx={{ 
-                            borderRadius: 2,
                             fontFamily: 'monospace',
-                            fontWeight: 500,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                            '&:hover': {
-                              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                            }
                           }}
                           clickable
                         />
                       ))}
                     </Box>
                     
-                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>
                       Example Preview
                     </Typography>
                     
@@ -1555,6 +1449,7 @@ const OfferSourcePage = () => {
                         sx={{ 
                           fontFamily: 'monospace',
                           wordBreak: 'break-all',
+                          fontSize: '0.8rem',
                           color: theme.palette.text.secondary
                         }}
                       >
@@ -1572,7 +1467,7 @@ const OfferSourcePage = () => {
                         p: 2, 
                         bgcolor: alpha(theme.palette.warning.main, 0.05), 
                         borderRadius: 2,
-                        borderLeft: `4px solid ${theme.palette.warning.main}`
+                        borderLeft: `3px solid ${theme.palette.warning.main}`
                       }}
                     >
                       <Typography variant="body2" color="text.secondary">
@@ -1590,17 +1485,19 @@ const OfferSourcePage = () => {
                 <Button 
                   variant="outlined"
                   onClick={() => setOpenTemplateModal(false)} 
-                  sx={{ mr: 2, borderRadius: 2, px: 3 }}
+                  sx={{ mr: 2, textTransform: 'none' }}
                 >
                   Cancel
                 </Button>
-                <GradientButton 
+                <Button
+                  variant="contained"
+                  color="primary"
                   onClick={handleSaveTemplate}
                   endIcon={editMode ? <EditIcon /> : <AddIcon />}
-                  sx={{ px: 3 }}
+                  sx={{ textTransform: 'none' }}
                 >
                   {editMode ? "Save Changes" : "Create Source"}
-                </GradientButton>
+                </Button>
               </Box>
             </Box>
           </ModalContainer>
@@ -1613,12 +1510,12 @@ const OfferSourcePage = () => {
           closeAfterTransition
         >
           <ModalContainer sx={{ width: '800px' }}>
-            <Box sx={{ bgcolor: theme.palette.warning.main, color: 'white', p: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ bgcolor: theme.palette.warning.main, color: 'white', p: 3 }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
                 <VisibilityIcon sx={{ mr: 1.5 }} /> Test Postback URL
               </Typography>
               {selectedSource && (
-                <Typography variant="body1" sx={{ mt: 1, opacity: 0.9 }}>
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
                   {selectedSource.source_name} ({selectedSource.source_type})
                 </Typography>
               )}
@@ -1626,7 +1523,7 @@ const OfferSourcePage = () => {
             
             {selectedSource && (
               <Box sx={{ p: 3 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Postback URL Template:
                 </Typography>
                 <Paper 
@@ -1642,14 +1539,15 @@ const OfferSourcePage = () => {
                     variant="body2" 
                     sx={{ 
                       fontFamily: 'monospace',
-                      wordBreak: 'break-all'
+                      wordBreak: 'break-all',
+                      fontSize: '0.8rem'
                     }}
                   >
                     {selectedSource.postback || 'No postback URL configured'}
                   </Typography>
                 </Paper>
                 
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                <Typography variant="subtitle2" sx={{ mb: 2 }}>
                   Test Parameters:
                 </Typography>
                 
@@ -1663,9 +1561,6 @@ const OfferSourcePage = () => {
                           name="click_id"
                           value={testPostbackData.click_id}
                           onChange={handleTestDataChange}
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} sm={6}>
@@ -1675,9 +1570,6 @@ const OfferSourcePage = () => {
                           name="payout"
                           value={testPostbackData.payout}
                           onChange={handleTestDataChange}
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                       <Grid item xs={12} sm={6}>
@@ -1688,7 +1580,6 @@ const OfferSourcePage = () => {
                             value={testPostbackData.status}
                             onChange={handleTestDataChange}
                             label="Status"
-                            sx={{ borderRadius: 2 }}
                           >
                             <MenuItem value="approved">Approved</MenuItem>
                             <MenuItem value="pending">Pending</MenuItem>
@@ -1703,9 +1594,6 @@ const OfferSourcePage = () => {
                           name="revenue"
                           value={testPostbackData.revenue}
                           onChange={handleTestDataChange}
-                          InputProps={{
-                            sx: { borderRadius: 2 }
-                          }}
                         />
                       </Grid>
                     </Grid>
@@ -1717,27 +1605,27 @@ const OfferSourcePage = () => {
                     variant="outlined"
                     onClick={handleGenerateTestUrl}
                     disabled={!selectedSource.postback}
-                    sx={{ borderRadius: 2, px: 3 }}
                     startIcon={<CodeIcon />}
+                    sx={{ textTransform: 'none' }}
                   >
                     Generate Test URL
                   </Button>
-                  <GradientButton
+                  <Button
+                    variant="contained"
+                    color="warning"
                     onClick={handleTestPostback}
                     disabled={!selectedSource.postback || isTesting}
-                    colorStart="#f5af19"
-                    colorEnd="#f12711"
                     endIcon={<SendIcon />}
-                    sx={{ px: 3 }}
+                    sx={{ textTransform: 'none' }}
                   >
                     {isTesting ? 'Testing...' : 'Send Test Postback'}
-                  </GradientButton>
+                  </Button>
                 </Box>
                 
                 {processedUrl && (
                   <StyledCard sx={{ mb: 3 }}>
                     <CardContent>
-                      <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         Generated URL:
                       </Typography>
                       <Box sx={{ position: 'relative' }}>
@@ -1749,15 +1637,14 @@ const OfferSourcePage = () => {
                           InputProps={{
                             readOnly: true,
                             sx: { 
-                              borderRadius: 2,
                               fontFamily: 'monospace',
-                              fontSize: '0.85rem',
+                              fontSize: '0.75rem',
                               pr: 5
                             }
                           }}
                         />
                         <Box sx={{ position: 'absolute', right: 8, top: 8 }}>
-                          <AnimatedIconButton
+                          <SimpleIconButton
                             onClick={() => {
                               navigator.clipboard.writeText(processedUrl);
                               setSnackbar({
@@ -1769,7 +1656,7 @@ const OfferSourcePage = () => {
                             title="Copy URL"
                           >
                             <ContentCopyIcon />
-                          </AnimatedIconButton>
+                          </SimpleIconButton>
                         </Box>
                       </Box>
                     </CardContent>
@@ -1781,13 +1668,13 @@ const OfferSourcePage = () => {
                     elevation={0}
                     sx={{ 
                       p: 3, 
-                      bgcolor: testResult.success ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                      bgcolor: testResult.success ? alpha(theme.palette.success.main, 0.05) : alpha(theme.palette.error.main, 0.05),
                       borderRadius: 2,
-                      borderLeft: `4px solid ${testResult.success ? theme.palette.success.main : theme.palette.error.main}`,
+                      borderLeft: `3px solid ${testResult.success ? theme.palette.success.main : theme.palette.error.main}`,
                       mb: 3
                     }}
                   >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
                       {testResult.success ? 
                         <><CheckCircleIcon sx={{ mr: 1, color: theme.palette.success.main }} /> Test Successful</> : 
                         <><CancelIcon sx={{ mr: 1, color: theme.palette.error.main }} /> Test Failed</>
@@ -1813,7 +1700,8 @@ const OfferSourcePage = () => {
                             variant="body2" 
                             sx={{ 
                               fontFamily: 'monospace',
-                              whiteSpace: 'pre-wrap'
+                              whiteSpace: 'pre-wrap',
+                              fontSize: '0.75rem'
                             }}
                           >
                             {JSON.stringify(testResult.data, null, 2)}
@@ -1828,7 +1716,7 @@ const OfferSourcePage = () => {
                   <Button 
                     variant="outlined"
                     onClick={handleClosePostbackTest}
-                    sx={{ borderRadius: 2, px: 3 }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Close
                   </Button>
@@ -1852,13 +1740,13 @@ const OfferSourcePage = () => {
               transform: "translate(-50%, -50%)",
               width: "400px",
               bgcolor: "background.paper",
-              boxShadow: '0 24px 40px rgba(0, 0, 0, 0.2)',
-              borderRadius: 4,
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
+              borderRadius: 2,
               overflow: 'hidden',
             }}
           >
             <Box sx={{ bgcolor: theme.palette.error.main, color: 'white', p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
                 <DeleteIcon sx={{ mr: 1.5 }} /> Confirm Deletion
               </Typography>
             </Box>
@@ -1871,7 +1759,7 @@ const OfferSourcePage = () => {
                 <Button 
                   variant="outlined"
                   onClick={() => setDeleteConfirmOpen(false)} 
-                  sx={{ mr: 2, borderRadius: 2 }}
+                  sx={{ mr: 2, textTransform: 'none' }}
                 >
                   Cancel
                 </Button>
@@ -1880,7 +1768,7 @@ const OfferSourcePage = () => {
                   color="error" 
                   onClick={handleConfirmDelete}
                   startIcon={<DeleteIcon />}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ textTransform: 'none' }}
                 >
                   Delete
                 </Button>
@@ -1899,12 +1787,7 @@ const OfferSourcePage = () => {
           <Alert 
             onClose={handleCloseSnackbar} 
             severity={snackbar.severity}
-            sx={{ 
-              width: '100%',
-              borderRadius: 2,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            }}
-            variant="filled"
+            sx={{ width: '100%' }}
           >
             {snackbar.message}
           </Alert>
