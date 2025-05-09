@@ -1376,21 +1376,7 @@ const LandingPage = () => {
                   <Typography variant="button" fontWeight={currentTab === 0 ? 600 : 400}>All Landers</Typography>
                 </Badge>
               } 
-            />
-            <Tab 
-              label={
-                <Badge badgeContent={landers.filter(l => l.profit > 0).length} color="success" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
-                  <Typography variant="button" fontWeight={currentTab === 1 ? 600 : 400}>Profitable</Typography>
-                </Badge>
-              }
-            />
-            <Tab 
-              label={
-                <Badge badgeContent={landers.filter(l => l.profit <= 0).length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
-                  <Typography variant="button" fontWeight={currentTab === 2 ? 600 : 400}>Unprofitable</Typography>
-                </Badge>
-              }
-            />
+              />
           </Tabs>
           
           <Box display="flex" gap={2}>
