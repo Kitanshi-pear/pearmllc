@@ -1165,7 +1165,7 @@ const LandingPage = () => {
               width: '100%'
             }}
           >
-            {params.value}
+            {params.value == landerData.url ? params.value : 'URL not available'}
           </Typography>
         );
       } 
