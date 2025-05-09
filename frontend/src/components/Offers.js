@@ -87,6 +87,8 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     padding: '12px 16px',
     fontSize: '0.875rem',
     borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+    display: 'flex',
+    justifyContent: 'center', /* Center all cell content */
   },
   '& .MuiDataGrid-row': {
     cursor: 'pointer',
@@ -187,6 +189,14 @@ const ElegantTab = styled(Tab)(({ theme }) => ({
   '&.Mui-selected': {
     fontWeight: 600,
   },
+}));
+
+// Cell container for centered content in DataGrid
+const CenteredCellContainer = styled(Box)(({ theme }) => ({
+  width: '100%',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
 }));
 
 const TabPanel = (props) => {
@@ -488,7 +498,7 @@ const OffersPage = () => {
         setSnackbar({ ...snackbar, open: false });
     };
 
-    // Enhanced columns for DataGrid with elegant styling
+    // Enhanced columns for DataGrid with center alignment for all columns
     const columns = [
         { 
             field: 'serial_no', 
@@ -501,44 +511,52 @@ const OffersPage = () => {
             field: 'offers_name', 
             headerName: 'Offer Name', 
             width: 220,
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => (
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Avatar 
-                        sx={{ 
-                            width: 28, 
-                            height: 28, 
-                            mr: 1.5,
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                            color: theme.palette.primary.main,
-                            fontSize: '0.875rem',
-                            fontWeight: 500
-                        }}
-                    >
-                        {params.value.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3 }}>
-                            {params.value}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            ID: {params.row.id}
-                        </Typography>
+                <CenteredCellContainer>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar 
+                            sx={{ 
+                                width: 28, 
+                                height: 28, 
+                                mr: 1.5,
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                color: theme.palette.primary.main,
+                                fontSize: '0.875rem',
+                                fontWeight: 500
+                            }}
+                        >
+                            {params.value.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, textAlign: 'center' }}>
+                                {params.value}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                                ID: {params.row.id}
+                            </Typography>
+                        </Box>
                     </Box>
-                </Box>
+                </CenteredCellContainer>
             )
         },
         { 
             field: 'offer_status', 
             headerName: 'Status', 
             width: 100,
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const isActive = params.value?.toLowerCase() === 'active';
                 return (
-                    <StatusChip
-                        label={params.value || 'Unknown'}
-                        status={isActive ? 'active' : 'inactive'}
-                        size="small"
-                    />
+                    <CenteredCellContainer>
+                        <StatusChip
+                            label={params.value || 'Unknown'}
+                            status={isActive ? 'active' : 'inactive'}
+                            size="small"
+                        />
+                    </CenteredCellContainer>
                 );
             }
         },
@@ -546,31 +564,37 @@ const OffersPage = () => {
             field: 'source', 
             headerName: 'Source', 
             width: 120,
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => (
-                <Chip
-                    icon={getSourceIcon(params.value)}
-                    label={params.value || 'Unknown'}
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                        height: 24,
-                        fontSize: '0.75rem',
-                        borderRadius: 4,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-                        backgroundColor: 'transparent',
-                        '& .MuiChip-icon': {
-                            mr: 0.5
-                        }
-                    }}
-                />
+                <CenteredCellContainer>
+                    <Chip
+                        icon={getSourceIcon(params.value)}
+                        label={params.value || 'Unknown'}
+                        variant="outlined"
+                        size="small"
+                        sx={{ 
+                            height: 24,
+                            fontSize: '0.75rem',
+                            borderRadius: 4,
+                            border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                            backgroundColor: 'transparent',
+                            '& .MuiChip-icon': {
+                                mr: 0.5
+                            }
+                        }}
+                    />
+                </CenteredCellContainer>
             )
         },
         { 
             field: 'postbackUrl', 
             headerName: 'Postback', 
             width: 90,
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => (
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <CenteredCellContainer>
                     {params.value ? (
                         <Tooltip title="Test Postback">
                             <SubtleIconButton 
@@ -586,7 +610,7 @@ const OffersPage = () => {
                     ) : (
                         <Typography variant="body2" color="text.secondary">None</Typography>
                     )}
-                </Box>
+                </CenteredCellContainer>
             ),
         },
         { 
@@ -594,12 +618,14 @@ const OffersPage = () => {
             headerName: 'Clicks', 
             width: 80, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => (
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {params.value?.toLocaleString() || 0}
-                </Typography>
+                <CenteredCellContainer>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {params.value?.toLocaleString() || 0}
+                    </Typography>
+                </CenteredCellContainer>
             )
         },
         { 
@@ -607,12 +633,14 @@ const OffersPage = () => {
             headerName: 'Conv.', 
             width: 80, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => (
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {params.value?.toLocaleString() || 0}
-                </Typography>
+                <CenteredCellContainer>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {params.value?.toLocaleString() || 0}
+                    </Typography>
+                </CenteredCellContainer>
             )
         },
         { 
@@ -620,17 +648,19 @@ const OffersPage = () => {
             headerName: 'CPA ($)', 
             width: 100, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const value = params.value || 0;
                 return (
-                    <Typography variant="body2" sx={{ 
-                        fontWeight: 500,
-                        color: value > 10 ? theme.palette.error.main : theme.palette.success.main 
-                    }}>
-                        ${value.toFixed(2)}
-                    </Typography>
+                    <CenteredCellContainer>
+                        <Typography variant="body2" sx={{ 
+                            fontWeight: 500,
+                            color: value > 10 ? theme.palette.error.main : theme.palette.success.main 
+                        }}>
+                            ${value.toFixed(2)}
+                        </Typography>
+                    </CenteredCellContainer>
                 );
             }
         },
@@ -639,17 +669,19 @@ const OffersPage = () => {
             headerName: 'EPC ($)', 
             width: 100, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const value = params.value || 0;
                 return (
-                    <Typography variant="body2" sx={{ 
-                        fontWeight: 500,
-                        color: value > 0.5 ? theme.palette.success.main : theme.palette.text.primary 
-                    }}>
-                        ${value.toFixed(2)}
-                    </Typography>
+                    <CenteredCellContainer>
+                        <Typography variant="body2" sx={{ 
+                            fontWeight: 500,
+                            color: value > 0.5 ? theme.palette.success.main : theme.palette.text.primary 
+                        }}>
+                            ${value.toFixed(2)}
+                        </Typography>
+                    </CenteredCellContainer>
                 );
             }
         },
@@ -658,14 +690,16 @@ const OffersPage = () => {
             headerName: 'Revenue', 
             width: 110, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const value = params.value || 0;
                 return (
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        ${value.toFixed(2)}
-                    </Typography>
+                    <CenteredCellContainer>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            ${value.toFixed(2)}
+                        </Typography>
+                    </CenteredCellContainer>
                 );
             }
         },
@@ -674,24 +708,26 @@ const OffersPage = () => {
             headerName: 'Profit', 
             width: 110, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const value = params.value || 0;
                 const isPositive = value >= 0;
                 return (
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {isPositive ? 
-                            <ArrowUpwardIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5, fontSize: '1rem' }} /> :
-                            <ArrowDownwardIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5, fontSize: '1rem' }} />
-                        }
-                        <Typography variant="body2" sx={{ 
-                            fontWeight: 500,
-                            color: isPositive ? theme.palette.success.main : theme.palette.error.main
-                        }}>
-                            ${Math.abs(value).toFixed(2)}
-                        </Typography>
-                    </Box>
+                    <CenteredCellContainer>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {isPositive ? 
+                                <ArrowUpwardIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5, fontSize: '1rem' }} /> :
+                                <ArrowDownwardIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5, fontSize: '1rem' }} />
+                            }
+                            <Typography variant="body2" sx={{ 
+                                fontWeight: 500,
+                                color: isPositive ? theme.palette.success.main : theme.palette.error.main
+                            }}>
+                                ${Math.abs(value).toFixed(2)}
+                            </Typography>
+                        </Box>
+                    </CenteredCellContainer>
                 );
             }
         },
@@ -700,30 +736,32 @@ const OffersPage = () => {
             headerName: 'ROI', 
             width: 100, 
             type: 'number',
-            align: 'right',
-            headerAlign: 'right',
+            align: 'center',
+            headerAlign: 'center',
             renderCell: (params) => {
                 const value = params.value || 0;
                 const isPositive = value >= 0;
                 return (
-                    <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 4,
-                        backgroundColor: isPositive ? 
-                            alpha(theme.palette.success.main, 0.1) : 
-                            alpha(theme.palette.error.main, 0.1),
-                    }}>
-                        <Typography variant="body2" sx={{ 
-                            fontWeight: 500,
-                            color: isPositive ? theme.palette.success.main : theme.palette.error.main
+                    <CenteredCellContainer>
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 4,
+                            backgroundColor: isPositive ? 
+                                alpha(theme.palette.success.main, 0.1) : 
+                                alpha(theme.palette.error.main, 0.1),
                         }}>
-                            {value.toFixed(2)}%
-                        </Typography>
-                    </Box>
+                            <Typography variant="body2" sx={{ 
+                                fontWeight: 500,
+                                color: isPositive ? theme.palette.success.main : theme.palette.error.main
+                            }}>
+                                {value.toFixed(2)}%
+                            </Typography>
+                        </Box>
+                    </CenteredCellContainer>
                 );
             }
         }
@@ -903,10 +941,10 @@ const OffersPage = () => {
                         <Grid container spacing={3} sx={{ mt: 3 }}>
                             <Grid item xs={12} md={2.4}>
                                 <StatCard>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center' }}>
                                         Total Offers
                                     </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
                                         <Typography variant="h5" sx={{ fontWeight: 500 }}>
                                             {stats.totalOffers}
                                         </Typography>
@@ -918,30 +956,30 @@ const OffersPage = () => {
                             </Grid>
                             <Grid item xs={12} md={2.4}>
                                 <StatCard>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center' }}>
                                         Total Clicks
                                     </Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 500, textAlign: 'center' }}>
                                         {offers.reduce((sum, o) => sum + (o.clicks || 0), 0).toLocaleString()}
                                     </Typography>
                                 </StatCard>
                             </Grid>
                             <Grid item xs={12} md={2.4}>
                                 <StatCard>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center' }}>
                                         Conversions
                                     </Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 500, textAlign: 'center' }}>
                                         {stats.totalConversions.toLocaleString()}
                                     </Typography>
                                 </StatCard>
                             </Grid>
                             <Grid item xs={12} md={2.4}>
                                 <StatCard>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center' }}>
                                         Total Revenue
                                     </Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 500, textAlign: 'center' }}>
                                         ${stats.totalRevenue.toLocaleString(undefined, {
                                             minimumFractionDigits: 2,
                                             maximumFractionDigits: 2
@@ -951,13 +989,14 @@ const OffersPage = () => {
                             </Grid>
                             <Grid item xs={12} md={2.4}>
                                 <StatCard>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center' }}>
                                         Total Profit
                                     </Typography>
                                     <Typography variant="h5" sx={{ 
                                         fontWeight: 500, 
                                         color: stats.totalProfit >= 0 ? 
-                                            theme.palette.success.main : theme.palette.error.main
+                                            theme.palette.success.main : theme.palette.error.main,
+                                        textAlign: 'center'
                                     }}>
                                         ${stats.totalProfit.toLocaleString(undefined, {
                                             minimumFractionDigits: 2,
