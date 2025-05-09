@@ -4,7 +4,7 @@ import axios from 'axios';
 import './AdminPanel.css';
 
 // API base URL
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://pearmllc.onrender.com';
 
 // Set up axios with token interceptor
 const setupAxiosInterceptors = (token) => {
