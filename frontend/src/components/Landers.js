@@ -1,19 +1,228 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box, CircularProgress, Typography, Button, Select, Dialog,
-  DialogTitle, DialogContent, DialogActions, FormControl, InputLabel,
-  Chip, MenuItem, TextField, Card, CardContent, Grid
+  Box, 
+  CircularProgress, 
+  Typography, 
+  Button, 
+  Select, 
+  Dialog,
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  FormControl, 
+  InputLabel,
+  Chip, 
+  MenuItem, 
+  TextField, 
+  Card, 
+  CardContent, 
+  Grid,
+  IconButton,
+  Paper,
+  Divider,
+  alpha,
+  useTheme,
+  Stack,
+  Tooltip,
+  InputAdornment,
+  Fade,
+  Tabs,
+  Tab,
+  Badge,
+  styled
 } from "@mui/material";
 import { DataGrid } from '@mui/x-data-grid';
 import Layout from "./Layout";
+
+// Icons
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DatePicker from '@mui/lab/DatePicker';
-import AdapterDateFns from '@mui/lab/AdapterDateFns';
-import LocalizationProvider from '@mui/lab/LocalizationProvider';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import AddIcon from '@mui/icons-material/Add';
+import DownloadIcon from '@mui/icons-material/Download';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LinkIcon from '@mui/icons-material/Link';
+import TagIcon from '@mui/icons-material/Tag';
+import DescriptionIcon from '@mui/icons-material/Description';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import MouseIcon from '@mui/icons-material/Mouse';
+import CodeIcon from '@mui/icons-material/Code';
+import PeopleIcon from '@mui/icons-material/People';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+
+// Date picker components
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+// Styled components
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 12,
+  boxShadow: '0 2px 12px 0 rgba(0,0,0,0.05)',
+  overflow: 'visible',
+  border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    boxShadow: '0 4px 18px 0 rgba(0,0,0,0.07)',
+  },
+}));
+
+const MetricCard = styled(Paper)(({ theme, color = 'primary' }) => ({
+  borderRadius: 12,
+  padding: theme.spacing(2),
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  position: 'relative',
+  overflow: 'hidden',
+  boxShadow: 'none',
+  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 4,
+    height: '100%',
+    backgroundColor: theme.palette[color].main,
+  }
+}));
+
+const MetricIcon = styled(Box)(({ theme, color = 'primary' }) => ({
+  width: 40,
+  height: 40,
+  borderRadius: 8,
+  backgroundColor: alpha(theme.palette[color].main, 0.1),
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: theme.palette[color].main
+}));
+
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+  border: 'none',
+  '& .MuiDataGrid-main': {
+    borderRadius: 12,
+    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+    overflow: 'hidden'
+  },
+  '& .MuiDataGrid-columnHeaders': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.02),
+    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  },
+  '& .MuiDataGrid-columnHeader': {
+    fontWeight: 600,
+  },
+  '& .MuiDataGrid-columnHeaderTitle': {
+    fontWeight: 600,
+    fontSize: '0.875rem',
+  },
+  '& .MuiDataGrid-row': {
+    '&:nth-of-type(even)': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.01),
+    },
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.04),
+    },
+    '&.Mui-selected': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+      },
+    },
+  },
+  '& .MuiDataGrid-cell': {
+    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.05)}`,
+    fontSize: '0.875rem',
+  },
+  '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
+    outline: 'none',
+  },
+  '& .MuiDataGrid-footerContainer': {
+    borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  },
+}));
+
+const ActionButton = styled(Button)(({ theme, variant = 'contained', color = 'primary' }) => ({
+  textTransform: 'none',
+  fontWeight: 500,
+  borderRadius: 8,
+  boxShadow: 'none',
+  padding: theme.spacing(0.75, 2),
+  ...(variant === 'contained' && {
+    '&:hover': {
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.07)',
+    },
+  }),
+}));
+
+const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: theme.spacing(2, 3),
+  backgroundColor: alpha(theme.palette.primary.main, 0.03),
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  '& .MuiTypography-root': {
+    fontWeight: 600,
+  },
+}));
+
+const MacroChip = styled(Chip)(({ theme }) => ({
+  borderRadius: 6,
+  backgroundColor: alpha(theme.palette.primary.main, 0.08),
+  border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+  color: theme.palette.primary.main,
+  fontFamily: 'monospace',
+  fontSize: '0.8125rem',
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.12),
+  },
+}));
+
+const TypeSelector = styled(Box)(({ theme, selected }) => ({
+  flex: '1 0 21%',
+  margin: theme.spacing(0.5),
+  padding: theme.spacing(2),
+  textAlign: 'center',
+  backgroundColor: selected ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.divider, 0.05),
+  borderRadius: 8,
+  cursor: 'pointer',
+  border: selected ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}` : `1px solid transparent`,
+  transition: 'all 0.15s ease',
+  '&:hover': {
+    backgroundColor: selected ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.divider, 0.1),
+  },
+}));
+
+const FormSection = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+}));
+
+const FormLabel = styled(Typography)(({ theme }) => ({
+  display: 'block',
+  marginBottom: theme.spacing(1),
+  fontWeight: 600,
+  fontSize: '0.9375rem',
+  color: theme.palette.text.primary,
+}));
+
+const FormHelperText = styled(Typography)(({ theme }) => ({
+  marginTop: theme.spacing(0.75),
+  fontSize: '0.8125rem',
+  color: alpha(theme.palette.text.primary, 0.7),
+  lineHeight: 1.4,
+}));
 
 // Modal component to create a new lander
 const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) => {
+  const theme = useTheme();
   const [landerData, setLanderData] = useState({
     name: '',
     type: 'LANDING',
@@ -178,14 +387,36 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
   ];
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{landerToEdit ? 'Edit Lander' : 'Landing'}</DialogTitle>
-      <DialogContent>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="md"
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
+        }
+      }}
+    >
+      <StyledDialogTitle>
+        <Typography variant="h6">
+          {landerToEdit ? 'Edit Lander' : 'Add New Lander'}
+        </Typography>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </StyledDialogTitle>
+
+      <DialogContent sx={{ p: 3, mt: 1 }}>
         {/* Name field */}
-        <Box sx={{ mb: 3, mt: 1 }}>
-          <Typography component="label" htmlFor="name" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
-            Name *
-          </Typography>
+        <FormSection>
+          <FormLabel component="label" htmlFor="name">
+            <Box display="flex" alignItems="center">
+              <DescriptionIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Name *
+            </Box>
+          </FormLabel>
           <TextField
             id="name"
             name="name"
@@ -194,46 +425,53 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
             value={landerData.name}
             onChange={handleChange}
             required
+            placeholder="Enter lander name"
+            size="medium"
+            InputProps={{
+              sx: { borderRadius: 1.5 }
+            }}
           />
-        </Box>
+        </FormSection>
 
         {/* Landing page type selection */}
-        <Box sx={{ mb: 3 }}>
-          <Typography component="div" sx={{ mb: 1, fontWeight: 'medium' }}>
-            Type
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        <FormSection>
+          <FormLabel component="div">
+            <Box display="flex" alignItems="center">
+              <FormatListBulletedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Type
+            </Box>
+          </FormLabel>
+          <FormHelperText sx={{ mb: 1.5 }}>
             Choose the type of your landing page.
-          </Typography>
+          </FormHelperText>
+          
           <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
             {landingTypes.map((type) => (
-              <Box
+              <TypeSelector
                 key={type.value}
+                selected={landerData.type === type.value}
                 onClick={() => setLanderData({ ...landerData, type: type.value })}
-                sx={{
-                  flex: '1 0 21%',
-                  m: 0.5,
-                  p: 2,
-                  textAlign: 'center',
-                  bgcolor: landerData.type === type.value ? '#e3f2fd' : '#f5f5f5',
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  border: landerData.type === type.value ? '1px solid #90caf9' : '1px solid transparent'
-                }}
               >
-                <Typography variant="body2" fontWeight={landerData.type === type.value ? 'bold' : 'regular'}>
+                <Typography 
+                  variant="body2" 
+                  fontWeight={landerData.type === type.value ? 600 : 400}
+                  color={landerData.type === type.value ? 'primary.main' : 'text.primary'}
+                >
                   {type.label}
                 </Typography>
-              </Box>
+              </TypeSelector>
             ))}
           </Box>
-        </Box>
+        </FormSection>
 
         {/* URL field */}
-        <Box sx={{ mb: 3 }}>
-          <Typography component="label" htmlFor="url" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
-            URL *
-          </Typography>
+        <FormSection>
+          <FormLabel component="label" htmlFor="url">
+            <Box display="flex" alignItems="center">
+              <LinkIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              URL Parameters *
+            </Box>
+          </FormLabel>
           <TextField
             id="url"
             name="url"
@@ -243,38 +481,53 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
             onChange={handleChange}
             placeholder="?sub1={sub1}&sub2={sub2}"
             required
+            InputProps={{
+              sx: { borderRadius: 1.5, fontFamily: 'monospace' }
+            }}
           />
-        </Box>
+        </FormSection>
 
         {/* Macros/tokens */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
-            {allMacros.map((macro, index) => (
-              <Chip
-                key={index}
-                label={`+ ${macro}`}
-                onClick={() => handleMacroClick(macro)}
-                variant="outlined"
-                size="small"
-                sx={{ 
-                  borderRadius: 1,
-                  bgcolor: '#f5f5f5',
-                  m: 0.25,
-                  cursor: 'pointer',
-                  '&:hover': {
-                    bgcolor: '#e0e0e0',
-                  }
-                }}
-              />
-            ))}
-          </Box>
-        </Box>
+        <FormSection>
+          <FormLabel>
+            <Box display="flex" alignItems="center">
+              <CodeIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Available Macros
+            </Box>
+          </FormLabel>
+          
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              maxHeight: 180, 
+              overflowY: 'auto',
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              backgroundColor: alpha(theme.palette.background.default, 0.4)
+            }}
+          >
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+              {allMacros.map((macro, index) => (
+                <MacroChip
+                  key={index}
+                  label={macro}
+                  onClick={() => handleMacroClick(macro)}
+                  size="small"
+                />
+              ))}
+            </Box>
+          </Paper>
+        </FormSection>
 
         {/* Tracking domain */}
-        <Box sx={{ mb: 3 }}>
-          <Typography component="label" htmlFor="domain" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
-            Tracking domain *
-          </Typography>
+        <FormSection>
+          <FormLabel component="label" htmlFor="domain">
+            <Box display="flex" alignItems="center">
+              <LanguageIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Tracking Domain *
+            </Box>
+          </FormLabel>
           <FormControl fullWidth variant="outlined">
             <Select
               id="domain"
@@ -287,10 +540,15 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
                 PaperProps: {
                   style: {
                     maxHeight: 300,
+                    borderRadius: 8
                   },
                 },
               }}
+              sx={{ borderRadius: 1.5 }}
             >
+              <MenuItem disabled value="">
+                <em>Select a tracking domain</em>
+              </MenuItem>
               {domains.map((domain) => (
                 <MenuItem key={domain.id} value={domain.url}>
                   {domain.url}
@@ -298,65 +556,110 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
               ))}
             </Select>
           </FormControl>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <FormHelperText>
             We strongly advise using custom tracking domain. Tracking script and /click URL should use the same tracking domain.
             You can set-up domain in Tools &gt; Domains
-          </Typography>
-        </Box>
+          </FormHelperText>
+        </FormSection>
 
         {/* Click URL Preview */}
-        <Box sx={{ mb: 3 }}>
-          <Typography component="label" htmlFor="preview-url" sx={{ display: 'block', mb: 1, fontWeight: 'medium' }}>
-            Click URL
-          </Typography>
-          <Box sx={{ position: 'relative' }}>
-            <TextField
-              id="preview-url"
-              fullWidth
-              variant="outlined"
-              value={getPreviewUrl()}
-              InputProps={{
-                readOnly: true,
-                startAdornment: (
-                  <Box sx={{ mr: 1, color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ marginRight: 8 }}>📋</span>
-                  </Box>
-                ),
-              }}
-            />
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <FormSection>
+          <FormLabel component="label" htmlFor="preview-url">
+            <Box display="flex" alignItems="center">
+              <InfoOutlinedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Click URL
+            </Box>
+          </FormLabel>
+          
+          <TextField
+            id="preview-url"
+            fullWidth
+            variant="outlined"
+            value={getPreviewUrl()}
+            InputProps={{
+              readOnly: true,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <ContentCopyIcon color="action" fontSize="small" sx={{ cursor: 'pointer' }} />
+                </InputAdornment>
+              ),
+              sx: { 
+                borderRadius: 1.5, 
+                backgroundColor: alpha(theme.palette.background.default, 0.4),
+                fontFamily: 'monospace',
+                fontSize: '0.875rem'
+              }
+            }}
+          />
+          
+          <FormHelperText>
             Replace URL to offer (hop-link) on your landing page with tracking.domain/click URL. You can add additional parameters to 
             the URL, ex: /click?sub1=variation1 to collect additional details on landing page performance.
-          </Typography>
-        </Box>
+          </FormHelperText>
+        </FormSection>
 
         {/* Tags section */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body1" fontWeight="medium" sx={{ mb: 1 }}>
-            Tags selected:
-          </Typography>
-          {/* Tags would go here - empty in the image */}
-        </Box>
+        <FormSection>
+          <FormLabel>
+            <Box display="flex" alignItems="center">
+              <TagIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+              Tags
+            </Box>
+          </FormLabel>
+          
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 2, 
+              borderRadius: 2,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              minHeight: 60,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            {landerData.tags && landerData.tags.length > 0 ? (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {landerData.tags.map((tag, index) => (
+                  <Chip
+                    key={index}
+                    label={tag}
+                    onDelete={() => {
+                      const newTags = [...landerData.tags];
+                      newTags.splice(index, 1);
+                      setLanderData({ ...landerData, tags: newTags });
+                    }}
+                    size="small"
+                    sx={{ borderRadius: 1 }}
+                  />
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No tags selected. Tags help you organize and filter your landers.
+              </Typography>
+            )}
+          </Paper>
+        </FormSection>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button 
+      <DialogActions sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+        <ActionButton 
           variant="outlined" 
           onClick={onClose}
           sx={{ mr: 1 }}
         >
-          CLOSE
-        </Button>
-        <Button 
+          Cancel
+        </ActionButton>
+        <ActionButton 
           variant="contained" 
           color="primary" 
           onClick={handleSave}
           disabled={!landerData.name || !landerData.domain}
-          sx={{ px: 4 }}
+          startIcon={<CheckCircleIcon />}
         >
-          SAVE
-        </Button>
+          {landerToEdit ? 'Update Lander' : 'Create Lander'}
+        </ActionButton>
       </DialogActions>
     </Dialog>
   );
@@ -364,29 +667,95 @@ const LanderModal = ({ open, onClose, macros, onLanderCreated, landerToEdit }) =
 
 // Date Range Selector Component
 const DateRangeSelector = ({ startDate, endDate, onDateChange }) => {
+  const theme = useTheme();
+  
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box display="flex" gap={2}>
-        <DatePicker
-          label="Start Date"
-          value={startDate}
-          onChange={(newDate) => onDateChange('startDate', newDate)}
-          renderInput={(params) => <TextField {...params} />}
-        />
-        <DatePicker
-          label="End Date"
-          value={endDate}
-          onChange={(newDate) => onDateChange('endDate', newDate)}
-          renderInput={(params) => <TextField {...params} />}
-          minDate={startDate}
-        />
-      </Box>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 2, 
+          borderRadius: 3,
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
+        <DateRangeIcon color="action" sx={{ mr: 2 }} />
+        
+        <Box display="flex" gap={2} alignItems="center">
+          <DatePicker
+            label="Start Date"
+            value={startDate}
+            onChange={(newDate) => onDateChange('startDate', newDate)}
+            slotProps={{ 
+              textField: { 
+                size: "small",
+                sx: { width: 170 }
+              } 
+            }}
+          />
+          <Typography variant="body2" color="text.secondary">to</Typography>
+          <DatePicker
+            label="End Date"
+            value={endDate}
+            onChange={(newDate) => onDateChange('endDate', newDate)}
+            minDate={startDate}
+            slotProps={{ 
+              textField: { 
+                size: "small",
+                sx: { width: 170 }
+              } 
+            }}
+          />
+        </Box>
+        
+        <Box flexGrow={1} />
+        
+        <Stack direction="row" spacing={1}>
+          <ActionButton 
+            variant="outlined" 
+            size="small"
+            onClick={() => {
+              const today = new Date();
+              onDateChange('startDate', new Date(today.setDate(today.getDate() - 7)));
+              onDateChange('endDate', new Date());
+            }}
+          >
+            Last 7 Days
+          </ActionButton>
+          <ActionButton 
+            variant="outlined" 
+            size="small"
+            onClick={() => {
+              const today = new Date();
+              onDateChange('startDate', new Date(today.setDate(today.getDate() - 30)));
+              onDateChange('endDate', new Date());
+            }}
+          >
+            Last 30 Days
+          </ActionButton>
+          <ActionButton 
+            variant="outlined" 
+            size="small"
+            onClick={() => {
+              const today = new Date();
+              onDateChange('startDate', new Date(today.setDate(today.getDate() - 90)));
+              onDateChange('endDate', new Date());
+            }}
+          >
+            Last 90 Days
+          </ActionButton>
+        </Stack>
+      </Paper>
     </LocalizationProvider>
   );
 };
 
 // Metrics Summary Component
 const MetricsSummary = ({ selectedRows }) => {
+  const theme = useTheme();
+  
   // Calculate totals and averages for selected rows
   const getTotals = () => {
     if (!selectedRows || selectedRows.length === 0) return null;
@@ -429,54 +798,90 @@ const MetricsSummary = ({ selectedRows }) => {
   
   if (!metrics) return null;
   
+  const metricItems = [
+    { 
+      title: 'Impressions', 
+      value: metrics.totals.impressions.toLocaleString(), 
+      icon: <VisibilityIcon />,
+      color: 'primary' 
+    },
+    { 
+      title: 'Clicks', 
+      value: metrics.totals.clicks.toLocaleString(), 
+      icon: <MouseIcon />,
+      color: 'secondary' 
+    },
+    { 
+      title: 'Conversions', 
+      value: metrics.totals.conversion.toLocaleString(), 
+      icon: <CheckCircleIcon />,
+      color: 'success' 
+    },
+    { 
+      title: 'CTR', 
+      value: `${metrics.averages.ctr.toFixed(2)}%`, 
+      icon: <TrendingUpIcon />,
+      color: 'info' 
+    },
+    { 
+      title: 'Revenue', 
+      value: `$${metrics.totals.total_revenue.toFixed(2)}`, 
+      icon: <AttachMoneyIcon />,
+      color: 'primary' 
+    },
+    { 
+      title: 'Cost', 
+      value: `$${metrics.totals.cost.toFixed(2)}`, 
+      icon: <AttachMoneyIcon />,
+      color: 'error' 
+    },
+    { 
+      title: 'Profit', 
+      value: `$${metrics.totals.profit.toFixed(2)}`, 
+      icon: <AttachMoneyIcon />,
+      color: 'success' 
+    },
+    { 
+      title: 'ROI', 
+      value: `${metrics.averages.roi.toFixed(2)}%`, 
+      icon: <ArrowUpwardIcon />,
+      color: metrics.averages.roi >= 0 ? 'success' : 'error' 
+    }
+  ];
+  
   return (
-    <Card variant="outlined" sx={{ mb: 2 }}>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Summary for {selectedRows.length} Selected Landers
-        </Typography>
-        
-        <Grid container spacing={2}>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Impressions</Typography>
-            <Typography variant="body1">{metrics.totals.impressions.toLocaleString()}</Typography>
+    <Box sx={{ mt: 3, mb: 3 }}>
+      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <PeopleIcon sx={{ mr: 1 }} />
+        Summary for {selectedRows.length} Selected Landers
+      </Typography>
+      
+      <Grid container spacing={2}>
+        {metricItems.map((metric, index) => (
+          <Grid item xs={6} md={3} key={index}>
+            <MetricCard color={metric.color}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {metric.title}
+                </Typography>
+                <MetricIcon color={metric.color}>
+                  {metric.icon}
+                </MetricIcon>
+              </Box>
+              <Typography variant="h4" fontWeight={600}>
+                {metric.value}
+              </Typography>
+            </MetricCard>
           </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Clicks</Typography>
-            <Typography variant="body1">{metrics.totals.clicks.toLocaleString()}</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Conversions</Typography>
-            <Typography variant="body1">{metrics.totals.conversion.toLocaleString()}</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">CTR</Typography>
-            <Typography variant="body1">{metrics.averages.ctr.toFixed(2)}%</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Revenue</Typography>
-            <Typography variant="body1">${metrics.totals.total_revenue.toFixed(2)}</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Cost</Typography>
-            <Typography variant="body1">${metrics.totals.cost.toFixed(2)}</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">Profit</Typography>
-            <Typography variant="body1">${metrics.totals.profit.toFixed(2)}</Typography>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Typography variant="subtitle2">ROI</Typography>
-            <Typography variant="body1">{metrics.averages.roi.toFixed(2)}%</Typography>
-          </Grid>
-        </Grid>
-      </CardContent>
-    </Card>
+        ))}
+      </Grid>
+    </Box>
   );
 };
 
 // Main page component
 const LandingPage = () => {
+  const theme = useTheme();
   const [landers, setLanders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -485,6 +890,7 @@ const LandingPage = () => {
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // 30 days ago
   const [endDate, setEndDate] = useState(new Date()); // Today
   const [selectionModel, setSelectionModel] = useState([]);
+  const [currentTab, setCurrentTab] = useState(0);
 
   const fetchLanders = async () => {
     setLoading(true);
@@ -663,6 +1069,10 @@ const LandingPage = () => {
     document.body.removeChild(link);
   };
 
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
   const macros = [
     '{sub1}', '{sub2}', '{sub3}', '{clickid}', '{campaignid}', '{campaignname}',
     '{sourceid}', '{country}', '{city}', '{ip}', '{timestamp}', '{useragent}',
@@ -685,28 +1095,54 @@ const LandingPage = () => {
             justifyContent="space-between"
             width="100%"
             sx={{
-              '&:hover .hover-icons': { visibility: 'visible' }
+              '&:hover .hover-icons': { opacity: 1 }
             }}
           >
-            <Typography variant="body2">{row.name}</Typography>
-            <Box className="hover-icons" display="flex" gap={1} visibility="hidden">
-              <EditIcon
-                fontSize="small"
-                sx={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditLander(row);
-                  setOpen(true);
-                }}
-              />
-              <ContentCopyIcon
-                fontSize="small"
-                sx={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(row.url);
-                }}
-              />
+            <Typography variant="body2" fontWeight={500}>{row.name}</Typography>
+            <Box 
+              className="hover-icons" 
+              display="flex" 
+              gap={0.5} 
+              opacity={0}
+              sx={{ transition: 'opacity 0.2s ease' }}
+            >
+              <Tooltip title="Edit Lander">
+                <IconButton
+                  size="small"
+                  sx={{ 
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.16),
+                    }
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditLander(row);
+                    setOpen(true);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Copy URL">
+                <IconButton
+                  size="small"
+                  sx={{ 
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.08),
+                    color: theme.palette.secondary.main,
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.secondary.main, 0.16),
+                    }
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(row.url);
+                  }}
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
           </Box>
         );
@@ -721,6 +1157,8 @@ const LandingPage = () => {
         return (
           <Typography
             variant="body2"
+            fontFamily="monospace"
+            fontSize="0.8125rem"
             sx={{
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -901,73 +1339,147 @@ const LandingPage = () => {
     }
   ];
 
+  const filteredLanders = currentTab === 0 
+    ? landers 
+    : currentTab === 1 
+      ? landers.filter(lander => lander.profit > 0) 
+      : landers.filter(lander => lander.profit <= 0);
+
   return (
     <Layout>
-      <Box p={3}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h5">Landers</Typography>
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4" fontWeight={600} gutterBottom>
+            Landers Management
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Create and manage your landing pages and track their performance
+          </Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Tabs 
+            value={currentTab} 
+            onChange={handleTabChange}
+            sx={{
+              '& .MuiTabs-indicator': {
+                height: 3,
+                borderTopLeftRadius: 3,
+                borderTopRightRadius: 3
+              }
+            }}
+          >
+            <Tab 
+              label={
+                <Badge badgeContent={landers.length} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
+                  <Typography variant="button" fontWeight={currentTab === 0 ? 600 : 400}>All Landers</Typography>
+                </Badge>
+              } 
+            />
+            <Tab 
+              label={
+                <Badge badgeContent={landers.filter(l => l.profit > 0).length} color="success" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
+                  <Typography variant="button" fontWeight={currentTab === 1 ? 600 : 400}>Profitable</Typography>
+                </Badge>
+              }
+            />
+            <Tab 
+              label={
+                <Badge badgeContent={landers.filter(l => l.profit <= 0).length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
+                  <Typography variant="button" fontWeight={currentTab === 2 ? 600 : 400}>Unprofitable</Typography>
+                </Badge>
+              }
+            />
+          </Tabs>
+          
           <Box display="flex" gap={2}>
-            <Button variant="contained" color="primary" onClick={handleOpen}>
-              + New Lander
-            </Button>
-            <Button 
+            <ActionButton 
               variant="outlined" 
               color="primary" 
               onClick={handleExportCSV}
               disabled={loading}
+              startIcon={<DownloadIcon />}
             >
               Export CSV
-            </Button>
+            </ActionButton>
+            <ActionButton 
+              variant="contained" 
+              color="primary" 
+              onClick={handleOpen}
+              startIcon={<AddIcon />}
+            >
+              New Lander
+            </ActionButton>
           </Box>
         </Box>
 
-        <Box mb={3}>
-          <DateRangeSelector 
-            startDate={startDate}
-            endDate={endDate}
-            onDateChange={handleDateChange}
-          />
-        </Box>
+        <DateRangeSelector 
+          startDate={startDate}
+          endDate={endDate}
+          onDateChange={handleDateChange}
+        />
 
         {selectedRows.length > 0 && (
           <MetricsSummary selectedRows={selectedRows} />
         )}
 
-        {loading ? (
-          <Box display="flex" justifyContent="center" my={5}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <DataGrid
-            rows={landers}
+        <Box sx={{ position: 'relative', mt: 3 }}>
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                zIndex: 10,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          )}
+          
+          <StyledDataGrid
+            rows={filteredLanders}
             columns={columns}
             autoHeight
-            pageSize={100}
-            rowsPerPageOptions={[25, 50, 100, 200, 500]}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50, 100]}
             checkboxSelection
             disableSelectionOnClick
             onRowClick={handleRowClick}
             selectionModel={selectionModel}
             onSelectionModelChange={handleSelectionModelChange}
-            sx={{
-              "& .MuiDataGrid-columnHeader": {
-                backgroundColor: "#f0f0f0",
-                fontWeight: "bold"
-              },
-              "& .MuiDataGrid-row:hover": {
-                backgroundColor: "#f1f1f1"
-              },
-              "& .MuiDataGrid-cell:focus-within": {
-                outline: "none !important"
-              }
-            }}
             initialState={{
               sorting: {
                 sortModel: [{ field: 'impressions', sort: 'desc' }],
               },
+              pagination: {
+                pageSize: 10,
+              },
+            }}
+            components={{
+              NoRowsOverlay: () => (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                  <DescriptionIcon sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.4, mb: 2 }} />
+                  <Typography variant="h6" sx={{ mb: 1 }}>No Landers Found</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Add your first lander to get started
+                  </Typography>
+                </Box>
+              ),
+            }}
+            sx={{
+              '.MuiDataGrid-row:hover .hover-icons': {
+                opacity: 1,
+              },
             }}
           />
-        )}
+        </Box>
       </Box>
 
       <LanderModal
