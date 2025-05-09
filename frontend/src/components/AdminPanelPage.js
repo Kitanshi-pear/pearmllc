@@ -112,6 +112,8 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import MenuIcon from "@mui/icons-material/Menu";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 // For data visualization
 import {
@@ -221,26 +223,27 @@ const StatusBadge = styled(Badge)(({ theme, status }) => {
   };
 });
 
-const CustomerStageChip = styled(Chip)(({ theme, stage }) => {
-  const getStageDetails = (stage) => {
-    switch (stage) {
-      case "Lead":
-        return { color: "info", icon: <PersonAddIcon fontSize="small" /> };
-      case "Qualified":
-        return { color: "success", icon: <CheckCircleIcon fontSize="small" /> };
-      case "Proposal":
-        return { color: "warning", icon: <DescriptionIcon fontSize="small" /> };
-      case "Negotiation":
-        return { color: "secondary", icon: <AttachMoneyIcon fontSize="small" /> };
-      case "Closed":
-        return { color: "primary", icon: <ShoppingCartIcon fontSize="small" /> };
-      case "Churned":
-        return { color: "error", icon: <DoDisturbIcon fontSize="small" /> };
-      default:
-        return { color: "default", icon: <InfoOutlinedIcon fontSize="small" /> };
-    }
-  };
+// Helper function to get stage details
+const getStageDetails = (stage) => {
+  switch (stage) {
+    case "Lead":
+      return { color: "info", icon: <PersonAddIcon fontSize="small" /> };
+    case "Qualified":
+      return { color: "success", icon: <CheckCircleIcon fontSize="small" /> };
+    case "Proposal":
+      return { color: "warning", icon: <DescriptionIcon fontSize="small" /> };
+    case "Negotiation":
+      return { color: "secondary", icon: <AttachMoneyIcon fontSize="small" /> };
+    case "Closed":
+      return { color: "primary", icon: <ShoppingCartIcon fontSize="small" /> };
+    case "Churned":
+      return { color: "error", icon: <DoDisturbIcon fontSize="small" /> };
+    default:
+      return { color: "default", icon: <InfoOutlinedIcon fontSize="small" /> };
+  }
+};
 
+const CustomerStageChip = styled(Chip)(({ theme, stage }) => {
   const { color, icon } = getStageDetails(stage);
 
   return {
@@ -293,7 +296,7 @@ const StyledTableHeadCell = styled(StyledTableCell)(({ theme }) => ({
   backgroundColor: alpha(theme.palette.primary.main, 0.02),
   fontWeight: 600,
   color: theme.palette.text.primary,
-  padding: theme.spacing(1.5, a2),
+  padding: theme.spacing(1.5, 2),
   position: "relative",
   "&:after": {
     content: '""',
