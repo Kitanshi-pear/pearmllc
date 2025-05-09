@@ -1,66 +1,178 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './AdminPanel.css';
-import { useAuth } from './AuthContext'; // Use your existing AuthContext
 
 // API base URL
-const API_URL = 'https://pearmllc.onrender.com/api/auth';
+const API_URL = 'https://pearmllc.onrender.com';
 
-// Sidebar Component
-function Sidebar() {
-  const { logout, user } = useAuth();
-  const navigate = useNavigate();
+// Set up axios with token interceptor
+const setupAxiosInterceptors = (token) => {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.role === 'manager';
-  const isAdminOrManager = isAdmin || isManager;
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  );
+};
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
+// Auth Context for managing user state
+const AuthContext = React.createContext();
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (token) {
+      setupAxiosInterceptors(token);
+    }
+  }, [token]);
+
+  const login = async (email, password) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const { token, ...userData } = response.data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      setUser(userData);
+      setToken(token);
+      setupAxiosInterceptors(token);
+      
+      return userData;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const logout = async () => {
+    try {
+      await axios.post(`${API_URL}/auth/logout`);
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      setToken(null);
+      axios.defaults.headers.common['Authorization'] = '';
+    }
+  };
 
-  return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <h1>Admin Panel</h1>
-      </div>
-      <nav className="sidebar-nav">
-        <ul>
-          <li>
-            <Link to="/admin">Admin Dashboard</Link>
-          </li>
-          <li>
-            <Link to="/admin/users">User Management</Link>
-          </li>
-          <li>
-            <Link to="/admin/roles">Role Management</Link>
-          </li>
-          <li>
-            <Link to="/admin/activity">Activity Logs</Link>
-          </li>
-          <li>
-            <Link to="/dashboard">Back to Main Dashboard</Link>
-          </li>
-        </ul>
-      </nav>
-      <div className="sidebar-footer">
-        <button className="logout-button" onClick={handleLogout}>
-          Logout
-        </button>
-      </div>
-    </div>
-  );
+  const checkTokenValidity = async () => {
+    if (!token) return false;
+    
+    try {
+      const response = await axios.get(`${API_URL}/auth/validate-token`);
+      return response.data.valid;
+    } catch (err) {
+      logout();
+      return false;
+    }
+  };
+
+  const value = {
+    user,
+    token,
+    loading,
+    error,
+    login,
+    logout,
+    checkTokenValidity,
+    isAdmin: user?.role === 'admin',
+    isManager: user?.role === 'manager',
+    isAdminOrManager: user?.role === 'admin' || user?.role === 'manager'
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Main Layout Component
-function Layout({ children }) {
+// Custom hook for using auth context
+function useAuth() {
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+// Protected Route Component
+function ProtectedRoute({ children, allowedRoles = [] }) {
+  const { user, token } = useAuth();
+  
+  if (!token || !user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" />;
+  }
+  
+  return children;
+}
+
+// Login Component
+function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login, loading, error } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      // Error is handled in the auth context
+    }
+  };
+
   return (
-    <div className="admin-layout">
-      <Sidebar />
-      <div className="content-container">{children}</div>
+    <div className="login-container">
+      <div className="login-card">
+        <h2>Admin Login</h2>
+        <form onSubmit={handleSubmit}>
+          {error && <div className="error-message">{error}</div>}
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -168,8 +280,7 @@ function UserManagement() {
   });
   const [editMode, setEditMode] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { isAdmin } = useAuth();
 
   const fetchUsers = async () => {
     try {
@@ -211,17 +322,11 @@ function UserManagement() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      console.log('Creating user with data:', userForm);
-      console.log('API URL:', `${API_URL}/auth/signup`);
-      
-      const response = await axios.post(`${API_URL}/auth/signup`, userForm);
-      console.log('Signup response:', response.data);
-      
+      await axios.post(`${API_URL}/auth/signup`, userForm);
       fetchUsers();
       setModalOpen(false);
       resetForm();
     } catch (err) {
-      console.error('Signup error:', err.response?.data || err.message);
       setError(err.response?.data?.error || 'Failed to create user');
     }
   };
@@ -401,8 +506,7 @@ function RoleManagement() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { isAdmin } = useAuth();
 
   const fetchRoles = async () => {
     try {
@@ -728,27 +832,114 @@ function Unauthorized() {
   );
 }
 
-// Main AdminPanel Component
-function AdminPanelPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.role === 'manager';
-  const isAdminOrManager = isAdmin || isManager;
+// Sidebar Component
+function Sidebar() {
+  const { logout, isAdmin, isManager, isAdminOrManager } = useAuth();
+  const navigate = useNavigate();
 
-  if (!isAdminOrManager) {
-    return <Navigate to="/dashboard" />;
-  }
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/users" element={<UserManagement />} />
-        <Route path="/roles" element={<RoleManagement />} />
-        <Route path="/activity" element={<ActivityLogs />} />
-        <Route path="*" element={<Navigate to="/admin" />} />
-      </Routes>
-    </Layout>
+    <div className="sidebar">
+      <div className="sidebar-header">
+        <h1>Admin Panel</h1>
+      </div>
+      <nav className="sidebar-nav">
+        <ul>
+          {isAdminOrManager && (
+            <li>
+              <Link to="/dashboard">Dashboard</Link>
+            </li>
+          )}
+          {isAdminOrManager && (
+            <li>
+              <Link to="/users">User Management</Link>
+            </li>
+          )}
+          {isAdminOrManager && (
+            <li>
+              <Link to="/roles">Role Management</Link>
+            </li>
+          )}
+          {isAdminOrManager && (
+            <li>
+              <Link to="/activity">Activity Logs</Link>
+            </li>
+          )}
+        </ul>
+      </nav>
+      <div className="sidebar-footer">
+        <button className="logout-button" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Main Layout Component
+function Layout({ children }) {
+  const { user } = useAuth();
+  
+  if (!user) return children;
+  
+  return (
+    <div className="admin-layout">
+      <Sidebar />
+      <div className="content-container">{children}</div>
+    </div>
+  );
+}
+
+// Main AdminPanel Component
+function AdminPanelPage() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/users" 
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <UserManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/roles" 
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <RoleManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/activity" 
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <ActivityLogs />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route path="*" element={<Navigate to="/dashboard" />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </AuthProvider>
   );
 }
 
