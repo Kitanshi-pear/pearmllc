@@ -533,9 +533,7 @@ const OffersPage = () => {
                             <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3, textAlign: 'center' }}>
                                 {params.value}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
-                                ID: {params.row.id}
-                            </Typography>
+        
                         </Box>
                     </Box>
                 </CenteredCellContainer>
