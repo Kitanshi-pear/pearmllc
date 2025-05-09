@@ -1346,7 +1346,7 @@ const LandingPage = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: { xs: 2, md: 3 } }}>
+      <Box >
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" fontWeight={600} gutterBottom>
             Landers Management
@@ -1377,7 +1377,7 @@ const LandingPage = () => {
               />
           </Tabs>
           
-          <Box display="flex" gap={2}>
+          <Box display="flex" gap={1}>
             <ActionButton 
               variant="outlined" 
               color="primary" 
