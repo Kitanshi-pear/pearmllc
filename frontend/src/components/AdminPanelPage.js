@@ -21,9 +21,6 @@ function Sidebar() {
     navigate('/');
   };
 
-  if (!isAdminOrManager) {
-    return <Navigate to="/dashboard" />;
-  }
 
   return (
     <div className="sidebar">
