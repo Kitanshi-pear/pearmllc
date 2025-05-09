@@ -81,6 +81,8 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
         const sessionToken = Buffer.from(`fb_${userId}`).toString('base64');
 
+        console.log("🔹 Facebook User Info:", userResponse.data);
+
         // Respond with script to save token and close popup
         res.send(`
             <script>
@@ -215,6 +217,8 @@ router.get('/auth/google/callback', async (req, res) => {
 
         // Create a session token
         const sessionToken = Buffer.from(`google_${userId}`).toString('base64');
+
+        console.log("🔹 Google User Info:", userInfo.data);
 
         // Return pure JavaScript to handle successful authentication
         res.send(`
